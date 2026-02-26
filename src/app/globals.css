@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #FAF8F5;
+  --foreground: #1A1A1A;
+  --primary: #D0021B;
+  --primary-hover: #A00016;
+  --gold: #C8A35F;
+  --base: #FAF8F5;
+  --charcoal: #1A1A1A;
+  --secondary: #555555;
+  --divider: #EEEEEE;
+  --card-bg: #FFFFFF;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-inter), Inter, Poppins, Helvetica, sans-serif;
+  line-height: 1.6;
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-primary text-white px-[26px] py-3 rounded-button font-semibold;
+    transition: all 0.3s ease;
+  }
+  .btn-primary:hover {
+    @apply bg-primary-hover;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(208, 2, 27, 0.3);
+  }
+  .btn-secondary {
+    @apply bg-transparent border-2 border-primary text-primary px-[26px] py-3 rounded-button font-semibold;
+    transition: all 0.3s ease;
+  }
+  .btn-secondary:hover {
+    @apply bg-primary text-white;
+  }
+  .badge-offer {
+    @apply bg-[#FFF7F7] text-primary border border-[#E6E6E6] rounded-badge px-2 py-1 text-sm;
+  }
+  .badge-premium {
+    @apply bg-base text-gold border border-gold rounded-badge px-2 py-1 text-sm;
+  }
+  .card {
+    @apply bg-white rounded-card shadow-card p-6;
+    transition: all 0.3s ease;
+  }
+  .card:hover {
+    @apply shadow-card-hover;
+    transform: translateY(-2px);
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
