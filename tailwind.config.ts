@@ -21,16 +21,21 @@ const config: Config = {
         secondary: "#555555",
       },
       fontFamily: {
-        sans: ["var(--font-inter)", "Inter", "Poppins", "Helvetica", "sans-serif"],
+        sans: ["var(--font-sans)", "Inter", "system-ui", "sans-serif"],
+        serif: ["var(--font-serif)", "Georgia", "serif"],
       },
       boxShadow: {
         card: "0 1px 3px rgba(0,0,0,0.08)",
         "card-hover": "0 4px 12px rgba(0,0,0,0.12)",
       },
       borderRadius: {
-        button: "6px",
-        badge: "5px",
-        card: "10px",
+        button: "8px",
+        badge: "6px",
+        card: "16px",
+        bento: "20px",
+      },
+      gridTemplateColumns: {
+        bento: "repeat(6, 1fr)",
       },
     },
   },

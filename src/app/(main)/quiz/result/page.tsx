@@ -47,52 +47,65 @@ function ResultContent() {
 
   if (status !== "shown") {
     return (
-      <div className="py-16 px-4 sm:px-6">
-        <div className="max-w-[500px] mx-auto">
-          <h1 className="text-2xl font-bold text-charcoal mb-2">See Your Results</h1>
-          <p className="text-secondary mb-6">
-            Enter your email to see your recommended level and bundle.
-          </p>
-          <form onSubmit={handleEmailSubmit} className="space-y-4">
-            <input
-              type="email"
-              placeholder="your@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="w-full px-4 py-3 border border-[var(--divider)] rounded-button text-charcoal"
-            />
-            <button type="submit" className="btn-primary w-full" disabled={status === "loading"}>
-              {status === "loading" ? "Loading..." : "Show My Results"}
-            </button>
-            {status === "error" && (
-              <p className="text-primary text-sm">Something went wrong. Try again.</p>
-            )}
-          </form>
+      <div className="py-12 sm:py-16 px-4 sm:px-6">
+        <div className="max-w-[1200px] mx-auto">
+          <div className="bento-grid">
+            <div className="bento-span-4 card">
+              <h1 className="font-heading text-2xl font-bold text-charcoal mb-2">See Your Results</h1>
+              <p className="text-secondary mb-6">
+                Enter your email to see your recommended level and bundle.
+              </p>
+              <form onSubmit={handleEmailSubmit} className="space-y-4">
+                <input
+                  type="email"
+                  placeholder="your@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="w-full px-4 py-3 border-2 border-[var(--divider)] rounded-bento text-charcoal focus:border-primary focus:outline-none transition"
+                />
+                <button type="submit" className="btn-primary w-full" disabled={status === "loading"}>
+                  {status === "loading" ? "Loading..." : "Show My Results"}
+                </button>
+                {status === "error" && (
+                  <p className="text-primary text-sm">Something went wrong. Try again.</p>
+                )}
+              </form>
+            </div>
+            <div className="bento-span-2 card flex flex-col justify-center bg-base border-[var(--divider)]">
+              <p className="text-secondary text-sm">We&apos;ll also add you to our newsletter for JLPT tips.</p>
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="py-16 px-4 sm:px-6">
-      <div className="max-w-[600px] mx-auto">
-        <h1 className="text-3xl font-bold text-charcoal mb-2">
-          Your Level: {recommendation.level}
-        </h1>
-        <p className="text-secondary mb-6">
-          You scored {score} out of {total}.
-        </p>
-        <div className="bg-base rounded-card p-6 border border-[var(--divider)] mb-6">
-          <h2 className="text-xl font-bold text-charcoal mb-2">Recommended: {recommendation.productName}</h2>
-          <p className="text-secondary mb-4">{recommendation.why}</p>
-          <Link href={`/product/${recommendation.productSlug}`} className="btn-primary inline-block">
-            Get the Bundle
-          </Link>
+    <div className="py-12 sm:py-16 px-4 sm:px-6">
+      <div className="max-w-[1200px] mx-auto">
+        <div className="bento-grid">
+          <div className="bento-span-4 bento-row-2 card">
+            <h1 className="font-heading text-3xl font-bold text-charcoal mb-2">
+              Your Level: {recommendation.level}
+            </h1>
+            <p className="text-secondary mb-6">
+              You scored {score} out of {total}.
+            </p>
+            <div className="space-y-4 mb-6">
+              <h2 className="font-heading text-xl font-bold text-charcoal">Recommended: {recommendation.productName}</h2>
+              <p className="text-secondary">{recommendation.why}</p>
+            </div>
+            <Link href={`/product/${recommendation.productSlug}`} className="btn-primary inline-block">
+              Get the Bundle
+            </Link>
+          </div>
+          <div className="bento-span-2 card flex flex-col justify-center bg-base border-[var(--divider)]">
+            <Link href="/store" className="text-primary font-medium hover:underline">
+              Browse all bundles →
+            </Link>
+          </div>
         </div>
-        <Link href="/store" className="text-primary font-medium hover:underline">
-          Browse all bundles →
-        </Link>
       </div>
     </div>
   );

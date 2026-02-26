@@ -18,11 +18,24 @@
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: var(--font-inter), Inter, Poppins, Helvetica, sans-serif;
+  font-family: var(--font-sans), Inter, system-ui, sans-serif;
   line-height: 1.6;
 }
 
+/* Subtle paper texture overlay */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9999;
+}
+
 @layer components {
+  .font-heading {
+    font-family: var(--font-serif), Georgia, serif;
+  }
   .btn-primary {
     @apply bg-primary text-white px-[26px] py-3 rounded-button font-semibold;
     transition: all 0.3s ease;
@@ -40,18 +53,45 @@ body {
     @apply bg-primary text-white;
   }
   .badge-offer {
-    @apply bg-[#FFF7F7] text-primary border border-[#E6E6E6] rounded-badge px-2 py-1 text-sm;
+    @apply bg-[#FFF7F7] text-primary border border-[#E6E6E6] rounded-badge px-2 py-1 text-xs font-medium uppercase tracking-wider;
   }
   .badge-premium {
-    @apply bg-base text-gold border border-gold rounded-badge px-2 py-1 text-sm;
+    @apply bg-base text-gold border border-gold rounded-badge px-2 py-1 text-xs font-medium uppercase tracking-wider;
   }
   .card {
-    @apply bg-white rounded-card shadow-card p-6;
+    @apply bg-white rounded-bento shadow-card p-6;
     transition: all 0.3s ease;
+    border: 1px solid rgba(0,0,0,0.04);
   }
   .card:hover {
     @apply shadow-card-hover;
     transform: translateY(-2px);
+  }
+  .bento-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 1rem;
+    grid-auto-rows: minmax(140px, auto);
+  }
+  .bento-span-2 { grid-column: span 2; }
+  .bento-span-3 { grid-column: span 3; }
+  .bento-span-4 { grid-column: span 4; }
+  .bento-span-6 { grid-column: span 6; }
+  .bento-row-2 { grid-row: span 2; }
+  .bento-row-3 { grid-row: span 3; }
+  @media (max-width: 768px) {
+    .bento-grid { grid-template-columns: 1fr; }
+    .bento-span-2, .bento-span-3, .bento-span-4, .bento-span-6 { grid-column: span 1; }
+    .bento-row-2, .bento-row-3 { grid-row: span 1; }
+  }
+  .section-divider {
+    @apply bg-base rounded-bento p-8 border border-[var(--divider)];
+  }
+  .page-title {
+    @apply font-heading text-3xl sm:text-4xl font-bold text-charcoal mb-2;
+  }
+  .page-subtitle {
+    @apply text-secondary text-lg max-w-2xl;
   }
 }
 

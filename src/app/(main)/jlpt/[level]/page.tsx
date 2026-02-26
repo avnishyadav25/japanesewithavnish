@@ -9,6 +9,13 @@ const LEVEL_NAMES: Record<string, string> = {
   n2: "N2 — Upper Intermediate",
   n1: "N1 — Advanced",
 };
+const LEVEL_SLUGS: Record<string, string> = {
+  n5: "n5-mastery-bundle",
+  n4: "n4-upgrade-bundle",
+  n3: "n3-power-bundle",
+  n2: "n2-pro-bundle",
+  n1: "n1-elite-bundle",
+};
 
 export async function generateStaticParams() {
   return LEVELS.map((level) => ({ level }));
@@ -23,8 +30,8 @@ export default async function JLPTLevelPage({ params }: { params: Promise<{ leve
   }
 
   return (
-    <div className="py-16 px-4 sm:px-6">
-      <div className="max-w-[1100px] mx-auto">
+    <div className="py-12 sm:py-16 px-4 sm:px-6">
+      <div className="max-w-[1200px] mx-auto">
         <nav className="text-sm text-secondary mb-8">
           <Link href="/" className="hover:text-primary">Home</Link>
           <span className="mx-2">/</span>
@@ -33,40 +40,42 @@ export default async function JLPTLevelPage({ params }: { params: Promise<{ leve
           <span className="text-charcoal">{LEVEL_NAMES[normalized]}</span>
         </nav>
 
-        <h1 className="text-3xl font-bold text-charcoal mb-4">
-          {LEVEL_NAMES[normalized]}
-        </h1>
-        <p className="text-secondary mb-8 max-w-2xl">
-          Master the {normalized.toUpperCase()} level with our comprehensive bundle. Includes grammar, vocabulary, kanji, and practice materials.
-        </p>
-
-        <div className="flex flex-wrap gap-4 mb-12">
-          {LEVELS.map((l) => (
-            <Link
-              key={l}
-              href={`/jlpt/${l}`}
-              className={`px-4 py-2 rounded-button font-medium transition ${
-                l === normalized
-                  ? "bg-primary text-white"
-                  : "bg-white border border-[var(--divider)] text-secondary hover:border-primary hover:text-primary"
-              }`}
-            >
-              {l.toUpperCase()}
+        <div className="bento-grid">
+          <div className="bento-span-4 card">
+            <h1 className="font-heading text-3xl font-bold text-charcoal mb-4">
+              {LEVEL_NAMES[normalized]}
+            </h1>
+            <p className="text-secondary mb-6">
+              Master the {normalized.toUpperCase()} level with our comprehensive bundle. Includes grammar, vocabulary, kanji, and practice materials.
+            </p>
+            <div className="flex flex-wrap gap-3 mb-6">
+              {LEVELS.map((l) => (
+                <Link
+                  key={l}
+                  href={`/jlpt/${l}`}
+                  className={`px-4 py-2 rounded-bento font-medium transition ${
+                    l === normalized
+                      ? "bg-primary text-white"
+                      : "bg-base border border-[var(--divider)] text-secondary hover:border-primary hover:text-primary"
+                  }`}
+                >
+                  {l.toUpperCase()}
+                </Link>
+              ))}
+            </div>
+            <Link href={`/product/${LEVEL_SLUGS[normalized]}`} className="btn-primary">
+              Get the {normalized.toUpperCase()} Bundle
             </Link>
-          ))}
-        </div>
-
-        <div className="bg-white rounded-card p-8 border border-[var(--divider)]">
-          <h2 className="text-xl font-bold text-charcoal mb-4">What You&apos;ll Learn</h2>
-          <ul className="list-disc list-inside text-secondary space-y-2 mb-8">
-            <li>Essential grammar patterns for {normalized.toUpperCase()}</li>
-            <li>Core vocabulary and kanji</li>
-            <li>Reading and listening practice</li>
-            <li>Sample questions and mock tests</li>
-          </ul>
-          <Link href={`/product/${normalized}-bundle`} className="btn-primary">
-            Get the {normalized.toUpperCase()} Bundle
-          </Link>
+          </div>
+          <div className="bento-span-2 bento-row-2 card flex flex-col justify-center bg-base border-[var(--divider)]">
+            <h2 className="font-heading text-lg font-bold text-charcoal mb-4">What You&apos;ll Learn</h2>
+            <ul className="list-disc list-inside text-secondary text-sm space-y-2">
+              <li>Essential grammar for {normalized.toUpperCase()}</li>
+              <li>Core vocabulary and kanji</li>
+              <li>Reading and listening practice</li>
+              <li>Sample questions and mock tests</li>
+            </ul>
+          </div>
         </div>
       </div>
     </div>

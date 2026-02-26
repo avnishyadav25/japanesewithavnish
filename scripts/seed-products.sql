@@ -9,3 +9,8 @@ INSERT INTO products (slug, name, description, price_paise, compare_price_paise,
 ('n1-elite-bundle', 'N1 Elite Bundle', 'Advanced JLPT N1', 59900, NULL, 'N1', 'premium', 'N2 passers going for N1', '["Master grammar", "Academic vocab", "Full mock tests", "Answer keys"]', 'Achieve N1 mastery', 'All digital purchases are final. No refunds.', 5, false),
 ('mega-bundle', 'Complete N5–N1 Mega Bundle', 'Everything from N5 to N1 + roadmap + 10 years papers', 89900, 199600, NULL, 'premium', 'Serious learners who want it all', '["All level bundles", "Study roadmap", "10 years past papers", "Lifetime access"]', 'Complete JLPT journey in one bundle', 'All digital purchases are final. No refunds.', 6, true)
 ON CONFLICT (slug) DO NOTHING;
+
+-- Sample coupon: 10% off (discount_type: percent, discount_value: 10)
+INSERT INTO coupons (code, discount_type, discount_value, max_uses) VALUES
+('WELCOME10', 'percent', 10, 100)
+ON CONFLICT (code) DO NOTHING;

@@ -49,8 +49,14 @@ export default function QuizPage() {
 
   if (loading) {
     return (
-      <div className="py-24 px-4 text-center">
-        <p className="text-secondary">Loading quiz...</p>
+      <div className="py-24 px-4">
+        <div className="max-w-[1200px] mx-auto">
+          <div className="bento-grid">
+            <div className="bento-span-6 card p-12 text-center">
+              <p className="text-secondary">Loading quiz...</p>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -58,13 +64,18 @@ export default function QuizPage() {
   const q = questions[currentIndex];
   if (!q) {
     return (
-      <div className="py-24 px-4 text-center">
-        <p className="text-secondary">No questions available.</p>
+      <div className="py-24 px-4">
+        <div className="bento-grid">
+          <div className="bento-span-6 card p-12 text-center">
+            <p className="text-secondary">No questions available.</p>
+          </div>
+        </div>
       </div>
     );
   }
 
   const options = Array.isArray(q.options) ? q.options : [];
+  const progress = ((currentIndex + 1) / questions.length) * 100;
 
   function handleAnswer(optionIndex: number) {
     const next = { ...answers, [currentIndex]: optionIndex };
@@ -80,24 +91,33 @@ export default function QuizPage() {
   }
 
   return (
-    <div className="py-16 px-4 sm:px-6">
-      <div className="max-w-[600px] mx-auto">
-        <p className="text-secondary text-sm mb-4">
-          Question {currentIndex + 1} of {questions.length}
-        </p>
-        <h2 className="text-xl font-bold text-charcoal mb-8">{q.question_text}</h2>
-        <ul className="space-y-3">
-          {options.map((opt, i) => (
-            <li key={i}>
-              <button
-                onClick={() => handleAnswer(i)}
-                className="w-full text-left px-4 py-3 rounded-card border border-[var(--divider)] hover:border-primary hover:bg-[#FFF7F7] transition"
-              >
-                {opt}
-              </button>
-            </li>
-          ))}
-        </ul>
+    <div className="py-12 sm:py-16 px-4 sm:px-6">
+      <div className="max-w-[1200px] mx-auto">
+        <div className="bento-grid">
+          <div className="bento-span-6 card">
+            <div className="h-1.5 bg-[var(--divider)] rounded-full mb-6 overflow-hidden">
+              <div
+                className="h-full bg-primary rounded-full transition-all duration-300"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <p className="text-secondary text-sm mb-4">
+              Question {currentIndex + 1} of {questions.length}
+            </p>
+            <h2 className="font-heading text-2xl font-bold text-charcoal mb-8">{q.question_text}</h2>
+            <div className="grid sm:grid-cols-2 gap-3">
+              {options.map((opt, i) => (
+                <button
+                  key={i}
+                  onClick={() => handleAnswer(i)}
+                  className="text-left px-5 py-4 rounded-bento border-2 border-[var(--divider)] hover:border-primary hover:bg-[#FFF7F7] transition-all"
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

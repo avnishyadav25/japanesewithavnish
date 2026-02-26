@@ -18,6 +18,11 @@ A premium Japanese learning site with digital bundles, placement quiz, and blog.
 - Admin panel for products, orders, quiz, newsletter
 - Policies: Privacy, Terms, Refunds (no refunds)
 
+## Docs
+
+- **[Setup & Operations Guide](docs/GUIDE.md)** — Env vars, DB setup, common issues, deployment
+- **[Phase Completion](docs/PHASES.md)** — Checklist for all 7 phases
+
 ## Local Setup
 
 ### Prerequisites

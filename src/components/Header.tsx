@@ -10,9 +10,12 @@ const navLinks = [
 
 export function Header() {
   return (
-    <header className="sticky top-0 z-50 bg-base/95 backdrop-blur border-b border-[var(--divider)]">
+    <header className="sticky top-0 z-50 bg-base/98 backdrop-blur-sm border-b border-[var(--divider)]">
       <div className="max-w-[1100px] mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
-        <Link href="/" className="text-xl font-bold text-charcoal hover:text-primary transition">
+        <Link
+          href="/"
+          className="font-heading text-xl font-bold text-charcoal hover:text-primary transition-colors"
+        >
           Japanese with Avnish
         </Link>
         <nav className="hidden md:flex items-center gap-8">
@@ -20,12 +23,15 @@ export function Header() {
             <Link
               key={link.href}
               href={link.href}
-              className="text-secondary hover:text-primary font-medium transition"
+              className="text-secondary hover:text-primary font-medium text-sm transition-colors"
             >
               {link.label}
             </Link>
           ))}
-          <Link href="/login" className="btn-secondary text-sm py-2 px-4">
+          <Link
+            href="/login"
+            className="btn-secondary text-sm py-2 px-4"
+          >
             My Library
           </Link>
         </nav>

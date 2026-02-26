@@ -3,76 +3,51 @@ import Link from "next/link";
 export default function HomePage() {
   return (
     <div>
-      <section className="py-16 sm:py-24 px-4 sm:px-6">
-        <div className="max-w-[1100px] mx-auto text-center">
-          <h1 className="text-3xl sm:text-4xl font-bold text-charcoal mb-4">
-            Learn Japanese the Right Way
-          </h1>
-          <p className="text-xl text-secondary max-w-2xl mx-auto mb-8">
-            Premium JLPT resources from N5 to N1. Structured bundles, placement quiz, and lessons to help you pass.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/quiz" className="btn-primary text-center">
-              Take the Placement Quiz
-            </Link>
-            <Link href="/store" className="btn-secondary text-center">
-              Browse Bundles
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      <section className="py-16 bg-white border-y border-[var(--divider)]">
-        <div className="max-w-[1100px] mx-auto px-4 sm:px-6">
-          <h2 className="text-2xl font-bold text-charcoal mb-8 text-center">
-            Start Your Journey
-          </h2>
-          <div className="grid sm:grid-cols-3 gap-8">
-            <div className="text-center">
-              <div className="text-4xl font-bold text-primary mb-2">1</div>
-              <h3 className="font-bold text-charcoal mb-2">Take the Quiz</h3>
-              <p className="text-secondary text-sm">
-                Find your level in 5 minutes. Get a personalized bundle recommendation.
-              </p>
-              <Link href="/quiz" className="text-primary font-medium text-sm mt-2 inline-block hover:underline">
-                Start Quiz →
-              </Link>
+      <section className="py-12 sm:py-20 px-4 sm:px-6">
+        <div className="max-w-[1200px] mx-auto">
+          <div className="bento-grid">
+            <div className="bento-span-4 bento-row-2 card flex flex-col justify-between bg-primary text-white border-0">
+              <div>
+                <h1 className="font-heading text-3xl sm:text-4xl font-bold mb-4">
+                  Learn Japanese the Right Way
+                </h1>
+                <p className="text-white/90 text-lg max-w-md">
+                  Premium JLPT resources from N5 to N1. Structured bundles, placement quiz, and lessons.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-3 mt-6">
+                <Link href="/quiz" className="bg-white text-primary px-6 py-3 rounded-button font-semibold hover:bg-white/90 transition">
+                  Take the Quiz
+                </Link>
+                <Link href="/store" className="border-2 border-white/80 text-white px-6 py-3 rounded-button font-semibold hover:bg-white/10 transition">
+                  Browse Bundles
+                </Link>
+              </div>
             </div>
-            <div className="text-center">
-              <div className="text-4xl font-bold text-primary mb-2">2</div>
-              <h3 className="font-bold text-charcoal mb-2">Get Your Bundle</h3>
-              <p className="text-secondary text-sm">
-                PDFs, audio, and resources tailored to your level. Instant access.
-              </p>
-              <Link href="/store" className="text-primary font-medium text-sm mt-2 inline-block hover:underline">
-                View Store →
-              </Link>
+            <div className="bento-span-2 bento-row-2 card flex flex-col justify-center items-center text-center bg-base border-[var(--divider)]">
+              <span className="text-5xl font-bold text-primary mb-2">1</span>
+              <h3 className="font-heading font-bold text-charcoal mb-1">Quiz</h3>
+              <p className="text-secondary text-sm mb-4">Find your level</p>
+              <Link href="/quiz" className="text-primary text-sm font-medium hover:underline">Start →</Link>
             </div>
-            <div className="text-center">
-              <div className="text-4xl font-bold text-primary mb-2">3</div>
-              <h3 className="font-bold text-charcoal mb-2">Study & Pass</h3>
-              <p className="text-secondary text-sm">
-                Access your library anytime. Download and study offline.
-              </p>
-              <Link href="/login" className="text-primary font-medium text-sm mt-2 inline-block hover:underline">
-                My Library →
-              </Link>
+            <div className="bento-span-2 bento-row-2 card flex flex-col justify-center items-center text-center bg-base border-[var(--divider)]">
+              <span className="text-5xl font-bold text-primary mb-2">2</span>
+              <h3 className="font-heading font-bold text-charcoal mb-1">Bundle</h3>
+              <p className="text-secondary text-sm mb-4">Get resources</p>
+              <Link href="/store" className="text-primary text-sm font-medium hover:underline">Store →</Link>
+            </div>
+            <div className="bento-span-2 bento-row-2 card flex flex-col justify-center items-center text-center bg-base border-[var(--divider)]">
+              <span className="text-5xl font-bold text-primary mb-2">3</span>
+              <h3 className="font-heading font-bold text-charcoal mb-1">Library</h3>
+              <p className="text-secondary text-sm mb-4">Study offline</p>
+              <Link href="/login" className="text-primary text-sm font-medium hover:underline">Login →</Link>
+            </div>
+            <div className="bento-span-4 card flex flex-col justify-center bg-white">
+              <h2 className="font-heading text-xl font-bold text-charcoal mb-2">JLPT N5 to N1</h2>
+              <p className="text-secondary text-sm mb-4">Complete coverage. Grammar, vocabulary, kanji.</p>
+              <Link href="/jlpt/n5" className="btn-primary inline-block w-fit">Explore Levels</Link>
             </div>
           </div>
-        </div>
-      </section>
-
-      <section className="py-16 px-4 sm:px-6">
-        <div className="max-w-[1100px] mx-auto text-center">
-          <h2 className="text-2xl font-bold text-charcoal mb-4">
-            JLPT N5 to N1 — Complete Coverage
-          </h2>
-          <p className="text-secondary mb-8 max-w-xl mx-auto">
-            From beginner to advanced. Each bundle includes grammar, vocabulary, kanji, and practice materials.
-          </p>
-          <Link href="/jlpt/n5" className="btn-primary">
-            Explore JLPT Levels
-          </Link>
         </div>
       </section>
     </div>
