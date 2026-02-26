@@ -5,11 +5,11 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 const THRESHOLDS = [
-  { level: "N5", minScore: 0, productSlug: "n5-mastery-bundle", productName: "N5 Mastery Bundle", why: "You're just starting. The N5 bundle will give you a solid foundation." },
-  { level: "N4", minScore: 3, productSlug: "n4-upgrade-bundle", productName: "N4 Upgrade Bundle", why: "You have basics. N4 will take you to elementary level." },
-  { level: "N3", minScore: 5, productSlug: "n3-power-bundle", productName: "N3 Power Bundle", why: "You're intermediate. N3 bridges to upper levels." },
-  { level: "N2", minScore: 7, productSlug: "n2-pro-bundle", productName: "N2 Pro Bundle", why: "You're upper intermediate. N2 prepares for advanced." },
-  { level: "N1", minScore: 9, productSlug: "n1-elite-bundle", productName: "N1 Elite Bundle", why: "You're advanced. N1 is the final stretch." },
+  { level: "N5", minScore: 0, productSlug: "japanese-n5-mastery-bundle", productName: "Japanese N5 Mastery Bundle", why: "You're just starting. The N5 bundle will give you a solid foundation." },
+  { level: "N4", minScore: 3, productSlug: "japanese-n4-upgrade-bundle", productName: "Japanese N4 Upgrade Bundle", why: "You have basics. N4 will take you to elementary level." },
+  { level: "N3", minScore: 5, productSlug: "japanese-n3-power-bundle", productName: "Japanese N3 Power Bundle", why: "You're intermediate. N3 bridges to upper levels." },
+  { level: "N2", minScore: 7, productSlug: "japanese-n2-pro-bundle", productName: "Japanese N2 Pro Bundle", why: "You're upper intermediate. N2 prepares for advanced." },
+  { level: "N1", minScore: 9, productSlug: "japanese-n1-elite-bundle", productName: "Japanese N1 Elite Bundle", why: "You're advanced. N1 is the final stretch." },
 ];
 
 function ResultContent() {

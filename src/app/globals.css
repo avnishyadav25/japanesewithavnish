@@ -67,6 +67,13 @@ body::before {
     @apply shadow-card-hover;
     transform: translateY(-2px);
   }
+  .card-content {
+    @apply bg-white rounded-bento shadow-card p-6;
+    border: 1px solid rgba(0,0,0,0.04);
+  }
+  .card-content:hover {
+    transform: none;
+  }
   .bento-grid {
     display: grid;
     grid-template-columns: repeat(6, 1fr);
@@ -99,4 +106,21 @@ body::before {
   .text-balance {
     text-wrap: balance;
   }
+}
+
+/* Japanese design patterns */
+.japanese-wave-bg {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cpath fill='%23D0021B' fill-opacity='0.03' d='M60 0c0 0-30 20-30 60s30 60 30 60 30-20 30-60S60 0 60 0z'/%3E%3Cpath fill='%23D0021B' fill-opacity='0.03' d='M0 60c0 0 20-30 60-30s60 30 60 30-20 30-60 30S0 60 0 60z'/%3E%3Cpath fill='%23D0021B' fill-opacity='0.03' d='M60 120c0 0 30-20 30-60s-30-60-30-60-30 20-30 60 30 60 30 60z'/%3E%3Cpath fill='%23D0021B' fill-opacity='0.03' d='M120 60c0 0-20 30-60 30S0 60 0 60s20-30 60-30 60 30 60 30z'/%3E%3C/svg%3E");
+}
+
+.japanese-shoji-border {
+  border-left: 4px solid var(--primary);
+  padding-left: 0.75rem;
+}
+
+.japanese-kanji-accent {
+  font-family: 'Hiragino Mincho ProN', 'Yu Mincho', 'MS PMincho', serif;
+  font-weight: 600;
+  color: var(--primary);
+  opacity: 0.9;
 }

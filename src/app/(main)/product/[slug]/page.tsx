@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AddToCartButton } from "./AddToCartButton";
@@ -32,23 +33,28 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
         priceCurrency="INR"
         url={productUrl}
       />
-      <div className="py-12 sm:py-16 px-4 sm:px-6">
+      <div className="py-12 sm:py-16 px-4 sm:px-6 japanese-wave-bg">
       <div className="max-w-[1200px] mx-auto">
-        <nav className="text-sm text-secondary mb-8">
+        <nav className="text-sm text-secondary mb-8 flex items-center gap-2">
           <Link href="/" className="hover:text-primary">Home</Link>
-          <span className="mx-2">/</span>
+          <span className="opacity-50">／</span>
           <Link href="/store" className="hover:text-primary">Store</Link>
-          <span className="mx-2">/</span>
-          <span className="text-charcoal">{product.name}</span>
+          <span className="opacity-50">／</span>
+          <span className="text-charcoal truncate max-w-[200px] sm:max-w-none">{product.name}</span>
         </nav>
 
         <div className="bento-grid">
-          <div className="bento-span-4 bento-row-2 card">
+          <div className="bento-span-4 bento-row-2 card border-l-4 border-l-primary/30">
+            {product.image_url && (
+              <div className="relative aspect-video -mx-6 -mt-6 mb-6 rounded-t-bento overflow-hidden">
+                <Image src={product.image_url} alt={product.name} fill className="object-cover" sizes="(max-width: 768px) 100vw, 50vw" priority />
+              </div>
+            )}
             {product.badge === "premium" && (
               <span className="badge-premium mb-4 inline-block">Premium</span>
             )}
             {product.badge === "offer" && (
-              <span className="badge-offer mb-4 inline-block">Offer</span>
+              <span className="badge-offer mb-4 inline-block">60% OFF</span>
             )}
             <h1 className="font-heading text-3xl font-bold text-charcoal mb-4">{product.name}</h1>
             <div className="flex items-baseline gap-2 mb-6">
@@ -58,9 +64,10 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
               )}
             </div>
             <AddToCartButton productId={product.id} slug={product.slug} pricePaise={product.price_paise} />
+            <p className="mt-4 text-secondary text-sm">即時アクセス • Lifetime access</p>
           </div>
 
-          <div className="bento-span-2 card">
+          <div className="bento-span-2 card japanese-shoji-border">
             <h2 className="font-heading text-lg font-bold text-charcoal mb-2">Preview / Sample</h2>
             {product.preview_url ? (
               <a
@@ -77,14 +84,14 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
           </div>
 
           {product.who_its_for && (
-            <div className="bento-span-2 card">
+            <div className="bento-span-2 card japanese-shoji-border">
               <h2 className="font-heading text-lg font-bold text-charcoal mb-2">Who It&apos;s For</h2>
               <p className="text-secondary text-sm">{product.who_its_for}</p>
             </div>
           )}
 
           {included.length > 0 && (
-            <div className="bento-span-2 bento-row-2 card">
+            <div className="bento-span-2 bento-row-2 card japanese-shoji-border">
               <h2 className="font-heading text-lg font-bold text-charcoal mb-2">What&apos;s Included</h2>
               <ul className="list-disc list-inside text-secondary text-sm space-y-1">
                 {included.map((item, i) => (
@@ -95,14 +102,14 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
           )}
 
           {product.outcome && (
-            <div className="bento-span-2 card">
+            <div className="bento-span-2 card japanese-shoji-border">
               <h2 className="font-heading text-lg font-bold text-charcoal mb-2">Outcome</h2>
               <p className="text-secondary text-sm">{product.outcome}</p>
             </div>
           )}
 
           {faq.length > 0 && (
-            <div className="bento-span-4 card">
+            <div className="bento-span-4 card japanese-shoji-border">
               <h2 className="font-heading text-lg font-bold text-charcoal mb-4">FAQ</h2>
               <dl className="space-y-4">
                 {faq.map((item, i) => (

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 const navLinks = [
   { href: "/start-here", label: "Start Here" },
@@ -14,8 +15,16 @@ export function Header() {
       <div className="max-w-[1100px] mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
         <Link
           href="/"
-          className="font-heading text-xl font-bold text-charcoal hover:text-primary transition-colors"
+          className="flex items-center gap-2.5 font-heading text-xl font-bold text-charcoal hover:text-primary transition-colors"
         >
+          <Image
+            src="/logo.png"
+            alt="Japanese with Avnish"
+            width={40}
+            height={40}
+            className="rounded-full object-contain"
+            priority
+          />
           Japanese with Avnish
         </Link>
         <nav className="hidden md:flex items-center gap-8">

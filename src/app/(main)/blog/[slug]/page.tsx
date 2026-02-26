@@ -43,7 +43,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
           <CTABlock
             title="Ready to level up?"
             description="Get the bundle that fits your level."
-            productSlug="n5-mastery-bundle"
+            productSlug="japanese-n5-mastery-bundle"
             buttonText="Browse Bundles"
           />
         </div>

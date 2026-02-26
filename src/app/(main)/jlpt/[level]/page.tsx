@@ -10,11 +10,11 @@ const LEVEL_NAMES: Record<string, string> = {
   n1: "N1 — Advanced",
 };
 const LEVEL_SLUGS: Record<string, string> = {
-  n5: "n5-mastery-bundle",
-  n4: "n4-upgrade-bundle",
-  n3: "n3-power-bundle",
-  n2: "n2-pro-bundle",
-  n1: "n1-elite-bundle",
+  n5: "japanese-n5-mastery-bundle",
+  n4: "japanese-n4-upgrade-bundle",
+  n3: "japanese-n3-power-bundle",
+  n2: "japanese-n2-pro-bundle",
+  n1: "japanese-n1-elite-bundle",
 };
 
 export async function generateStaticParams() {
