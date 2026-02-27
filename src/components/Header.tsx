@@ -33,11 +33,11 @@ export function Header() {
   return (
     <>
       <header
-        className={`sticky top-0 z-50 bg-white/98 backdrop-blur-sm transition-all duration-300 ${
+        className={`sticky top-0 z-50 bg-[#1A1A1A] text-[#FAF8F5] transition-all duration-300 ${
           scrolled ? "h-14 shadow-sm" : "h-16"
         }`}
       >
-        <div className="max-w-[1100px] mx-auto px-5 lg:px-6 h-full flex items-center justify-between bg-[#1A1A1A] text-[#FAF8F5] rounded-b-[10px]">
+        <div className="max-w-[1100px] mx-auto px-5 lg:px-6 h-full flex items-center justify-between">
           <Link
             href="/"
             className="flex items-center gap-2.5 font-heading font-bold text-[#FAF8F5] hover:text-primary transition-colors"
