@@ -7,30 +7,24 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "",
     "/start-here",
     "/blog",
+    "/learn",
     "/store",
     "/quiz",
     "/login",
     "/library",
+    "/free-n5-pack",
     "/thank-you",
     "/policies/privacy",
     "/policies/terms",
     "/policies/refunds",
   ];
 
-  const jlpt = ["n5", "n4", "n3", "n2", "n1"].map((l) => `/jlpt/${l}`);
+  const staticWithJlpt = [...staticPages, "/jlpt"];
 
-  return [
-    ...staticPages.map((path) => ({
-      url: `${BASE}${path || "/"}`,
-      lastModified: new Date(),
-      changeFrequency: "weekly" as const,
-      priority: path === "" ? 1 : 0.8,
-    })),
-    ...jlpt.map((path) => ({
-      url: `${BASE}${path}`,
-      lastModified: new Date(),
-      changeFrequency: "monthly" as const,
-      priority: 0.7,
-    })),
-  ];
+  return staticWithJlpt.map((path) => ({
+    url: `${BASE}${path || "/"}`,
+    lastModified: new Date(),
+    changeFrequency: path === "/jlpt" ? ("weekly" as const) : path === "" ? ("weekly" as const) : ("weekly" as const),
+    priority: path === "" ? 1 : path === "/jlpt" ? 0.8 : 0.8,
+  }));
 }

@@ -1,5 +1,7 @@
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { AnnouncementBar } from "@/components/AnnouncementBar";
+import { NewsletterSection } from "@/components/NewsletterSection";
 
 const isComingSoon = process.env.COMING_SOON === "true" || process.env.COMING_SOON === "1";
 
@@ -10,9 +12,19 @@ export default function MainLayout({
 }) {
   return (
     <div className="min-h-screen flex flex-col bg-base">
-      {!isComingSoon && <Header />}
+      {!isComingSoon && (
+        <>
+          <AnnouncementBar />
+          <Header />
+        </>
+      )}
       <main className="flex-1">{children}</main>
-      {!isComingSoon && <Footer />}
+      {!isComingSoon && (
+        <>
+          <NewsletterSection source="site" />
+          <Footer />
+        </>
+      )}
     </div>
   );
 }

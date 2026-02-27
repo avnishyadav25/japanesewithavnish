@@ -29,10 +29,11 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-base flex flex-col items-center justify-center px-4">
+    <div className="min-h-screen bg-base japanese-wave-bg flex flex-col items-center justify-center px-4">
       <div className="max-w-md w-full">
         <div className="bento-grid">
           <div className="bento-span-6 card">
+            <p className="japanese-kanji-accent text-sm mb-2">日本語</p>
             <h1 className="font-heading text-2xl font-bold text-charcoal mb-2">Admin Login</h1>
             <p className="text-secondary mb-6">
               Enter your admin credentials to access the panel.

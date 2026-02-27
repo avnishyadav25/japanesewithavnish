@@ -16,20 +16,25 @@
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
+  color: #1A1A1A;
+  background: #FAF8F5;
   font-family: var(--font-sans), Inter, system-ui, sans-serif;
+  font-size: 16px;
   line-height: 1.6;
 }
+body, body * {
+  --section-padding: 60px 20px;
+}
+@media (max-width: 768px) {
+  body { --section-padding: 40px 16px; }
+}
+@media (min-width: 1024px) {
+  body { --section-padding: 60px 24px; }
+}
 
-/* Subtle paper texture overlay */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
-  pointer-events: none;
-  z-index: 9999;
+/* Pattern limited to hero only - rest of page is plain #FAF8F5 */
+.hero-pattern-bg {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cpath fill='%23D0021B' fill-opacity='0.04' d='M60 0c0 0-30 20-30 60s30 60 30 60 30-20 30-60S60 0 60 0z'/%3E%3Cpath fill='%23D0021B' fill-opacity='0.04' d='M0 60c0 0 20-30 60-30s60 30 60 30-20 30-60 30S0 60 0 60z'/%3E%3Cpath fill='%23D0021B' fill-opacity='0.04' d='M60 120c0 0 30-20 30-60s-30-60-30-60-30 20-30 60 30 60 30 60z'/%3E%3Cpath fill='%23D0021B' fill-opacity='0.04' d='M120 60c0 0-20 30-60 30S0 60 0 60s20-30 60-30 60 30 60 30z'/%3E%3C/svg%3E");
 }
 
 @layer components {
@@ -37,8 +42,13 @@ body::before {
     font-family: var(--font-serif), Georgia, serif;
   }
   .btn-primary {
-    @apply bg-primary text-white px-[26px] py-3 rounded-button font-semibold;
+    @apply bg-primary text-white font-semibold;
+    height: 44px;
+    padding: 12px 20px;
+    border-radius: 6px;
     transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
   }
   .btn-primary:hover {
     @apply bg-primary-hover;
@@ -46,8 +56,13 @@ body::before {
     box-shadow: 0 4px 12px rgba(208, 2, 27, 0.3);
   }
   .btn-secondary {
-    @apply bg-transparent border-2 border-primary text-primary px-[26px] py-3 rounded-button font-semibold;
+    @apply bg-transparent border-2 border-primary text-primary font-semibold;
+    height: 44px;
+    padding: 10px 18px;
+    border-radius: 6px;
     transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
   }
   .btn-secondary:hover {
     @apply bg-primary text-white;
@@ -59,9 +74,11 @@ body::before {
     @apply bg-base text-gold border border-gold rounded-badge px-2 py-1 text-xs font-medium uppercase tracking-wider;
   }
   .card {
-    @apply bg-white rounded-bento shadow-card p-6;
+    @apply bg-white shadow-card;
+    padding: 20px;
+    border-radius: 10px;
     transition: all 0.3s ease;
-    border: 1px solid rgba(0,0,0,0.04);
+    border: 1px solid #EEEEEE;
   }
   .card:hover {
     @apply shadow-card-hover;
@@ -110,7 +127,7 @@ body::before {
 
 /* Japanese design patterns */
 .japanese-wave-bg {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cpath fill='%23D0021B' fill-opacity='0.03' d='M60 0c0 0-30 20-30 60s30 60 30 60 30-20 30-60S60 0 60 0z'/%3E%3Cpath fill='%23D0021B' fill-opacity='0.03' d='M0 60c0 0 20-30 60-30s60 30 60 30-20 30-60 30S0 60 0 60z'/%3E%3Cpath fill='%23D0021B' fill-opacity='0.03' d='M60 120c0 0 30-20 30-60s-30-60-30-60-30 20-30 60 30 60 30 60z'/%3E%3Cpath fill='%23D0021B' fill-opacity='0.03' d='M120 60c0 0-20 30-60 30S0 60 0 60s20-30 60-30 60 30 60 30z'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cpath fill='%23D0021B' fill-opacity='0.025' d='M60 0c0 0-30 20-30 60s30 60 30 60 30-20 30-60S60 0 60 0z'/%3E%3Cpath fill='%23D0021B' fill-opacity='0.025' d='M0 60c0 0 20-30 60-30s60 30 60 30-20 30-60 30S0 60 0 60z'/%3E%3Cpath fill='%23D0021B' fill-opacity='0.025' d='M60 120c0 0 30-20 30-60s-30-60-30-60-30 20-30 60 30 60 30 60z'/%3E%3Cpath fill='%23D0021B' fill-opacity='0.025' d='M120 60c0 0-20 30-60 30S0 60 0 60s20-30 60-30 60 30 60 30z'/%3E%3C/svg%3E");
 }
 
 .japanese-shoji-border {
@@ -123,4 +140,47 @@ body::before {
   font-weight: 600;
   color: var(--primary);
   opacity: 0.9;
+}
+
+.japanese-asanoha {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'%3E%3Cpath fill='%23D0021B' fill-opacity='0.02' d='M30 0L60 30l-30 30L0 30z'/%3E%3C/svg%3E");
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse-soft {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in-up 0.5s ease-out forwards;
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2s ease-in-out infinite;
 }

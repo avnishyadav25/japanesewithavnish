@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-export function NewsletterForm() {
+export function NewsletterForm({ variant = "light", source = "footer" }: { variant?: "light" | "dark"; source?: string }) {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
 
@@ -14,7 +14,7 @@ export function NewsletterForm() {
       const res = await fetch("/api/subscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim() }),
+        body: JSON.stringify({ email: email.trim(), source }),
       });
       const data = await res.json();
       if (res.ok && data.success) {
@@ -28,6 +28,7 @@ export function NewsletterForm() {
     }
   }
 
+  const isDark = variant === "dark";
   return (
     <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2 max-w-sm">
       <input
@@ -37,7 +38,11 @@ export function NewsletterForm() {
         onChange={(e) => setEmail(e.target.value)}
         required
         disabled={status === "loading" || status === "success"}
-        className="flex-1 px-4 py-2.5 border-2 border-[var(--divider)] rounded-bento text-sm focus:border-primary focus:outline-none transition disabled:opacity-60"
+        className={`flex-1 px-4 py-2.5 rounded-lg text-sm focus:outline-none transition disabled:opacity-60 ${
+          isDark
+            ? "bg-white/10 border border-white/30 text-[#FAF8F5] placeholder:text-[#FAF8F5]/60 focus:border-primary"
+            : "border-2 border-[var(--divider)] focus:border-primary"
+        }`}
       />
       <button
         type="submit"

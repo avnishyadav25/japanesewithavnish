@@ -1,51 +1,147 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { filterPosts, type PostForFilter } from "@/lib/blog-filters";
+import { BlogFilterBar } from "@/components/blog/BlogFilterBar";
+import { BlogPostCard } from "@/components/blog/BlogPostCard";
 
-export default async function BlogPage() {
+const POSTS_PER_PAGE = 12;
+
+export default async function BlogPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ level?: string; type?: string; search?: string; page?: string }>;
+}) {
+  const params = await searchParams;
+  const level = params.level || "all";
+  const type = params.type || "all";
+  const search = params.search || "";
+  const page = Math.max(1, parseInt(params.page || "1", 10));
+
   const supabase = await createClient();
-  const { data: posts } = await supabase
-    .from("posts")
-    .select("id, slug, title, summary, published_at")
-    .eq("status", "published")
-    .order("published_at", { ascending: false })
-    .limit(20);
 
-  const items = posts && posts.length > 0 ? posts : [];
+  const [postsRes, settingsRes] = await Promise.all([
+    supabase
+      .from("posts")
+      .select("id, slug, title, summary, seo_description, published_at, og_image_url, jlpt_level, tags")
+      .eq("status", "published")
+      .order("published_at", { ascending: false })
+      .limit(100),
+    supabase
+      .from("site_settings")
+      .select("key, value")
+      .eq("key", "blog_featured_posts")
+      .maybeSingle(),
+  ]);
+
+  const allPosts = (postsRes.data || []) as PostForFilter[];
+  const featuredSlugs = (settingsRes.data?.value as string[]) || [];
+  const filtered = filterPosts(allPosts, level, type, search);
+
+  const featuredPosts = featuredSlugs.length >= 2
+    ? featuredSlugs
+        .slice(0, 2)
+        .map((slug) => filtered.find((p) => p.slug === slug))
+        .filter(Boolean) as PostForFilter[]
+    : filtered.slice(0, 2);
+
+  const showFeaturedRow = featuredPosts.length >= 2;
+  const featuredIds = new Set(featuredPosts.map((p) => p.id));
+  const restPosts = showFeaturedRow
+    ? filtered.filter((p) => !featuredIds.has(p.id))
+    : filtered;
+  const totalPages = Math.ceil(restPosts.length / POSTS_PER_PAGE) || 1;
+  const currentPage = Math.min(page, totalPages);
+  const paginated = restPosts.slice(
+    (currentPage - 1) * POSTS_PER_PAGE,
+    currentPage * POSTS_PER_PAGE
+  );
+
+  const baseQuery = new URLSearchParams();
+  if (level !== "all") baseQuery.set("level", level);
+  if (type !== "all") baseQuery.set("type", type);
+  if (search) baseQuery.set("search", search);
+  const queryStr = baseQuery.toString();
 
   return (
     <div className="py-12 sm:py-16 px-4 sm:px-6">
       <div className="max-w-[1200px] mx-auto">
-        <div className="mb-10">
-          <h1 className="font-heading text-3xl sm:text-4xl font-bold text-charcoal mb-2">Blog</h1>
-          <p className="text-secondary">Lessons, tips, and resources for your JLPT journey.</p>
+        {/* Hero */}
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-10">
+          <div>
+            <h1 className="font-heading text-3xl sm:text-4xl font-bold text-charcoal mb-2">
+              Blog
+            </h1>
+            <p className="text-secondary">
+              Lessons, tips, and resources for your JLPT journey.
+            </p>
+          </div>
+          <div className="flex gap-4 text-sm">
+            <Link href="/quiz" className="text-primary font-medium hover:underline">
+              Take the Quiz →
+            </Link>
+            <Link href="/store" className="text-primary font-medium hover:underline">
+              Browse Bundles →
+            </Link>
+          </div>
         </div>
 
-        {items.length > 0 ? (
-          <div className="bento-grid">
-            {items.map((post, i) => (
-              <div
-                key={post.id}
-                className={i === 0 ? "bento-span-4 bento-row-2" : i === 1 ? "bento-span-2 bento-row-2" : "bento-span-2"}
-              >
-                <Link href={`/blog/${post.slug}`} className="card block h-full hover:no-underline group">
-                  <h2 className="font-heading font-bold text-charcoal mb-2 group-hover:text-primary transition-colors">
-                    {i === 0 ? post.title : post.title.length > 50 ? post.title.slice(0, 50) + "…" : post.title}
-                  </h2>
-                  {post.summary && (
-                    <p className="text-secondary text-sm mb-2 line-clamp-2">{post.summary}</p>
-                  )}
-                  {post.published_at && (
-                    <time className="text-xs text-secondary">
-                      {new Date(post.published_at).toLocaleDateString()}
-                    </time>
-                  )}
-                </Link>
+        <BlogFilterBar />
+
+        {filtered.length > 0 ? (
+          <>
+            {/* Featured row */}
+            {showFeaturedRow && (
+              <div className="bento-grid mb-10">
+                <BlogPostCard post={featuredPosts[0]} size="featured" />
+                <BlogPostCard post={featuredPosts[1]} size="medium" />
               </div>
-            ))}
-          </div>
+            )}
+
+            {/* Main grid */}
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
+              {paginated.map((post) => (
+                <BlogPostCard key={post.id} post={post} size="small" />
+              ))}
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <nav className="flex justify-center gap-2 items-center">
+                {currentPage > 1 && (
+                  <Link
+                    href={
+                      currentPage === 2
+                        ? `/blog${queryStr ? `?${queryStr}` : ""}`
+                        : `/blog?${new URLSearchParams({
+                            ...Object.fromEntries(baseQuery),
+                            page: String(currentPage - 1),
+                          }).toString()}`
+                    }
+                    className="px-4 py-2 border border-[var(--divider)] rounded-md text-secondary hover:border-primary hover:text-primary"
+                  >
+                    Previous
+                  </Link>
+                )}
+                <span className="px-4 py-2 text-secondary text-sm">
+                  Page {currentPage} of {totalPages}
+                </span>
+                {currentPage < totalPages && (
+                  <Link
+                    href={`/blog?${new URLSearchParams({
+                      ...Object.fromEntries(baseQuery),
+                      page: String(currentPage + 1),
+                    }).toString()}`}
+                    className="px-4 py-2 border border-[var(--divider)] rounded-md text-secondary hover:border-primary hover:text-primary"
+                  >
+                    Next
+                  </Link>
+                )}
+              </nav>
+            )}
+          </>
         ) : (
-          <div className="card bento-span-6 p-12 text-center">
-            <p className="text-secondary">No posts yet. Check back soon!</p>
+          <div className="card p-12 text-center">
+            <p className="text-secondary">No posts match your filters. Try adjusting your search.</p>
           </div>
         )}
       </div>

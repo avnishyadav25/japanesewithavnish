@@ -1,39 +1,175 @@
 import Link from "next/link";
-import { NewsletterForm } from "./NewsletterForm";
+import Image from "next/image";
+import { createClient } from "@/lib/supabase/server";
+import { NewsletterForm } from "@/components/NewsletterForm";
 
-const footerLinks = [
-  { href: "/policies/privacy", label: "Privacy" },
-  { href: "/policies/terms", label: "Terms" },
-  { href: "/policies/refunds", label: "Refunds" },
+const FOOTER_KEYS = [
+  "contact_email",
+  "support_email",
+  "youtube_url",
+  "instagram_url",
+  "twitter_url",
+] as const;
+
+async function getFooterSettings() {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("site_settings")
+    .select("key, value")
+    .in("key", FOOTER_KEYS);
+  const map: Record<string, string> = {};
+  data?.forEach((r) => {
+    const v = r.value;
+    map[r.key] = typeof v === "string" ? v : "";
+  });
+  return map;
+}
+
+const quickLinks = [
+  { href: "/start-here", label: "Start Here" },
+  { href: "/quiz", label: "Quiz" },
+  { href: "/store", label: "Store" },
+  { href: "/blog", label: "Blog" },
+  { href: "/login", label: "My Library" },
 ];
 
-export function Footer() {
+const policyLinks = [
+  { href: "/policies/privacy", label: "Privacy Policy" },
+  { href: "/policies/terms", label: "Terms" },
+  { href: "/policies/refunds", label: "Refund Policy" },
+];
+
+export async function Footer() {
+  const settings = await getFooterSettings();
+  const contactEmail = settings.contact_email || settings.support_email || "";
+  const social = {
+    youtube: settings.youtube_url,
+    instagram: settings.instagram_url,
+    twitter: settings.twitter_url,
+  };
+
   return (
-    <footer className="border-t border-[var(--divider)] bg-white mt-auto">
-      <div className="max-w-[1100px] mx-auto px-4 sm:px-6 py-12">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-8">
+    <footer className="bg-[#1A1A1A] mt-auto">
+      <div className="max-w-[1100px] mx-auto px-5 lg:px-6 py-12">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-10 md:gap-8">
+          {/* Column 1 — Brand */}
           <div>
-            <Link href="/" className="font-heading text-lg font-bold text-charcoal hover:text-primary transition">
+            <Link
+              href="/"
+              className="flex items-center gap-2.5 font-heading font-bold text-[#FAF8F5] hover:text-primary transition-colors"
+            >
+              <Image
+                src="/logo-dark.png"
+                alt="Learn Japanese with Avnish"
+                width={40}
+                height={40}
+                className="rounded-full object-contain"
+              />
               Japanese with Avnish
             </Link>
-            <p className="text-secondary text-sm mt-2 mb-4">JLPT tips and updates.</p>
-            <NewsletterForm />
+            <p className="text-[#FAF8F5]/80 text-sm mt-2 mb-4">
+              Clean JLPT mastery system from N5 to N1.
+            </p>
+            <p className="text-[#FAF8F5]/70 text-xs mb-3">JLPT tips + updates. No spam.</p>
+            <NewsletterForm variant="dark" />
+            <div className="flex gap-4 mt-4">
+              {social.youtube && (
+                <a
+                  href={social.youtube}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#FAF8F5]/80 hover:text-primary transition-colors"
+                  aria-label="YouTube"
+                >
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+                  </svg>
+                </a>
+              )}
+              {social.instagram && (
+                <a
+                  href={social.instagram}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#FAF8F5]/80 hover:text-primary transition-colors"
+                  aria-label="Instagram"
+                >
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
+                  </svg>
+                </a>
+              )}
+              {social.twitter && (
+                <a
+                  href={social.twitter}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#FAF8F5]/80 hover:text-primary transition-colors"
+                  aria-label="X / Twitter"
+                >
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                  </svg>
+                </a>
+              )}
+            </div>
           </div>
-          <div className="flex gap-8">
-            {footerLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="text-secondary hover:text-primary text-sm transition-colors"
-              >
-                {link.label}
-              </Link>
-            ))}
+
+          {/* Column 2 — Quick Links */}
+          <div>
+            <h3 className="font-heading font-bold text-[#FAF8F5] mb-4 text-sm uppercase tracking-wider">
+              Quick Links
+            </h3>
+            <ul className="space-y-2">
+              {quickLinks.map((link) => (
+                <li key={link.href}>
+                  <Link
+                    href={link.href}
+                    className="text-[#FAF8F5]/80 hover:text-primary text-sm transition-colors"
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Column 3 — Support / Policies */}
+          <div>
+            <h3 className="font-heading font-bold text-[#FAF8F5] mb-4 text-sm uppercase tracking-wider">
+              Support
+            </h3>
+            <ul className="space-y-2">
+              {contactEmail && (
+                <li>
+                  <a
+                    href={`mailto:${contactEmail}`}
+                    className="text-[#FAF8F5]/80 hover:text-primary text-sm transition-colors"
+                  >
+                    Contact
+                  </a>
+                </li>
+              )}
+              {policyLinks.map((link) => (
+                <li key={link.href}>
+                  <Link
+                    href={link.href}
+                    className="text-[#FAF8F5]/80 hover:text-primary text-sm transition-colors"
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
-        <p className="text-secondary text-sm mt-8 text-center">
-          © {new Date().getFullYear()} Japanese with Avnish. All rights reserved.
-        </p>
+
+        {/* Bottom strip */}
+        <div className="mt-10 pt-8 border-t border-white/10 text-center">
+          <p className="text-[#FAF8F5]/70 text-sm">
+            © {new Date().getFullYear()} Japanese with Avnish. All rights reserved.
+          </p>
+        </div>
       </div>
     </footer>
   );

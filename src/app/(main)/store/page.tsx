@@ -66,13 +66,14 @@ export default async function StorePage({
                 jlptLevel={mega.jlpt_level}
                 size="large"
                 imageUrl={mega.image_url}
+                index={0}
               />
             </div>
           )}
           {rest.map((product, i) => (
             <div
               key={product.id}
-              className={i < 2 ? "bento-span-2" : "bento-span-2"}
+              className="bento-span-2"
             >
               <ProductCard
                 slug={product.slug}
@@ -83,6 +84,7 @@ export default async function StorePage({
                 jlptLevel={product.jlpt_level}
                 size="medium"
                 imageUrl={product.image_url}
+                index={(mega ? 1 : 0) + i}
               />
             </div>
           ))}

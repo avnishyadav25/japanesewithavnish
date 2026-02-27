@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AddToCartButton } from "./AddToCartButton";
 import { ProductSchema } from "@/components/JsonLd";
+import { BundleContentsTree } from "@/components/BundleContentsTree";
+import { getBundleContents } from "@/data/bundle-contents";
 
 export default async function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -20,6 +22,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
   const compareRs = product.compare_price_paise ? product.compare_price_paise / 100 : null;
   const included = (product.whats_included as string[]) || [];
   const faq = (product.faq as { q: string; a: string }[]) || [];
+  const bundleContents = getBundleContents(slug);
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://japanesewithavnish.com";
   const productUrl = `${siteUrl}/product/${product.slug}`;
@@ -51,10 +54,10 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
               </div>
             )}
             {product.badge === "premium" && (
-              <span className="badge-premium mb-4 inline-block">Premium</span>
+              <span className="badge-premium mb-4 inline-block animate-pulse-soft">Premium</span>
             )}
             {product.badge === "offer" && (
-              <span className="badge-offer mb-4 inline-block">60% OFF</span>
+              <span className="badge-offer mb-4 inline-block animate-pulse-soft">60% OFF</span>
             )}
             <h1 className="font-heading text-3xl font-bold text-charcoal mb-4">{product.name}</h1>
             <div className="flex items-baseline gap-2 mb-6">
@@ -68,7 +71,11 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
           </div>
 
           <div className="bento-span-2 card japanese-shoji-border">
-            <h2 className="font-heading text-lg font-bold text-charcoal mb-2">Preview / Sample</h2>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="japanese-kanji-accent text-lg">サンプル</span>
+              <span className="text-secondary text-sm">—</span>
+              <span className="text-secondary text-sm">Preview / Sample</span>
+            </div>
             {product.preview_url ? (
               <a
                 href={product.preview_url}
@@ -83,16 +90,30 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
             )}
           </div>
 
+          {bundleContents && (
+            <div className={`card japanese-shoji-border ${product.is_mega ? "bento-span-4 bento-row-2" : "bento-span-2 bento-row-2"}`}>
+              <BundleContentsTree items={bundleContents} titleJa="含まれるファイル" titleEn="Bundle Contents" />
+            </div>
+          )}
+
           {product.who_its_for && (
             <div className="bento-span-2 card japanese-shoji-border">
-              <h2 className="font-heading text-lg font-bold text-charcoal mb-2">Who It&apos;s For</h2>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="japanese-kanji-accent text-lg">対象者</span>
+                <span className="text-secondary text-sm">—</span>
+                <span className="text-secondary text-sm">Who It&apos;s For</span>
+              </div>
               <p className="text-secondary text-sm">{product.who_its_for}</p>
             </div>
           )}
 
           {included.length > 0 && (
             <div className="bento-span-2 bento-row-2 card japanese-shoji-border">
-              <h2 className="font-heading text-lg font-bold text-charcoal mb-2">What&apos;s Included</h2>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="japanese-kanji-accent text-lg">内容</span>
+                <span className="text-secondary text-sm">—</span>
+                <span className="text-secondary text-sm">What&apos;s Included</span>
+              </div>
               <ul className="list-disc list-inside text-secondary text-sm space-y-1">
                 {included.map((item, i) => (
                   <li key={i}>{item}</li>
@@ -103,14 +124,22 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
 
           {product.outcome && (
             <div className="bento-span-2 card japanese-shoji-border">
-              <h2 className="font-heading text-lg font-bold text-charcoal mb-2">Outcome</h2>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="japanese-kanji-accent text-lg">成果</span>
+                <span className="text-secondary text-sm">—</span>
+                <span className="text-secondary text-sm">Outcome</span>
+              </div>
               <p className="text-secondary text-sm">{product.outcome}</p>
             </div>
           )}
 
           {faq.length > 0 && (
             <div className="bento-span-4 card japanese-shoji-border">
-              <h2 className="font-heading text-lg font-bold text-charcoal mb-4">FAQ</h2>
+              <div className="flex items-center gap-2 mb-4">
+                <span className="japanese-kanji-accent text-lg">よくある質問</span>
+                <span className="text-secondary text-sm">—</span>
+                <span className="text-secondary text-sm">FAQ</span>
+              </div>
               <dl className="space-y-4">
                 {faq.map((item, i) => (
                   <div key={i}>
