@@ -1,44 +1,104 @@
-import Link from "next/link";
+import { createClient } from "@/lib/supabase/server";
+import {
+  filterLearnItems,
+  normalizeLearnLevel,
+  type LearnItemForFilter,
+} from "@/lib/learn-filters";
+import { LearnContent } from "@/components/learn/LearnContent";
 
-const LEARN_TYPES = [
-  { type: "grammar", label: "Grammar", desc: "文法 — Grammar patterns and structures", kanji: "文法" },
-  { type: "vocabulary", label: "Vocabulary", desc: "語彙 — Words and expressions", kanji: "語彙" },
-  { type: "kanji", label: "Kanji", desc: "漢字 — Characters and readings", kanji: "漢字" },
-  { type: "reading", label: "Reading", desc: "読解 — Reading comprehension", kanji: "読解" },
-  { type: "writing", label: "Writing", desc: "作文 — Writing practice", kanji: "作文" },
-];
+const PER_PAGE = 12;
 
-export default function LearnHubPage() {
+export default async function LearnHubPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    level?: string;
+    category?: string;
+    search?: string;
+    sort?: string;
+    page?: string;
+  }>;
+}) {
+  const params = await searchParams;
+  const level = normalizeLearnLevel(params.level || "all");
+  const category = (params.category || "all").toLowerCase();
+  const search = (params.search || "").trim();
+  const sort = params.sort === "recommended" ? "recommended" : "newest";
+  const page = Math.max(1, parseInt(params.page || "1", 10));
+
+  const supabase = await createClient();
+
+  const [contentRes, settingsRes] = await Promise.all([
+    supabase
+      .from("learning_content")
+      .select("id, slug, title, content, content_type, jlpt_level, tags, meta, status, sort_order, created_at, updated_at")
+      .eq("status", "published")
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: false })
+      .limit(200),
+    supabase
+      .from("site_settings")
+      .select("key, value")
+      .eq("key", "learn_recommended")
+      .maybeSingle(),
+  ]);
+
+  const allItems = (contentRes.data || []) as LearnItemForFilter[];
+  const recommendedByLevel = (settingsRes.data?.value as Record<string, string[]>) || {};
+  const curatedSlugs = recommendedByLevel[level] ?? recommendedByLevel.all ?? [];
+
+  const filtered = filterLearnItems(allItems, level, category, search);
+
+  const recommendedItems: LearnItemForFilter[] = [];
+  const seen = new Set<string>();
+  for (const slug of curatedSlugs.slice(0, 6)) {
+    const item = allItems.find((i) => i.slug === slug && filterLearnItems([i], level, "all", "").length > 0);
+    if (item && !seen.has(item.id)) {
+      recommendedItems.push(item);
+      seen.add(item.id);
+    }
+  }
+  const need = 6 - recommendedItems.length;
+  if (need > 0) {
+    for (const item of filtered) {
+      if (recommendedItems.length >= 6) break;
+      if (!seen.has(item.id)) {
+        recommendedItems.push(item);
+        seen.add(item.id);
+      }
+    }
+  }
+
+  const sorted =
+    sort === "recommended"
+      ? [...filtered].sort((a, b) => {
+          const aCurated = curatedSlugs.includes(a.slug);
+          const bCurated = curatedSlugs.includes(b.slug);
+          if (aCurated && !bCurated) return -1;
+          if (!aCurated && bCurated) return 1;
+          return (a.sort_order ?? 0) - (b.sort_order ?? 0) || new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+        })
+      : [...filtered].sort(
+          (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+        );
+
+  const totalCount = sorted.length;
+  const totalPages = Math.ceil(totalCount / PER_PAGE) || 1;
+  const currentPage = Math.min(page, totalPages);
+  const paginated = sorted.slice(
+    (currentPage - 1) * PER_PAGE,
+    currentPage * PER_PAGE
+  );
+
   return (
-    <div className="py-12 sm:py-16 px-4 sm:px-6 japanese-wave-bg">
-      <div className="max-w-[1200px] mx-auto">
-        <div className="mb-10">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="japanese-kanji-accent text-xl">学習</span>
-            <span className="text-secondary">—</span>
-            <h1 className="font-heading text-3xl sm:text-4xl font-bold text-charcoal">Learn</h1>
-          </div>
-          <p className="text-secondary">
-            Grammar, vocabulary, kanji, reading, and writing — structured by JLPT level.
-          </p>
-        </div>
-
-        <div className="bento-grid">
-          {LEARN_TYPES.map((item) => (
-            <Link
-              key={item.type}
-              href={`/learn/${item.type}`}
-              className="bento-span-2 card block hover:no-underline group"
-            >
-              <span className="japanese-kanji-accent text-2xl block mb-2">{item.kanji}</span>
-              <h2 className="font-heading font-bold text-charcoal group-hover:text-primary transition">
-                {item.label}
-              </h2>
-              <p className="text-secondary text-sm mt-1">{item.desc}</p>
-            </Link>
-          ))}
-        </div>
-      </div>
-    </div>
+    <LearnContent
+      level={level}
+      category={category}
+      sort={sort}
+      recommended={recommendedItems}
+      items={paginated}
+      totalCount={totalCount}
+      currentPage={currentPage}
+    />
   );
 }

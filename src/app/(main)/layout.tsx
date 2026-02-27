@@ -2,8 +2,11 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { AnnouncementBar } from "@/components/AnnouncementBar";
 import { NewsletterSection } from "@/components/NewsletterSection";
+import { Suspense } from "react";
+import { PathnameGuard } from "./pathname-guard";
 
-const isComingSoon = process.env.COMING_SOON === "true" || process.env.COMING_SOON === "1";
+const isComingSoon =
+  process.env.COMING_SOON === "true" || process.env.COMING_SOON === "1";
 
 export default function MainLayout({
   children,
@@ -21,7 +24,11 @@ export default function MainLayout({
       <main className="flex-1">{children}</main>
       {!isComingSoon && (
         <>
-          <NewsletterSection source="site" />
+          <Suspense>
+            <PathnameGuard>
+              <NewsletterSection source="site" />
+            </PathnameGuard>
+          </Suspense>
           <Footer />
         </>
       )}

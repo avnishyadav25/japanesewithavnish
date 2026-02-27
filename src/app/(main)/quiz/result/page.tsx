@@ -18,6 +18,7 @@ function ResultContent() {
   const total = parseInt(searchParams.get("total") || "10", 10);
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"gate" | "loading" | "shown" | "error">("gate");
+  const [newsletterOptIn, setNewsletterOptIn] = useState(true);
   const [recommendation, setRecommendation] = useState<typeof THRESHOLDS[0] | null>(null);
 
   useEffect(() => {
@@ -32,7 +33,7 @@ function ResultContent() {
       const res = await fetch("/api/quiz/submit-result", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, score, total }),
+        body: JSON.stringify({ email, score, total, newsletterOptIn }),
       });
       if (!res.ok) throw new Error("Failed");
       setStatus("shown");
@@ -45,67 +46,138 @@ function ResultContent() {
     return <div className="py-24 text-center">Loading...</div>;
   }
 
-  if (status !== "shown") {
-    return (
-      <div className="py-12 sm:py-16 px-4 sm:px-6">
-        <div className="max-w-[1200px] mx-auto">
-          <div className="bento-grid">
-            <div className="bento-span-4 card">
-              <h1 className="font-heading text-2xl font-bold text-charcoal mb-2">See Your Results</h1>
-              <p className="text-secondary mb-6">
-                Enter your email to see your recommended level and bundle.
-              </p>
-              <form onSubmit={handleEmailSubmit} className="space-y-4">
-                <input
-                  type="email"
-                  placeholder="your@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="w-full px-4 py-3 border-2 border-[var(--divider)] rounded-bento text-charcoal focus:border-primary focus:outline-none transition"
-                />
-                <button type="submit" className="btn-primary w-full" disabled={status === "loading"}>
-                  {status === "loading" ? "Loading..." : "Show My Results"}
-                </button>
-                {status === "error" && (
-                  <p className="text-primary text-sm">Something went wrong. Try again.</p>
-                )}
-              </form>
-            </div>
-            <div className="bento-span-2 card flex flex-col justify-center bg-base border-[var(--divider)]">
-              <p className="text-secondary text-sm">We&apos;ll also add you to our newsletter for JLPT tips.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="py-12 sm:py-16 px-4 sm:px-6">
-      <div className="max-w-[1200px] mx-auto">
-        <div className="bento-grid">
-          <div className="bento-span-4 bento-row-2 card">
-            <h1 className="font-heading text-3xl font-bold text-charcoal mb-2">
-              Your Level: {recommendation.level}
-            </h1>
-            <p className="text-secondary mb-6">
-              You scored {score} out of {total}.
-            </p>
-            <div className="space-y-4 mb-6">
-              <h2 className="font-heading text-xl font-bold text-charcoal">Recommended: {recommendation.productName}</h2>
-              <p className="text-secondary">{recommendation.why}</p>
-            </div>
-            <Link href={`/product/${recommendation.productSlug}`} className="btn-primary inline-block">
-              Get the Bundle
-            </Link>
-          </div>
-          <div className="bento-span-2 card flex flex-col justify-center bg-base border-[var(--divider)]">
-            <Link href="/store" className="text-primary font-medium hover:underline">
-              Browse all bundles →
-            </Link>
-          </div>
-        </div>
+    <div className="bg-[#FAF8F5] py-12 sm:py-16 px-4 sm:px-6">
+      <div className="max-w-[1100px] mx-auto">
+        {!recommendation ? null : (
+          <>
+            {/* Email gate */}
+            {status === "gate" || status === "loading" || status === "error" ? (
+              <div className="bento-grid mb-10">
+                <div className="bento-span-4 card">
+                  <h1 className="font-heading text-2xl sm:text-3xl font-bold text-charcoal mb-2">
+                    See Your Results
+                  </h1>
+                  <p className="text-secondary mb-6">
+                    Enter your email to unlock your recommended JLPT level and bundle.
+                  </p>
+                  <form onSubmit={handleEmailSubmit} className="space-y-4">
+                    <input
+                      type="email"
+                      placeholder="your@email.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      className="w-full px-4 py-3 border-2 border-[var(--divider)] rounded-bento text-charcoal focus:border-primary focus:outline-none transition"
+                    />
+                    <label className="flex items-center gap-2 text-sm text-secondary">
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 rounded border-[var(--divider)]"
+                        checked={newsletterOptIn}
+                        onChange={(e) => setNewsletterOptIn(e.target.checked)}
+                      />
+                      <span>Send me JLPT tips (1–2 emails/week). No spam.</span>
+                    </label>
+                    <button
+                      type="submit"
+                      className="btn-primary w-full"
+                      disabled={status === "loading"}
+                    >
+                      {status === "loading" ? "Loading..." : "Show My Results"}
+                    </button>
+                    {status === "error" && (
+                      <p className="text-primary text-sm">
+                        Something went wrong. Try again.
+                      </p>
+                    )}
+                  </form>
+                </div>
+                <div className="bento-span-2 card flex flex-col justify-center bg-base border-[var(--divider)]">
+                  <h2 className="font-heading text-lg font-semibold text-charcoal mb-2">
+                    What happens next
+                  </h2>
+                  <ul className="text-secondary text-sm space-y-1">
+                    <li>You&apos;ll see your level instantly on this page.</li>
+                    <li>We&apos;ll email your result and access link.</li>
+                    <li>You can unsubscribe from emails anytime.</li>
+                  </ul>
+                </div>
+              </div>
+            ) : null}
+
+            {/* Results card (shown after email submit) */}
+            {status === "shown" && (
+              <div className="bento-grid">
+                <div className="bento-span-4 bento-row-2 card">
+                  <h1 className="font-heading text-3xl font-bold text-charcoal mb-2">
+                    Your level: {recommendation.level}
+                  </h1>
+                  <p className="text-secondary mb-4">
+                    You scored {score} out of {total}.
+                  </p>
+                  <div className="inline-flex items-center gap-2 mb-4">
+                    <span className="text-xs font-semibold px-3 py-1 rounded-full bg-[#FFF7F7] text-primary border border-primary/20">
+                      Confidence:{" "}
+                      {score / (total || 1) >= 0.8
+                        ? "High"
+                        : score / (total || 1) >= 0.5
+                        ? "Medium"
+                        : "Exploratory"}
+                    </span>
+                  </div>
+                  <div className="space-y-3 mb-6">
+                    <h2 className="font-heading text-xl font-bold text-charcoal">
+                      Recommended: {recommendation.productName}
+                    </h2>
+                    <ul className="text-secondary text-sm space-y-1">
+                      <li>You got {score} out of {total} correct.</li>
+                      <li>We looked at your answers across vocab and grammar.</li>
+                      <li>This level is a good next step for your JLPT journey.</li>
+                    </ul>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Link
+                      href={`/product/${recommendation.productSlug}`}
+                      className="btn-primary"
+                    >
+                      Get {recommendation.productName}
+                    </Link>
+                    <Link
+                      href="/store"
+                      className="text-sm text-primary font-medium hover:underline"
+                    >
+                      Compare all bundles →
+                    </Link>
+                    <Link
+                      href={`/learn?level=${recommendation.level.toLowerCase()}`}
+                      className="text-sm text-primary font-medium hover:underline"
+                    >
+                      Start learning now →
+                    </Link>
+                  </div>
+                </div>
+                <div className="bento-span-2 card flex flex-col justify-center bg-base border-[var(--divider)]">
+                  <p className="text-secondary text-sm mb-2">
+                    Not sure about this level?
+                  </p>
+                  <Link
+                    href="/quiz"
+                    className="text-primary font-medium hover:underline text-sm mb-2"
+                  >
+                    Take the quiz again →
+                  </Link>
+                  <Link
+                    href="/start-here"
+                    className="text-primary font-medium hover:underline text-sm"
+                  >
+                    Read the Start Here guide →
+                  </Link>
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   );

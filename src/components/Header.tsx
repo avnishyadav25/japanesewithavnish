@@ -34,13 +34,13 @@ export function Header() {
     <>
       <header
         className={`sticky top-0 z-50 bg-white/98 backdrop-blur-sm transition-all duration-300 ${
-          scrolled ? "h-14 border-b border-[#EEEEEE] shadow-sm" : "h-16 border-b border-transparent"
+          scrolled ? "h-14 shadow-sm" : "h-16"
         }`}
       >
-        <div className="max-w-[1100px] mx-auto px-5 lg:px-6 h-full flex items-center justify-between">
+        <div className="max-w-[1100px] mx-auto px-5 lg:px-6 h-full flex items-center justify-between bg-[#1A1A1A] text-[#FAF8F5] rounded-b-[10px]">
           <Link
             href="/"
-            className="flex items-center gap-2.5 font-heading font-bold text-[#1A1A1A] hover:text-primary transition-colors"
+            className="flex items-center gap-2.5 font-heading font-bold text-[#FAF8F5] hover:text-primary transition-colors"
           >
             <Image
               src="/logo.png"
@@ -58,7 +58,7 @@ export function Header() {
               <Link
                 key={link.href}
                 href={link.href}
-                className="text-[#555555] hover:text-primary font-medium text-[15px] transition-colors"
+                className="text-[#FAF8F5]/80 hover:text-primary font-medium text-[15px] transition-colors"
               >
                 {link.label}
               </Link>
@@ -68,13 +68,13 @@ export function Header() {
           <div className="hidden md:flex items-center gap-6">
             <Link
               href="/free-n5-pack"
-              className="text-[#555555] hover:text-primary font-medium text-sm"
+              className="text-[#FAF8F5]/80 hover:text-primary font-medium text-sm"
             >
               Free N5 Pack
             </Link>
             <Link
               href="/login"
-              className="border-2 border-primary text-primary font-semibold py-2 px-[18px] rounded-md hover:bg-primary hover:text-white transition-colors text-sm"
+              className="bg-primary text-white font-semibold py-2 px-[18px] rounded-md hover:bg-white hover:text-primary transition-colors text-sm"
             >
               My Library
             </Link>
@@ -83,7 +83,7 @@ export function Header() {
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
-            className="md:hidden p-2 text-[#1A1A1A] hover:text-primary transition-colors"
+            className="md:hidden p-2 text-[#FAF8F5] hover:text-primary transition-colors"
             aria-label="Open menu"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -102,7 +102,7 @@ export function Header() {
         />
       )}
       <div
-        className={`fixed top-0 right-0 z-[61] h-full w-full max-w-[280px] bg-white shadow-xl transform transition-transform duration-300 md:hidden ${
+        className={`fixed top-0 right-0 z-[61] h-full w-full max-w-[280px] bg-[#1A1A1A] shadow-xl transform transition-transform duration-300 md:hidden ${
           mobileOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
@@ -110,7 +110,7 @@ export function Header() {
           <button
             type="button"
             onClick={() => setMobileOpen(false)}
-            className="absolute top-4 right-4 p-2 text-[#555555] hover:text-primary"
+            className="absolute top-4 right-4 p-2 text-[#FAF8F5]/80 hover:text-primary"
             aria-label="Close menu"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -123,7 +123,7 @@ export function Header() {
                 key={link.href}
                 href={link.href}
                 onClick={() => setMobileOpen(false)}
-                className="py-3 text-[#1A1A1A] hover:text-primary font-medium text-[15px]"
+                className="py-3 text-[#FAF8F5] hover:text-primary font-medium text-[15px]"
               >
                 {link.label}
               </Link>
@@ -131,16 +131,16 @@ export function Header() {
             <Link
               href="/free-n5-pack"
               onClick={() => setMobileOpen(false)}
-              className="py-3 text-[#555555] hover:text-primary font-medium text-sm"
+                className="py-3 text-[#FAF8F5]/80 hover:text-primary font-medium text-sm"
             >
               Free N5 Pack
             </Link>
           </nav>
-          <div className="mt-auto pt-4 border-t border-[#EEEEEE]">
+          <div className="mt-auto pt-4 border-t border-[#EEEEEE]/30">
             <Link
               href="/login"
               onClick={() => setMobileOpen(false)}
-              className="block w-full text-center border-2 border-primary text-primary font-semibold py-3 px-4 rounded-md hover:bg-primary hover:text-white transition-colors"
+              className="block w-full text-center bg-primary text-white font-semibold py-3 px-4 rounded-md hover:bg-white hover:text-primary transition-colors"
             >
               My Library
             </Link>

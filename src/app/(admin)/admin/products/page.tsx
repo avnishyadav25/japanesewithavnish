@@ -40,12 +40,20 @@ export default async function AdminProductsPage() {
                     )}
                   </div>
                 </div>
-                <Link
-                  href={`/product/${p.slug}`}
-                  className="text-primary text-sm hover:underline flex-shrink-0"
-                >
-                  View
-                </Link>
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  <Link
+                    href={`/product/${p.slug}`}
+                    className="text-primary text-sm hover:underline"
+                  >
+                    View
+                  </Link>
+                  <Link
+                    href={`/admin/products/${p.id}/edit`}
+                    className="text-secondary text-sm hover:underline"
+                  >
+                    Edit
+                  </Link>
+                </div>
               </div>
             </AdminCard>
           ))}

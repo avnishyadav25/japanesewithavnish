@@ -135,30 +135,44 @@ function CheckoutContent() {
 
   if (!product) {
     return (
-      <div className="bento-grid">
-        <div className="bento-span-6 card p-12 text-center">
-          <p className="text-secondary mb-4">Product not found.</p>
-          <Link href="/store" className="btn-primary">Browse Store</Link>
+      <div className="py-12 sm:py-16 px-4 sm:px-6">
+        <div className="max-w-[1200px] mx-auto">
+          <div className="bento-grid">
+            <div className="bento-span-6 card p-12 text-center">
+              <p className="text-secondary mb-4">Product not found.</p>
+              <Link href="/store" className="btn-primary">
+                Browse Store
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="py-12 sm:py-16 px-4 sm:px-6">
+    <div className="bg-[#FAF8F5] py-12 sm:py-16 px-4 sm:px-6">
       <div className="max-w-[1200px] mx-auto">
         <div className="bento-grid">
           <div className="bento-span-4 card">
-            <h1 className="font-heading text-2xl font-bold text-charcoal mb-2">Checkout</h1>
+            <h1 className="font-heading text-2xl font-bold text-charcoal mb-2">
+              Checkout
+            </h1>
             <p className="text-secondary mb-6">
               {product.name} —{" "}
               {discountInfo ? (
                 <>
-                  <span className="line-through text-secondary">₹{product.price_paise / 100}</span>{" "}
-                  <span className="font-bold text-primary">₹{discountInfo.final_paise / 100}</span>
+                  <span className="line-through text-secondary">
+                    ₹{product.price_paise / 100}
+                  </span>{" "}
+                  <span className="font-bold text-primary">
+                    ₹{discountInfo.final_paise / 100}
+                  </span>
                 </>
               ) : (
-                <span className="font-bold text-primary">₹{product.price_paise / 100}</span>
+                <span className="font-bold text-primary">
+                  ₹{product.price_paise / 100}
+                </span>
               )}
             </p>
 
@@ -183,8 +197,12 @@ function CheckoutContent() {
                   {couponStatus === "checking" ? "..." : "Apply"}
                 </button>
               </div>
-              {couponStatus === "valid" && <p className="text-green-600 text-sm">Coupon applied!</p>}
-              {couponStatus === "invalid" && <p className="text-primary text-sm">Invalid or expired coupon.</p>}
+              {couponStatus === "valid" && (
+                <p className="text-green-600 text-sm">Coupon applied!</p>
+              )}
+              {couponStatus === "invalid" && (
+                <p className="text-primary text-sm">Invalid or expired coupon.</p>
+              )}
               <input
                 type="text"
                 placeholder="Name"
@@ -201,22 +219,44 @@ function CheckoutContent() {
                 required
                 className="w-full px-4 py-3 border-2 border-[var(--divider)] rounded-bento focus:border-primary focus:outline-none transition"
               />
-              <input
-                type="tel"
-                placeholder="Phone (required for Razorpay)"
-                value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                required
-                className="w-full px-4 py-3 border-2 border-[var(--divider)] rounded-bento focus:border-primary focus:outline-none transition"
-              />
+              <div>
+                <input
+                  type="tel"
+                  placeholder="Phone"
+                  value={form.phone}
+                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  required
+                  className="w-full px-4 py-3 border-2 border-[var(--divider)] rounded-bento focus:border-primary focus:outline-none transition"
+                />
+                <p className="text-xs text-secondary mt-1">
+                  Required for Razorpay payment.
+                </p>
+              </div>
               <button type="submit" className="btn-primary w-full" disabled={submitting}>
                 {submitting ? "Opening..." : "Pay with Razorpay"}
               </button>
-              {error && <p className="text-primary text-sm">{error}</p>}
+              <p className="text-xs text-secondary mt-2">
+                By paying, you agree to our Terms &amp; Refund Policy (no refunds for
+                digital products).
+              </p>
+              {error && <p className="text-primary text-sm mt-2">{error}</p>}
             </form>
           </div>
           <div className="bento-span-2 bento-row-2 card flex flex-col justify-center bg-base border-[var(--divider)]">
-            <p className="text-secondary text-sm">Secure payment via Razorpay. You&apos;ll receive instant access after payment.</p>
+            <h2 className="font-heading text-lg font-bold text-charcoal mb-3">
+              What you&apos;ll get
+            </h2>
+            <ul className="text-secondary text-sm space-y-1 mb-4">
+              <li>Instant access link by email after payment.</li>
+              <li>Lifetime access to your bundles in My Library.</li>
+              <li>Download PDFs and audio anytime on any device.</li>
+            </ul>
+            <p className="text-secondary text-sm mb-2">
+              Payment issues? Contact support via the email on the site.
+            </p>
+            <p className="text-secondary text-sm">
+              Secure payment handled by Razorpay.
+            </p>
           </div>
         </div>
       </div>

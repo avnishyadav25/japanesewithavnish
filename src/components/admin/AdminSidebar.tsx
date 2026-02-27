@@ -25,6 +25,7 @@ const navGroups = [
   {
     label: "Learning",
     items: [
+      { href: "/admin/learn/recommended", label: "Recommended" },
       { href: "/admin/learn/grammar", label: "Grammar" },
       { href: "/admin/learn/vocabulary", label: "Vocabulary" },
       { href: "/admin/learn/kanji", label: "Kanji" },

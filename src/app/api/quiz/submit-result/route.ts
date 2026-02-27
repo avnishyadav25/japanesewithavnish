@@ -12,7 +12,7 @@ const THRESHOLDS = [
 
 export async function POST(req: Request) {
   try {
-    const { email, score, total } = await req.json();
+    const { email, score, total, newsletterOptIn } = await req.json();
     if (!email || typeof email !== "string") {
       return NextResponse.json({ error: "Email required" }, { status: 400 });
     }
@@ -21,7 +21,11 @@ export async function POST(req: Request) {
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
     const supabase = createAdminClient();
-    await supabase.from("subscribers").upsert({ email, source: "quiz" }, { onConflict: "email" });
+    if (newsletterOptIn !== false) {
+      await supabase
+        .from("subscribers")
+        .upsert({ email, source: "quiz" }, { onConflict: "email" });
+    }
     await supabase.from("quiz_attempts").insert({
       email,
       score: score || 0,
