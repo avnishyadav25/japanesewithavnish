@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
-import { AdminCard } from "@/components/admin/AdminCard";
 import { ProductEditForm } from "../../ProductEditForm";
 
 export default async function AdminProductEditPage({
@@ -13,7 +12,7 @@ export default async function AdminProductEditPage({
   const { data: product, error } = await supabase
     .from("products")
     .select(
-      "id, name, slug, badge, jlpt_level, preview_url, who_its_for, outcome, whats_included, faq, no_refunds_note"
+      "id, name, slug, description, price_paise, compare_price_paise, badge, jlpt_level, preview_url, who_its_for, outcome, whats_included, faq, no_refunds_note, is_mega, image_url, image_prompt, gallery_images"
     )
     .eq("id", params.id)
     .single();
@@ -23,19 +22,16 @@ export default async function AdminProductEditPage({
   }
 
   return (
-    <div>
+    <div className="page-enter">
       <AdminPageHeader
-        title={product.name}
+        title={`🔥 ${product.name}`}
         breadcrumb={[
           { label: "Admin", href: "/admin" },
           { label: "Products", href: "/admin/products" },
           { label: "Edit", href: `/admin/products/${product.id}/edit` },
         ]}
       />
-      <AdminCard>
-        <ProductEditForm product={product} />
-      </AdminCard>
+      <ProductEditForm product={product} />
     </div>
   );
 }
-

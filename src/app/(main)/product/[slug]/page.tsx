@@ -7,7 +7,11 @@ import { ProductSchema } from "@/components/JsonLd";
 import { BundleContentsTree } from "@/components/BundleContentsTree";
 import { getBundleContents } from "@/data/bundle-contents";
 
-export default async function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function ProductPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
   const { slug } = await params;
   const supabase = await createClient();
   const { data: product, error } = await supabase
@@ -19,12 +23,28 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
   if (error || !product) notFound();
 
   const priceRs = product.price_paise / 100;
-  const compareRs = product.compare_price_paise ? product.compare_price_paise / 100 : null;
+  const compareRs = product.compare_price_paise
+    ? product.compare_price_paise / 100
+    : null;
+  const discount =
+    compareRs && compareRs > priceRs
+      ? Math.round(((compareRs - priceRs) / compareRs) * 100)
+      : null;
+  const savingRs =
+    compareRs && compareRs > priceRs ? compareRs - priceRs : null;
+
   const included = (product.whats_included as string[]) || [];
   const faq = (product.faq as { q: string; a: string }[]) || [];
+  const galleryImages = (product.gallery_images as string[]) || [];
   const bundleContents = getBundleContents(slug);
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://japanesewithavnish.com";
+  // Parse who_its_for into bullet list if line-separated
+  const whoLines = product.who_its_for
+    ? product.who_its_for.split("\n").map((l: string) => l.trim()).filter(Boolean)
+    : [];
+
+  const siteUrl =
+    process.env.NEXT_PUBLIC_SITE_URL || "https://japanesewithavnish.com";
   const productUrl = `${siteUrl}/product/${product.slug}`;
 
   return (
@@ -38,12 +58,13 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
       />
       <div className="bg-[#FAF8F5] py-12 sm:py-16 px-4 sm:px-6">
         <div className="max-w-[1100px] mx-auto">
+          {/* Breadcrumb */}
           <nav className="text-sm text-secondary mb-8 flex items-center gap-2">
-            <Link href="/" className="hover:text-primary">
+            <Link href="/" className="hover:text-primary transition-colors">
               Home
             </Link>
             <span className="opacity-50">／</span>
-            <Link href="/store" className="hover:text-primary">
+            <Link href="/store" className="hover:text-primary transition-colors">
               Store
             </Link>
             <span className="opacity-50">／</span>
@@ -52,38 +73,83 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
             </span>
           </nav>
 
-          <div className="grid gap-10 lg:grid-cols-[minmax(0,720px)_340px]">
-            {/* Left column: media + details */}
+          <div className="grid gap-10 lg:grid-cols-[minmax(0,680px)_340px]">
+            {/* ─── Left column ─────────────────────────────── */}
             <div>
-              {/* Media / sample card */}
-              <article className="card overflow-hidden mb-8">
-                {product.image_url && (
-                  <div className="relative aspect-video w-full mb-4 rounded-t-[10px] overflow-hidden">
-                    <Image
-                      src={product.image_url}
-                      alt={product.name}
-                      fill
-                      className="object-cover"
-                      sizes="(max-width: 768px) 100vw, 60vw"
-                      priority
-                    />
-                  </div>
-                )}
-                <div className="flex items-center justify-between gap-2 mb-3">
-                  <div className="flex items-center gap-2">
-                    {product.badge === "premium" && (
-                      <span className="badge-premium">Premium</span>
-                    )}
-                    {product.badge === "offer" && (
-                      <span className="badge-offer">Offer</span>
-                    )}
-                  </div>
-                  {product.jlpt_level && (
-                    <span className="text-xs px-2 py-1 rounded-md bg-[#FAF8F5] border border-[#EEEEEE] text-[#555555]">
-                      {product.jlpt_level}
-                    </span>
+              {/* Hero image */}
+              {product.image_url && (
+                <div className="relative aspect-video w-full rounded-bento overflow-hidden mb-4 shadow-sm">
+                  <Image
+                    src={product.image_url}
+                    alt={product.name}
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 100vw, 60vw"
+                    priority
+                  />
+                  {discount && (
+                    <div className="absolute top-3 right-3 bg-primary text-white text-sm font-bold px-3 py-1 rounded-full shadow">
+                      {discount}% OFF
+                    </div>
                   )}
                 </div>
+              )}
+
+              {/* Gallery strip */}
+              {galleryImages.length > 0 && (
+                <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
+                  {galleryImages.filter(Boolean).map((url, i) => (
+                    <div
+                      key={i}
+                      className="relative flex-shrink-0 w-24 h-16 rounded-bento overflow-hidden border border-[var(--divider)] bg-[var(--base)]"
+                    >
+                      <Image
+                        src={url}
+                        alt={`${product.name} gallery ${i + 1}`}
+                        fill
+                        className="object-cover hover:scale-110 transition-transform duration-300"
+                        sizes="96px"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Badges + JLPT */}
+              <div className="flex items-center gap-2 flex-wrap mb-4">
+                {product.badge === "premium" && (
+                  <span className="badge-premium">Premium</span>
+                )}
+                {product.badge === "offer" && (
+                  <span className="badge-offer">Offer</span>
+                )}
+                {product.jlpt_level && (
+                  <span className="text-xs px-3 py-1 rounded-full bg-[var(--base)] border border-[var(--divider)] text-secondary font-medium">
+                    JLPT {product.jlpt_level}
+                  </span>
+                )}
+                {product.is_mega && (
+                  <span className="text-xs px-3 py-1 rounded-full bg-primary/10 text-primary font-semibold border border-primary/20">
+                    Mega Bundle
+                  </span>
+                )}
+              </div>
+
+              {/* Description card */}
+              {product.description && (
+                <article className="card mb-6">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="japanese-kanji-accent text-lg">概要</span>
+                    <span className="text-secondary text-sm">— Overview</span>
+                  </div>
+                  <p className="text-secondary text-sm leading-relaxed">
+                    {product.description}
+                  </p>
+                </article>
+              )}
+
+              {/* Sample / preview */}
+              <article className="card overflow-hidden mb-6">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="japanese-kanji-accent text-sm">サンプル</span>
                   <span className="text-secondary text-xs">— Preview / Sample</span>
@@ -105,30 +171,38 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
               </article>
 
               {/* Who it's for */}
-              {product.who_its_for && (
+              {whoLines.length > 0 && (
                 <section className="card mb-6">
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className="flex items-center gap-2 mb-3">
                     <span className="japanese-kanji-accent text-lg">対象者</span>
                     <span className="text-secondary text-sm">—</span>
                     <span className="text-secondary text-sm">Who this is for</span>
                   </div>
-                  <p className="text-secondary text-sm leading-relaxed">
-                    {product.who_its_for}
-                  </p>
+                  <ul className="space-y-2">
+                    {whoLines.map((line: string, i: number) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-secondary">
+                        <span className="text-primary mt-0.5 flex-shrink-0">✓</span>
+                        {line}
+                      </li>
+                    ))}
+                  </ul>
                 </section>
               )}
 
               {/* What's included */}
               {included.length > 0 && (
                 <section className="card mb-6">
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className="flex items-center gap-2 mb-3">
                     <span className="japanese-kanji-accent text-lg">内容</span>
                     <span className="text-secondary text-sm">—</span>
                     <span className="text-secondary text-sm">What&apos;s included</span>
                   </div>
-                  <ul className="list-disc list-inside text-secondary text-sm space-y-1">
+                  <ul className="space-y-2">
                     {included.map((item, i) => (
-                      <li key={i}>{item}</li>
+                      <li key={i} className="flex items-start gap-2 text-sm text-secondary">
+                        <span className="text-primary mt-0.5 flex-shrink-0">→</span>
+                        {item}
+                      </li>
                     ))}
                   </ul>
                 </section>
@@ -145,10 +219,10 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
                 </section>
               )}
 
-              {/* Outcomes */}
+              {/* Outcome */}
               {product.outcome && (
                 <section className="card mb-6">
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className="flex items-center gap-2 mb-3">
                     <span className="japanese-kanji-accent text-lg">成果</span>
                     <span className="text-secondary text-sm">—</span>
                     <span className="text-secondary text-sm">What you&apos;ll achieve</span>
@@ -159,75 +233,135 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
                 </section>
               )}
 
-              {/* Product FAQ */}
+              {/* FAQ */}
               {faq.length > 0 && (
                 <section className="card mb-6">
                   <div className="flex items-center gap-2 mb-4">
                     <span className="japanese-kanji-accent text-lg">よくある質問</span>
-                    <span className="text-secondary text-sm">—</span>
-                    <span className="text-secondary text-sm">FAQ</span>
+                    <span className="text-secondary text-sm">— FAQ</span>
                   </div>
-                  <dl className="space-y-4">
+                  <dl className="space-y-5">
                     {faq.map((item, i) => (
-                      <div key={i}>
-                        <dt className="font-medium text-charcoal text-sm">{item.q}</dt>
-                        <dd className="text-secondary text-sm mt-1">{item.a}</dd>
+                      <div key={i} className="border-b border-[var(--divider)] pb-4 last:border-0 last:pb-0">
+                        <dt className="font-medium text-charcoal text-sm mb-1">
+                          Q. {item.q}
+                        </dt>
+                        <dd className="text-secondary text-sm leading-relaxed pl-4">
+                          {item.a}
+                        </dd>
                       </div>
                     ))}
                   </dl>
+                  {product.no_refunds_note && (
+                    <p className="text-xs text-secondary mt-4 pt-3 border-t border-[var(--divider)]">
+                      ⚠ {product.no_refunds_note}
+                    </p>
+                  )}
                 </section>
-              )}
-
-              {/* No refunds note */}
-              {product.no_refunds_note && (
-                <p className="text-sm text-secondary mt-4">
-                  {product.no_refunds_note}
-                </p>
               )}
             </div>
 
-            {/* Right column: sticky purchase card */}
-            <aside className="lg:sticky lg:top-24">
-              <div className="card p-6 mb-6">
-                <h1 className="font-heading text-2xl sm:text-3xl font-bold text-charcoal mb-2">
-                  {product.name}
-                </h1>
-                {product.who_its_for && (
-                  <p className="text-secondary text-sm mb-4">
-                    {product.who_its_for}
-                  </p>
-                )}
-                <div className="flex items-baseline gap-2 mb-4">
-                  <span className="text-3xl font-bold text-primary">₹{priceRs}</span>
-                  {compareRs && (
-                    <span className="text-secondary line-through text-sm">
-                      ₹{compareRs}
+            {/* ─── Right column: sticky purchase card ─────── */}
+            <aside className="lg:sticky lg:top-24 self-start">
+              <div className="card p-6 mb-4">
+                {/* Badges */}
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {product.badge === "premium" && (
+                    <span className="badge-premium">Premium</span>
+                  )}
+                  {product.badge === "offer" && (
+                    <span className="badge-offer">Offer</span>
+                  )}
+                  {product.jlpt_level && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--base)] border border-[var(--divider)] text-secondary font-medium">
+                      JLPT {product.jlpt_level}
                     </span>
                   )}
                 </div>
+
+                <h1 className="font-heading text-xl sm:text-2xl font-bold text-charcoal mb-2">
+                  {product.name}
+                </h1>
+
+                {product.description && (
+                  <p className="text-secondary text-sm mb-4 leading-relaxed">
+                    {product.description}
+                  </p>
+                )}
+
+                {/* Price block */}
+                <div className="bg-[var(--base)] rounded-bento p-4 mb-4">
+                  <div className="flex items-baseline gap-2 mb-1">
+                    <span className="text-3xl font-bold text-primary">
+                      ₹{priceRs.toLocaleString("en-IN")}
+                    </span>
+                    {compareRs && (
+                      <span className="text-secondary line-through text-base">
+                        ₹{compareRs.toLocaleString("en-IN")}
+                      </span>
+                    )}
+                  </div>
+                  {discount && savingRs && (
+                    <p className="text-green-700 text-sm font-medium">
+                      You save ₹{savingRs.toLocaleString("en-IN")} ({discount}% off)
+                    </p>
+                  )}
+                </div>
+
                 <AddToCartButton
                   productId={product.id}
                   slug={product.slug}
                   pricePaise={product.price_paise}
                 />
-                <p className="mt-3 text-secondary text-xs">
-                  Instant access • Lifetime access • Secure checkout
-                </p>
-                <div className="mt-4 space-y-1 text-sm">
+
+                <ul className="mt-4 space-y-1.5 text-xs text-secondary">
+                  {[
+                    "✓ Instant access after payment",
+                    "✓ Download all materials",
+                    "✓ Lifetime access",
+                    "✓ Secure checkout",
+                  ].map((t) => (
+                    <li key={t}>{t}</li>
+                  ))}
+                </ul>
+
+                <div className="mt-4 pt-4 border-t border-[var(--divider)] space-y-1.5">
                   <Link
                     href="/quiz"
-                    className="text-primary font-medium hover:underline block"
+                    className="text-primary text-sm font-medium hover:underline block"
                   >
                     Not sure your level? Take the quiz →
                   </Link>
                   <Link
                     href="/store"
-                    className="text-primary font-medium hover:underline block"
+                    className="text-primary text-sm font-medium hover:underline block"
                   >
                     View all bundles →
                   </Link>
                 </div>
               </div>
+
+              {/* Included teaser in sidebar (first 4 items) */}
+              {included.length > 0 && (
+                <div className="card p-4">
+                  <p className="text-xs font-semibold text-secondary uppercase tracking-wider mb-2">
+                    Includes
+                  </p>
+                  <ul className="space-y-1.5">
+                    {included.slice(0, 4).map((item, i) => (
+                      <li key={i} className="flex items-start gap-2 text-xs text-secondary">
+                        <span className="text-primary mt-0.5 flex-shrink-0">→</span>
+                        {item}
+                      </li>
+                    ))}
+                    {included.length > 4 && (
+                      <li className="text-xs text-secondary pl-4">
+                        + {included.length - 4} more items
+                      </li>
+                    )}
+                  </ul>
+                </div>
+              )}
             </aside>
           </div>
         </div>

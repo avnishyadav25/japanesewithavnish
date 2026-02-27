@@ -96,7 +96,7 @@ export function LearningContentForm({
             <div className="flex items-center justify-between mb-1">
               <label className="block text-sm font-medium text-charcoal">Content</label>
               <GenerateContentButton
-                contentType={contentType as "grammar" | "vocabulary" | "kanji" | "reading" | "writing"}
+                contentType={contentType as "grammar" | "vocabulary" | "kanji" | "reading" | "listening" | "writing"}
                 context={{
                   jlptLevel: form.jlpt_level || undefined,
                   topic: form.title,

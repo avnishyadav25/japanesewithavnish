@@ -5,7 +5,9 @@ export type ContentType =
   | "vocabulary"
   | "kanji"
   | "reading"
-  | "writing";
+  | "listening"
+  | "writing"
+  | "product";
 
 export type PromptContext = {
   topic?: string;
@@ -215,6 +217,27 @@ Output: Clean Markdown.
 ${TONE_RULES}`;
     }
 
+    case "listening": {
+      return `${BASE_BRAND}
+Create a JLPT ${level} listening comprehension practice lesson.
+
+Topic: "${topic}"
+${tags}${desc}
+
+Structure:
+1. Scene/Context (H1): Describe the listening scenario (e.g., at a station, in a restaurant, a phone call)
+2. Dialogue or Monologue (Japanese text, 100–180 words): Natural-sounding, appropriate for ${level}
+   - Include furigana for kanji above N5 level
+3. Comprehension questions (3–4): Multiple choice or short answer
+4. Answer key with brief explanations
+5. Vocabulary spotlight: 3–5 key words from the passage (word + reading + meaning)
+6. Listening tip: One practice strategy for ${level} listening sections
+
+Tone: Calm, educational. Dialogue should feel natural and contextually appropriate.
+Output: Clean Markdown.
+${TONE_RULES}`;
+    }
+
     case "writing": {
       return `${BASE_BRAND}
 Create a JLPT ${level} writing practice lesson.
@@ -231,6 +254,35 @@ Structure:
 
 Tone: Calm, academic, structured.
 Output: Clean Markdown.
+${TONE_RULES}`;
+    }
+
+    case "product": {
+      return `${BASE_BRAND}
+Generate complete product copy for a JLPT ${level} learning bundle.
+
+Product name: "${topic}"
+${tags}${desc}
+
+Write premium, conversion-focused product copy for a Japanese learning digital bundle. Tone: calm, structured, professional, premium — not salesy or hype-driven.
+
+OUTPUT FORMAT (return ONLY valid JSON, no other text):
+{
+  "description": "2–3 sentence marketing description. Clear value proposition. Who it's for + what they get + outcome. 60–80 words.",
+  "who_its_for": "3 short bullet points (one per line, no bullet symbols) describing the ideal learner. E.g.:\\nStudents preparing for JLPT ${level} exam\\nSelf-learners wanting structured offline study material\\nLearners who want to study without internet dependency",
+  "outcome": "1–2 sentences. What the learner will be able to do after completing this bundle. Specific, measurable, motivating. E.g.: 'Complete JLPT ${level} preparation with 800+ vocabulary words, essential grammar patterns, and 5 full-length mock tests.'",
+  "whats_included": ["Item 1 with quantity/detail", "Item 2 with quantity/detail", "Item 3", "Item 4", "Item 5", "Item 6"],
+  "faq": [
+    {"q": "How do I access the content after purchase?", "a": "You will receive an email with a magic link to your personal library where all downloads are available."},
+    {"q": "Can I study offline?", "a": "Yes, all PDFs and audio files can be downloaded to your device for offline study."},
+    {"q": "Is this suitable for complete beginners?", "a": "Provide an honest JLPT-level-appropriate answer here."},
+    {"q": "How long will it take to complete?", "a": "Provide a realistic time estimate based on the JLPT level and bundle contents."}
+  ],
+  "no_refunds_note": "All digital purchases are final. No refunds once content is accessed.",
+  "image_prompt": "A clean flat-vector product banner image for the '${topic}' JLPT ${level} Japanese learning bundle. Display the product name '${topic}' prominently at the top in bold, dark charcoal typography. Show an elegant study desk with: a structured Japanese study workbook open to a vocabulary/grammar page (hiragana/katakana/kanji visible), audio headphones, pencil, JLPT ${level} flashcards neatly arranged. Background: soft off-white #FAF8F5 with subtle cherry blossom petals and faint torii gate silhouette. Red (#D0021B) accent line or seal in corner. Calm academic atmosphere, premium quality. 16:9 aspect ratio. Include 'japanesewithavnish.com' as subtle footer text. No anime, no people faces, no clutter."
+}
+
+Return only the JSON. No markdown fences. No extra explanation.
 ${TONE_RULES}`;
     }
 

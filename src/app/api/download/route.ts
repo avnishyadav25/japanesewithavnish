@@ -4,16 +4,32 @@ export const dynamic = "force-dynamic";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-const BUCKET = "bundle-assets";
-const EXPIRY_SECONDS = 30 * 60; // 30 minutes
+// Map product slug → BUNDLE_*_DRIVE_URL env var
+const SLUG_TO_DRIVE_ENV: Record<string, string> = {
+  "complete-japanese-n5-n1-mega-bundle": "BUNDLE_MEGA_DRIVE_URL",
+  "japanese-n5-mastery-bundle": "BUNDLE_N5_DRIVE_URL",
+  "japanese-n4-upgrade-bundle": "BUNDLE_N4_DRIVE_URL",
+  "japanese-n3-power-bundle": "BUNDLE_N3_DRIVE_URL",
+  "japanese-n2-pro-bundle": "BUNDLE_N2_DRIVE_URL",
+  "japanese-n1-elite-bundle": "BUNDLE_N1_DRIVE_URL",
+  "free-n5-pack": "BUNDLE_FREE_STARTER_KIT_DRIVE_URL",
+  "free-n5-starter-kit": "BUNDLE_FREE_STARTER_KIT_DRIVE_URL",
+};
+
+function getDriveUrl(slug: string): string | null {
+  const envKey = SLUG_TO_DRIVE_ENV[slug];
+  if (!envKey) return null;
+  return process.env[envKey] || null;
+}
 
 export async function GET(req: NextRequest) {
   try {
-    const assetId = req.nextUrl.searchParams.get("asset_id");
-    if (!assetId) {
-      return NextResponse.json({ error: "asset_id required" }, { status: 400 });
+    const productId = req.nextUrl.searchParams.get("product_id");
+    if (!productId) {
+      return NextResponse.json({ error: "product_id required" }, { status: 400 });
     }
 
+    // Auth check
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user?.email) {
@@ -22,43 +38,44 @@ export async function GET(req: NextRequest) {
 
     const admin = createAdminClient();
 
-    const { data: asset, error: assetError } = await admin
-      .from("product_assets")
-      .select("id, storage_path, product_id")
-      .eq("id", assetId)
-      .single();
-
-    if (assetError || !asset) {
-      return NextResponse.json({ error: "Asset not found" }, { status: 404 });
-    }
-
+    // Entitlement check
     const { data: entitlement } = await admin
       .from("entitlements")
       .select("id")
       .eq("user_email", user.email)
-      .eq("product_id", asset.product_id)
+      .eq("product_id", productId)
       .eq("active", true)
-      .single();
+      .maybeSingle();
 
     if (!entitlement) {
-      return NextResponse.json({ error: "No access to this asset" }, { status: 403 });
+      return NextResponse.json({ error: "No access to this product" }, { status: 403 });
     }
 
-    await admin.from("download_logs").insert({
-      user_email: user.email,
-      asset_id: assetId,
-    });
+    // Look up product slug to get Drive URL
+    const { data: product } = await admin
+      .from("products")
+      .select("slug")
+      .eq("id", productId)
+      .single();
 
-    const { data: signedUrl, error: urlError } = await admin.storage
-      .from(BUCKET)
-      .createSignedUrl(asset.storage_path, EXPIRY_SECONDS);
-
-    if (urlError || !signedUrl?.signedUrl) {
-      console.error("Signed URL error:", urlError);
-      return NextResponse.json({ error: "Failed to generate download link" }, { status: 500 });
+    if (!product?.slug) {
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ url: signedUrl.signedUrl });
+    const driveUrl = getDriveUrl(product.slug);
+    if (!driveUrl) {
+      return NextResponse.json({ error: "Download not configured for this product" }, { status: 404 });
+    }
+
+    // Log download (non-blocking)
+    try {
+      await admin.from("download_logs").insert({
+        user_email: user.email,
+        asset_id: productId,
+      });
+    } catch { /* ignore log errors */ }
+
+    return NextResponse.json({ url: driveUrl });
   } catch (e) {
     console.error("Download error:", e);
     return NextResponse.json({ error: "Download failed" }, { status: 500 });

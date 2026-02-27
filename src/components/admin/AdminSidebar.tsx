@@ -30,6 +30,7 @@ const navGroups = [
       { href: "/admin/learn/vocabulary", label: "Vocabulary" },
       { href: "/admin/learn/kanji", label: "Kanji" },
       { href: "/admin/learn/reading", label: "Reading" },
+      { href: "/admin/learn/listening", label: "Listening" },
       { href: "/admin/learn/writing", label: "Writing" },
     ],
   },
@@ -53,9 +54,8 @@ function NavLink({ href, label }: { href: string; label: string }) {
   return (
     <Link
       href={href}
-      className={`block py-2 px-3 rounded-bento text-sm transition ${
-        isActive ? "bg-primary/10 text-primary font-medium japanese-shoji-border" : "text-secondary hover:text-primary hover:bg-base"
-      }`}
+      className={`block py-2 px-3 rounded-bento text-sm transition ${isActive ? "bg-primary/10 text-primary font-medium japanese-shoji-border" : "text-secondary hover:text-primary hover:bg-base"
+        }`}
     >
       {label}
     </Link>
@@ -87,9 +87,8 @@ export function AdminSidebar() {
       )}
 
       <aside
-        className={`fixed top-0 left-0 h-full w-[240px] bg-white border-r border-[var(--divider)] z-50 flex flex-col transition-transform md:translate-x-0 ${
-          open ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`fixed top-0 left-0 h-full w-[240px] bg-white border-r border-[var(--divider)] z-50 flex flex-col transition-transform md:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"
+          }`}
       >
         <div className="p-4 border-b border-[var(--divider)] flex items-center justify-between">
           <Link href="/admin" className="font-heading font-bold text-charcoal">

@@ -33,7 +33,9 @@ export async function POST(req: Request) {
       "vocabulary",
       "kanji",
       "reading",
+      "listening",
       "writing",
+      "product",
     ];
     if (!contentType || !validTypes.includes(contentType)) {
       return NextResponse.json({ error: "Invalid contentType" }, { status: 400 });
@@ -44,6 +46,8 @@ export async function POST(req: Request) {
     const systemPrompt = getPrompt(contentType, context);
     const userPrompt = prompt || "Generate the content as described.";
     const isBlog = contentType === "blog";
+    const isProduct = contentType === "product";
+    const isJsonResponse = isBlog || isProduct;
 
     const res = await fetch(DEEPSEEK_API, {
       method: "POST",
@@ -59,11 +63,13 @@ export async function POST(req: Request) {
             role: "user",
             content: isBlog
               ? "Generate the blog post. Return ONLY a valid JSON object with keys: content, title, slug, tags, jlpt_level, seo_title, seo_description, image_prompt, section_image_prompts. No markdown code blocks, no extra text."
-              : userPrompt,
+              : isProduct
+                ? "Generate the product copy. Return ONLY a valid JSON object with keys: description, who_its_for, outcome, whats_included, faq, no_refunds_note, image_prompt. No markdown code blocks, no extra text."
+                : userPrompt,
           },
         ],
         temperature: 0.7,
-        max_tokens: isBlog ? 8000 : 4000,
+        max_tokens: isBlog ? 8000 : isProduct ? 3000 : 4000,
       }),
     });
 
@@ -76,27 +82,40 @@ export async function POST(req: Request) {
     const data = await res.json();
     const raw = data.choices?.[0]?.message?.content ?? "";
 
-    if (isBlog) {
+    if (isJsonResponse) {
       try {
         const extracted = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
         const parsed = JSON.parse(extracted) as Record<string, unknown>;
         const out: Record<string, unknown> = {};
-        for (const k of ["content", "title", "slug", "tags", "jlpt_level", "seo_title", "seo_description", "image_prompt"]) {
-          const v = parsed[k];
-          if (typeof v === "string") out[k] = v;
+
+        if (isBlog) {
+          for (const k of ["content", "title", "slug", "tags", "jlpt_level", "seo_title", "seo_description", "image_prompt"]) {
+            const v = parsed[k];
+            if (typeof v === "string") out[k] = v;
+          }
+          const sectionImagePrompts = parsed.section_image_prompts;
+          if (Array.isArray(sectionImagePrompts) && sectionImagePrompts.length > 0) {
+            out.section_image_prompts = sectionImagePrompts.filter(
+              (p: unknown) =>
+                p &&
+                typeof p === "object" &&
+                "placeholder" in p &&
+                "section" in p &&
+                "prompt" in p
+            );
+          }
+          if (out.content) return NextResponse.json(out);
         }
-        const sectionImagePrompts = parsed.section_image_prompts;
-        if (Array.isArray(sectionImagePrompts) && sectionImagePrompts.length > 0) {
-          out.section_image_prompts = sectionImagePrompts.filter(
-            (p: unknown) =>
-              p &&
-              typeof p === "object" &&
-              "placeholder" in p &&
-              "section" in p &&
-              "prompt" in p
-          );
+
+        if (isProduct) {
+          for (const k of ["description", "who_its_for", "outcome", "no_refunds_note", "image_prompt"]) {
+            const v = parsed[k];
+            if (typeof v === "string") out[k] = v;
+          }
+          if (Array.isArray(parsed.whats_included)) out.whats_included = parsed.whats_included;
+          if (Array.isArray(parsed.faq)) out.faq = parsed.faq;
+          if (out.description || out.who_its_for) return NextResponse.json(out);
         }
-        if (out.content) return NextResponse.json(out);
       } catch {
         // Fallback: return content only
       }

@@ -10,6 +10,7 @@ interface StoreProduct {
   id: string;
   slug: string;
   name: string;
+  description?: string | null;
   price_paise: number;
   compare_price_paise?: number | null;
   jlpt_level?: string | null;
@@ -47,73 +48,73 @@ export default async function StorePage({
     products && products.length > 0
       ? (products as StoreProduct[])
       : [
-          {
-            id: "1",
-            slug: "japanese-n5-mastery-bundle",
-            name: "🔥 Japanese N5 Mastery Bundle",
-            price_paise: 19900,
-            compare_price_paise: 99900,
-            jlpt_level: "N5",
-            badge: "offer",
-            is_mega: false,
-          },
-          {
-            id: "2",
-            slug: "japanese-n4-upgrade-bundle",
-            name: "🎌 Japanese N4 Upgrade Bundle",
-            price_paise: 29900,
-            compare_price_paise: 129900,
-            jlpt_level: "N4",
-            badge: "offer",
-            is_mega: false,
-          },
-          {
-            id: "3",
-            slug: "japanese-n3-power-bundle",
-            name: "⚡ Japanese N3 Power Bundle",
-            price_paise: 39900,
-            compare_price_paise: 169900,
-            jlpt_level: "N3",
-            badge: "offer",
-            is_mega: false,
-          },
-          {
-            id: "4",
-            slug: "japanese-n2-pro-bundle",
-            name: "💼 Japanese N2 Pro Bundle",
-            price_paise: 49900,
-            compare_price_paise: 229900,
-            jlpt_level: "N2",
-            badge: "offer",
-            is_mega: false,
-          },
-          {
-            id: "5",
-            slug: "japanese-n1-elite-bundle",
-            name: "🏆 Japanese N1 Elite Bundle",
-            price_paise: 59900,
-            compare_price_paise: 249900,
-            jlpt_level: "N1",
-            badge: "premium",
-            is_mega: false,
-          },
-          {
-            id: "6",
-            slug: "complete-japanese-n5-n1-mega-bundle",
-            name: "🎌 Japanese Complete N5–N1 Mega Bundle",
-            price_paise: 89900,
-            compare_price_paise: 359900,
-            jlpt_level: null,
-            badge: "premium",
-            is_mega: true,
-          },
-        ];
+        {
+          id: "1",
+          slug: "japanese-n5-mastery-bundle",
+          name: "🔥 Japanese N5 Mastery Bundle",
+          price_paise: 19900,
+          compare_price_paise: 99900,
+          jlpt_level: "N5",
+          badge: "offer",
+          is_mega: false,
+        },
+        {
+          id: "2",
+          slug: "japanese-n4-upgrade-bundle",
+          name: "🎌 Japanese N4 Upgrade Bundle",
+          price_paise: 29900,
+          compare_price_paise: 129900,
+          jlpt_level: "N4",
+          badge: "offer",
+          is_mega: false,
+        },
+        {
+          id: "3",
+          slug: "japanese-n3-power-bundle",
+          name: "⚡ Japanese N3 Power Bundle",
+          price_paise: 39900,
+          compare_price_paise: 169900,
+          jlpt_level: "N3",
+          badge: "offer",
+          is_mega: false,
+        },
+        {
+          id: "4",
+          slug: "japanese-n2-pro-bundle",
+          name: "💼 Japanese N2 Pro Bundle",
+          price_paise: 49900,
+          compare_price_paise: 229900,
+          jlpt_level: "N2",
+          badge: "offer",
+          is_mega: false,
+        },
+        {
+          id: "5",
+          slug: "japanese-n1-elite-bundle",
+          name: "🏆 Japanese N1 Elite Bundle",
+          price_paise: 59900,
+          compare_price_paise: 249900,
+          jlpt_level: "N1",
+          badge: "premium",
+          is_mega: false,
+        },
+        {
+          id: "6",
+          slug: "complete-japanese-n5-n1-mega-bundle",
+          name: "🎌 Japanese Complete N5–N1 Mega Bundle",
+          price_paise: 89900,
+          compare_price_paise: 359900,
+          jlpt_level: null,
+          badge: "premium",
+          is_mega: true,
+        },
+      ];
 
   const levelFilter = level?.toUpperCase();
   let filtered = levelFilter
     ? items.filter(
-        (p) => p.jlpt_level === levelFilter || (levelFilter === "MEGA" && p.is_mega)
-      )
+      (p) => p.jlpt_level === levelFilter || (levelFilter === "MEGA" && p.is_mega)
+    )
     : items;
 
   const sortKey = sort === "price" || sort === "newest" ? sort : "recommended";
@@ -189,14 +190,15 @@ export default async function StorePage({
                 <ProductCard
                   slug={mega.slug}
                   name={mega.name}
+                  description={mega.description}
                   price={mega.price_paise}
                   comparePrice={mega.compare_price_paise || undefined}
                   badge={
                     mega.badge === "premium"
                       ? "premium"
                       : mega.badge === "offer"
-                      ? "offer"
-                      : undefined
+                        ? "offer"
+                        : undefined
                   }
                   jlptLevel={mega.jlpt_level || undefined}
                   size="large"
@@ -210,14 +212,15 @@ export default async function StorePage({
                 <ProductCard
                   slug={product.slug}
                   name={product.name}
+                  description={product.description}
                   price={product.price_paise}
                   comparePrice={product.compare_price_paise || undefined}
                   badge={
                     product.badge === "premium"
                       ? "premium"
                       : product.badge === "offer"
-                      ? "offer"
-                      : undefined
+                        ? "offer"
+                        : undefined
                   }
                   jlptLevel={product.jlpt_level || undefined}
                   size="medium"

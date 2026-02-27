@@ -66,12 +66,19 @@ export function GenerateContentModal({
         body: JSON.stringify({ contentType, context }),
       });
       const data = await res.json();
-      if (data.content) {
-        if (contentType === "blog" && typeof data.title === "string") {
-          onGenerated(data as BlogGeneratedFields);
-        } else {
-          onGenerated(data.content);
-        }
+      if (data.error) throw new Error(data.error);
+
+      if (contentType === "blog" && typeof data.content === "string" && typeof data.title === "string") {
+        // Blog: structured JSON with content, title, slug, etc.
+        onGenerated(data as BlogGeneratedFields);
+        onClose();
+      } else if (contentType === "product") {
+        // Product: structured JSON without a 'content' key
+        onGenerated(data);
+        onClose();
+      } else if (typeof data.content === "string") {
+        // All other types: plain text content
+        onGenerated(data.content);
         onClose();
       }
     } finally {

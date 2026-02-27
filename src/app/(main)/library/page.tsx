@@ -1,6 +1,5 @@
 import "server-only";
 import Link from "next/link";
-import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { LibraryContent } from "./LibraryContent";
 
