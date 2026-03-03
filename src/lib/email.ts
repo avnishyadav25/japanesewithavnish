@@ -1,4 +1,4 @@
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 import {
   emailWrapper,
   welcomeNewsletterContent,
@@ -8,68 +8,100 @@ import {
   productListHtml,
   type EmailProduct,
 } from "./email-templates";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { sql } from "@/lib/db";
+import { getDriveUrlForSlug } from "@/lib/drive-url";
 
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const FROM_EMAIL = process.env.EMAIL_FROM || "Japanese with Avnish <noreply@japanesewithavnish.com>";
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://japanesewithavnish.com";
 
+function getTransporter(): nodemailer.Transporter | null {
+  const host = process.env.SMTP_HOST;
+  if (!host) return null;
+  const port = Number(process.env.SMTP_PORT) || 587;
+  // Port 465 = implicit SSL (secure: true). Port 587 = STARTTLS (secure: false). Wrong version number = usually secure:true on 587.
+  const secure = port === 465;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure,
+    auth: user && pass ? { user, pass } : undefined,
+  });
+}
+
+async function sendMail(to: string, subject: string, html: string): Promise<{ id?: string } | null> {
+  const transporter = getTransporter();
+  if (!transporter) {
+    console.warn("[Email] SMTP not configured (SMTP_HOST missing). Skipping send.");
+    return null;
+  }
+  try {
+    const info = await transporter.sendMail({
+      from: FROM_EMAIL,
+      to,
+      subject,
+      html,
+    });
+    return { id: info.messageId };
+  } catch (err) {
+    console.error("[Email] Send failed:", err instanceof Error ? err.message : String(err));
+    throw err;
+  }
+}
+
 async function getProductsForEmail(): Promise<EmailProduct[]> {
   try {
-    const admin = createAdminClient();
-    const { data } = await admin
-      .from("products")
-      .select("slug, name, price_paise, image_url, jlpt_level")
-      .order("sort_order", { ascending: true })
-      .limit(6);
-    return (data || []) as EmailProduct[];
+    if (!sql) return [];
+    const rows = await sql`SELECT slug, name, price_paise, image_url, jlpt_level FROM products ORDER BY sort_order ASC LIMIT 6`;
+    return (rows || []) as EmailProduct[];
   } catch {
     return [];
   }
 }
 
 export async function sendMagicLink(email: string, magicLinkUrl: string) {
-  if (!resend) return null;
-  const { data, error } = await resend.emails.send({
-    from: FROM_EMAIL,
-    to: email,
-    subject: "Login to Japanese with Avnish",
-    html: `
+  return sendMail(
+    email,
+    "Login to Japanese with Avnish",
+    `
       <p>Click the link below to access your library:</p>
       <p><a href="${magicLinkUrl}" style="color:#D0021B;font-weight:600;">Access My Library</a></p>
       <p>This link expires in 1 hour.</p>
       <p>If you didn't request this, you can ignore this email.</p>
-    `,
-  });
-  if (error) throw error;
-  return data;
+    `
+  );
 }
+
+export type OrderConfirmationOptions = {
+  accessToken: string;
+  productSlug?: string | null;
+};
 
 export async function sendOrderConfirmation(
   email: string,
   name: string,
-  libraryUrl: string,
-  orderId: string
+  orderId: string,
+  options: OrderConfirmationOptions
 ) {
-  if (!resend) return null;
+  const { accessToken, productSlug } = options;
+  const libraryUrl = `${SITE_URL}/access?token=${accessToken}`;
+  const driveUrl = productSlug ? getDriveUrlForSlug(productSlug) : null;
+  const accessUrl = driveUrl || libraryUrl;
+  const orderDetailUrl = `${SITE_URL}/order/${orderId}?token=${accessToken}`;
+
   const content = `
     <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">Hi ${name},</p>
     <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">Thank you for your purchase! Your digital bundle is ready.</p>
-    <p style="margin:0 0 24px;"><a href="${libraryUrl}" style="background:#D0021B;color:white;padding:12px 26px;text-decoration:none;border-radius:8px;display:inline-block;font-weight:600;">Access My Library</a></p>
+    <p style="margin:0 0 16px;"><a href="${accessUrl}" style="background:#D0021B;color:white;padding:12px 26px;text-decoration:none;border-radius:8px;display:inline-block;font-weight:600;">Access My Library</a></p>
+    <p style="margin:0 0 16px;"><a href="${orderDetailUrl}" style="color:#D0021B;font-weight:600;">View order details</a></p>
     <p style="font-size:14px;line-height:1.6;margin:0;color:#555;">Order ID: ${orderId}</p>
-    <p style="font-size:14px;line-height:1.6;margin:8px 0 0;color:#555;">You can access your downloads anytime by logging in with this email.</p>
+    <p style="font-size:14px;line-height:1.6;margin:8px 0 0;color:#555;">You can return to your library anytime using the link above (it stays valid for 30 days).</p>
     <p style="font-size:14px;line-height:1.6;margin:16px 0 0;">— Japanese with Avnish</p>
   `;
   const products = await getProductsForEmail();
   const productList = productListHtml(products, SITE_URL);
-  const { data, error } = await resend.emails.send({
-    from: FROM_EMAIL,
-    to: email,
-    subject: "Your purchase is ready — Japanese with Avnish",
-    html: emailWrapper(content, productList),
-  });
-  if (error) throw error;
-  return data;
+  return sendMail(email, "Your purchase is ready — Japanese with Avnish", emailWrapper(content, productList));
 }
 
 export async function sendQuizResults(
@@ -78,7 +110,6 @@ export async function sendQuizResults(
   recommendedBundle: string,
   productUrl: string
 ) {
-  if (!resend) return null;
   const content = `
     <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">Based on your quiz results, we recommend the <strong>${level}</strong> level.</p>
     <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">Your best fit: <strong>${recommendedBundle}</strong></p>
@@ -87,29 +118,14 @@ export async function sendQuizResults(
   `;
   const products = await getProductsForEmail();
   const productList = productListHtml(products, SITE_URL);
-  const { data, error } = await resend.emails.send({
-    from: FROM_EMAIL,
-    to: email,
-    subject: `Your JLPT level: ${level} — Japanese with Avnish`,
-    html: emailWrapper(content, productList),
-  });
-  if (error) throw error;
-  return data;
+  return sendMail(email, `Your JLPT level: ${level} — Japanese with Avnish`, emailWrapper(content, productList));
 }
 
 export async function sendWelcomeNewsletter(email: string, name?: string) {
-  if (!resend) return null;
   const content = welcomeNewsletterContent(name || "");
   const products = await getProductsForEmail();
   const productList = productListHtml(products, SITE_URL);
-  const { data, error } = await resend.emails.send({
-    from: FROM_EMAIL,
-    to: email,
-    subject: "Welcome to Japanese with Avnish — JLPT tips & updates",
-    html: emailWrapper(content, productList),
-  });
-  if (error) throw error;
-  return data;
+  return sendMail(email, "Welcome to Japanese with Avnish — JLPT tips & updates", emailWrapper(content, productList));
 }
 
 export async function sendNewsletter(
@@ -118,18 +134,10 @@ export async function sendNewsletter(
   subject: string,
   htmlContent: string
 ) {
-  if (!resend) return null;
   const content = newsletterContent(htmlContent);
   const products = await getProductsForEmail();
   const productList = productListHtml(products, SITE_URL);
-  const { data, error } = await resend.emails.send({
-    from: FROM_EMAIL,
-    to: email,
-    subject,
-    html: emailWrapper(content, productList),
-  });
-  if (error) throw error;
-  return data;
+  return sendMail(email, subject, emailWrapper(content, productList));
 }
 
 export async function sendNewCommentNotification(
@@ -140,7 +148,6 @@ export async function sendNewCommentNotification(
   commenterName: string,
   commentPreview: string
 ) {
-  if (!resend) return null;
   const content = newCommentNotificationContent(
     name,
     postTitle,
@@ -150,14 +157,11 @@ export async function sendNewCommentNotification(
   );
   const products = await getProductsForEmail();
   const productList = productListHtml(products, SITE_URL);
-  const { data, error } = await resend.emails.send({
-    from: FROM_EMAIL,
-    to: email,
-    subject: `New comment on "${postTitle}" — Japanese with Avnish`,
-    html: emailWrapper(content, productList),
-  });
-  if (error) throw error;
-  return data;
+  return sendMail(
+    email,
+    `New comment on "${postTitle}" — Japanese with Avnish`,
+    emailWrapper(content, productList)
+  );
 }
 
 export async function sendCommunityGuidelinesEmail(
@@ -166,16 +170,33 @@ export async function sendCommunityGuidelinesEmail(
   postTitle: string,
   postUrl: string
 ) {
-  if (!resend) return null;
   const content = communityGuidelinesContent(name, postTitle, postUrl);
   const products = await getProductsForEmail();
   const productList = productListHtml(products, SITE_URL);
-  const { data, error } = await resend.emails.send({
-    from: FROM_EMAIL,
-    to: email,
-    subject: `Community guidelines — Japanese with Avnish`,
-    html: emailWrapper(content, productList),
-  });
-  if (error) throw error;
-  return data;
+  return sendMail(email, "Community guidelines — Japanese with Avnish", emailWrapper(content, productList));
+}
+
+/** Sent when a payment fails (e.g. Razorpay payment.failed). Includes product link to retry. */
+export async function sendPaymentFailedRetryEmail(
+  email: string,
+  name: string,
+  productUrl: string,
+  productName?: string
+) {
+  const productLabel = productName || "your bundle";
+  const content = `
+    <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">Hi ${name},</p>
+    <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">Your recent payment didn&apos;t go through. This can happen if the card was declined, insufficient funds, or the payment was cancelled.</p>
+    <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">You can try again anytime using the link below:</p>
+    <p style="margin:0 0 24px;"><a href="${productUrl}" style="background:#D0021B;color:white;padding:12px 26px;text-decoration:none;border-radius:8px;display:inline-block;font-weight:600;">Retry payment — ${productLabel}</a></p>
+    <p style="font-size:14px;line-height:1.6;margin:0;color:#555;">If you need help or want to use a different payment method, reply to this email or contact us using the link in the footer.</p>
+    <p style="font-size:14px;line-height:1.6;margin:16px 0 0;">— Japanese with Avnish</p>
+  `;
+  const products = await getProductsForEmail();
+  const productList = productListHtml(products, SITE_URL);
+  return sendMail(
+    email,
+    "Payment didn't go through — try again — Japanese with Avnish",
+    emailWrapper(content, productList)
+  );
 }

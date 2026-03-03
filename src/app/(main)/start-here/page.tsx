@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { sql } from "@/lib/db";
 import { StartHereAnnouncement } from "@/components/StartHereAnnouncement";
 import { ChooseYourPathTabs } from "@/components/ChooseYourPathTabs";
 import { HomeBundleCard } from "@/components/HomeBundleCard";
@@ -26,32 +26,28 @@ const LEVEL_SLUGS: Record<string, string> = {
 const MEGA_SLUG = "complete-japanese-n5-n1-mega-bundle";
 
 export default async function StartHerePage() {
-  const supabase = await createClient();
-
-  const [productsRes, settingsRes, postsRes] = await Promise.all([
-    supabase.from("products").select("*").order("sort_order", { ascending: true }),
-    supabase.from("site_settings").select("key, value").in("key", [
-      "start_here_announcement",
-      "start_here_curated_posts",
-      "start_here_faq",
-    ]),
-    supabase.from("posts").select("id, slug, title, summary, jlpt_level").eq("status", "published"),
-  ]);
-
-  const products = productsRes.data?.length ? productsRes.data : FALLBACK_PRODUCTS;
-  const mega = products.find((p: { is_mega?: boolean }) => p.is_mega) ?? products.find((p: { slug: string }) => p.slug === MEGA_SLUG);
-  const restProducts = products.filter((p: { is_mega?: boolean }) => !p.is_mega);
-
+  let products = FALLBACK_PRODUCTS;
   const settings: Record<string, unknown> = {};
-  settingsRes.data?.forEach((r: { key: string; value: unknown }) => {
-    settings[r.key] = r.value;
-  });
+  let allPosts: { id: string; slug: string; title: string; summary?: string | null; jlpt_level?: string[] | null }[] = [];
+
+  if (sql) {
+    const [productRows, settingsRows, postsRows] = await Promise.all([
+      sql`SELECT * FROM products ORDER BY sort_order ASC`,
+      sql`SELECT key, value FROM site_settings WHERE key = ANY(ARRAY['start_here_announcement', 'start_here_curated_posts', 'start_here_faq'])`,
+      sql`SELECT id, slug, title, summary, jlpt_level FROM posts WHERE status = 'published'`,
+    ]);
+    products = (productRows as Record<string, unknown>[])?.length ? (productRows as typeof FALLBACK_PRODUCTS) : FALLBACK_PRODUCTS;
+    (settingsRows as { key: string; value: unknown }[]).forEach((r) => { settings[r.key] = r.value; });
+    allPosts = (postsRows as typeof allPosts) ?? [];
+  }
+
+  const mega = products.find((p: { is_mega?: boolean }) => p.is_mega) ?? products.find((p: { slug: string }) => p.slug === MEGA_SLUG) ?? null;
+  const restProducts = products.filter((p: { is_mega?: boolean }) => !p.is_mega);
 
   const announcement = settings.start_here_announcement as { enabled?: boolean; message?: string; href?: string } | null;
   const curatedSlugs = settings.start_here_curated_posts as string[] | null;
   const faqItems = settings.start_here_faq as { q: string; a: string }[] | null;
 
-  const allPosts = (postsRes.data ?? []) as { id: string; slug: string; title: string; summary?: string | null; jlpt_level?: string[] | null }[];
   let curatedPosts: typeof allPosts = [];
   if (Array.isArray(curatedSlugs) && curatedSlugs.length > 0) {
     curatedPosts = curatedSlugs
@@ -157,7 +153,7 @@ export default async function StartHerePage() {
         <div className="max-w-[1100px] mx-auto">
           <h2 className="font-heading text-2xl font-bold text-charcoal mb-8">Recommended bundles</h2>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {orderedBundles.map((product: { id: string; slug: string; name: string; price_paise: number; compare_price_paise?: number; jlpt_level?: string; badge?: string; is_mega?: boolean }) => (
+            {orderedBundles.map((product: { id: string; slug: string; name: string; price_paise: number; compare_price_paise?: number; jlpt_level?: string | null; badge?: string; is_mega?: boolean }) => (
               <HomeBundleCard
                 key={product.id}
                 slug={product.slug}

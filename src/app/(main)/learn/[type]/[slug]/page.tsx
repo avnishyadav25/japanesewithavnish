@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { sql } from "@/lib/db";
 
 const TYPES = ["grammar", "vocabulary", "kanji", "reading", "writing"] as const;
 const TYPE_LABELS: Record<string, string> = {
@@ -21,16 +21,14 @@ export default async function LearnDetailPage({
 
   if (!TYPES.includes(normalized as (typeof TYPES)[number])) notFound();
 
-  const supabase = await createClient();
-  const { data: item, error } = await supabase
-    .from("learning_content")
-    .select("*")
-    .eq("content_type", normalized)
-    .eq("slug", slug)
-    .eq("status", "published")
-    .single();
-
-  if (error || !item) notFound();
+  if (!sql) notFound();
+  const rows = await sql`
+    SELECT * FROM learning_content
+    WHERE content_type = ${normalized} AND slug = ${slug} AND status = 'published'
+    LIMIT 1
+  `;
+  const item = rows[0] as { title: string; jlpt_level?: string; content?: string } | undefined;
+  if (!item) notFound();
 
   return (
     <div className="py-12 sm:py-16 px-4 sm:px-6 japanese-wave-bg">

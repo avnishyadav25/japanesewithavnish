@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { sql } from "@/lib/db";
 import {
   filterLearnItems,
   normalizeLearnLevel,
@@ -36,26 +36,18 @@ export default async function LearnTypePage({
   const page = Math.max(1, parseInt(sp.page || "1", 10));
 
   const basePath = `/learn/${normalizedType}`;
-  const supabase = await createClient();
+  let allItems: LearnItemForFilter[] = [];
+  let recommendedByLevel: Record<string, string[]> = {};
 
-  const [contentRes, settingsRes] = await Promise.all([
-    supabase
-      .from("learning_content")
-      .select("id, slug, title, content, content_type, jlpt_level, tags, meta, status, sort_order, created_at, updated_at")
-      .eq("content_type", normalizedType)
-      .eq("status", "published")
-      .order("sort_order", { ascending: true })
-      .order("created_at", { ascending: false })
-      .limit(200),
-    supabase
-      .from("site_settings")
-      .select("key, value")
-      .eq("key", "learn_recommended")
-      .maybeSingle(),
-  ]);
-
-  const allItems = (contentRes.data || []) as LearnItemForFilter[];
-  const recommendedByLevel = (settingsRes.data?.value as Record<string, string[]>) || {};
+  if (sql) {
+    const [contentRows, settingsRows] = await Promise.all([
+      sql`SELECT id, slug, title, content, content_type, jlpt_level, tags, meta, status, sort_order, created_at, updated_at FROM learning_content WHERE content_type = ${normalizedType} AND status = 'published' ORDER BY sort_order ASC, created_at DESC LIMIT 200`,
+      sql`SELECT value FROM site_settings WHERE key = 'learn_recommended' LIMIT 1`,
+    ]);
+    allItems = (contentRows || []) as LearnItemForFilter[];
+    const settingsRow = settingsRows[0] as { value: Record<string, string[]> } | undefined;
+    recommendedByLevel = settingsRow?.value || {};
+  }
   const curatedSlugs = recommendedByLevel[level] ?? recommendedByLevel.all ?? [];
 
   const filtered = filterLearnItems(allItems, level, normalizedType, search);

@@ -20,6 +20,16 @@ CREATE INDEX IF NOT EXISTS idx_learning_content_status ON learning_content(statu
 
 ALTER TABLE learning_content ENABLE ROW LEVEL SECURITY;
 
--- Public read for published content
-CREATE POLICY "Public read published learning_content" ON learning_content
-  FOR SELECT USING (status = 'published');
+-- Public read for published content (idempotent)
+DO $$
+BEGIN
+  BEGIN
+    CREATE POLICY "Public read published learning_content" ON learning_content
+      FOR SELECT USING (status = 'published');
+  EXCEPTION
+    WHEN duplicate_object THEN
+      -- Policy already exists; ignore so migration is re-runnable
+      NULL;
+  END;
+END;
+$$;

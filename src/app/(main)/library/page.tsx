@@ -1,14 +1,11 @@
 import "server-only";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { getSession } from "@/lib/auth/session";
 import { LibraryContent } from "./LibraryContent";
 
 async function getUserEmail() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return user?.email || null;
+  const session = await getSession();
+  return session?.email ?? null;
 }
 
 export default async function LibraryPage() {

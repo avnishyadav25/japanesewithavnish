@@ -13,6 +13,9 @@ const nextConfig = {
     remotePatterns: [
       { protocol: "https", hostname: "cdn.shopify.com", pathname: "/**" },
       { protocol: "https", hostname: "*.supabase.co", pathname: "/storage/v1/object/public/**" },
+      // R2 public bucket URLs (add your custom domain here if needed)
+      { protocol: "https", hostname: "*.r2.dev", pathname: "/**" },
+      { protocol: "https", hostname: "*.r2.cloudflarestorage.com", pathname: "/**" },
     ],
   },
   experimental: {

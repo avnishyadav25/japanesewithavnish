@@ -1,30 +1,30 @@
-import { createAdminClient } from "@/lib/supabase/admin";
+import { sql } from "@/lib/db";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
 import { BlogListClient } from "./BlogListClient";
 
+type PostRow = { id: string; slug: string; title: string; status: string; published_at: string | null; jlpt_level: string | string[] | null; og_image_url: string | null; summary: string | null };
+
 export default async function AdminBlogsPage() {
-  const supabase = createAdminClient();
+  let posts: PostRow[] = [];
+  let thisMonth = 0;
 
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  if (sql) {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const [postsRows, countRows] = await Promise.all([
+      sql`SELECT id, slug, title, status, published_at, jlpt_level, og_image_url, summary FROM posts ORDER BY created_at DESC`,
+      sql`SELECT COUNT(*)::int AS c FROM posts WHERE published_at >= ${monthStart}`,
+    ]);
+    posts = (postsRows ?? []) as PostRow[];
+    thisMonth = (countRows[0] as { c: number })?.c ?? 0;
+  }
 
-  const [{ data: posts }, { count: thisMonth }] = await Promise.all([
-    supabase
-      .from("posts")
-      .select("id, slug, title, status, published_at, jlpt_level, og_image_url, summary")
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("posts")
-      .select("id", { count: "exact", head: true })
-      .gte("published_at", monthStart),
-  ]);
-
-  const total = posts?.length ?? 0;
-  const published = posts?.filter((p) => p.status === "published").length ?? 0;
+  const total = posts.length;
+  const published = posts.filter((p) => p.status === "published").length;
   const draft = total - published;
 
-  if (!posts || posts.length === 0) {
+  if (posts.length === 0) {
     return (
       <div>
         <AdminPageHeader
@@ -49,7 +49,7 @@ export default async function AdminBlogsPage() {
       />
       <BlogListClient
         posts={posts}
-        stats={{ total, published, draft, thisMonth: thisMonth ?? 0 }}
+        stats={{ total, published, draft, thisMonth }}
       />
     </div>
   );

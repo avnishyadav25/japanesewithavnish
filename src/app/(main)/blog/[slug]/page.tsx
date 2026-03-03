@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { sql } from "@/lib/db";
 import { ProductCard } from "@/components/ProductCard";
 import { BlogCommentForm } from "@/components/BlogCommentForm";
 import { BlogCommentList } from "@/components/BlogCommentList";
@@ -19,63 +19,59 @@ function estimateReadTime(content: string): number {
 
 export default async function BlogPostPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const supabase = await createClient();
-  const { data: post, error } = await supabase
-    .from("posts")
-    .select("*")
-    .eq("slug", slug)
-    .eq("status", "published")
-    .single();
+  if (!sql) notFound();
 
-  if (error || !post) notFound();
+  const postRows = await sql`SELECT * FROM posts WHERE slug = ${slug} AND status = 'published' LIMIT 1`;
+  const postRaw = postRows[0] as Record<string, unknown> | undefined;
+  if (!postRaw) notFound();
+  const post = postRaw as {
+    id: string; title: string; summary?: string | null; seo_description?: string | null; content?: string | null;
+    published_at?: string | null; og_image_url?: string | null; jlpt_level?: unknown; tags?: string[];
+  };
 
   const jlptLevels = Array.isArray(post.jlpt_level)
     ? post.jlpt_level
     : post.jlpt_level
       ? [post.jlpt_level]
       : [];
-  const primaryLevel = jlptLevels[0]?.toUpperCase?.() || "";
+  const primaryLevel = (jlptLevels[0] as string)?.toUpperCase?.() || "";
   const tags = (post.tags || []) as string[];
   const topicTag = tags[0] || "Article";
 
-  const { data: products } = await supabase
-    .from("products")
-    .select("id, slug, name, price_paise, compare_price_paise, badge, jlpt_level, image_url, is_mega")
-    .order("sort_order", { ascending: true });
-  const allProducts = products || [];
+  const productRows = await sql`SELECT id, slug, name, price_paise, compare_price_paise, badge, jlpt_level, image_url, is_mega FROM products ORDER BY sort_order ASC`;
+  const allProducts = (productRows || []) as { id: string; slug: string; name: string; price_paise: number; compare_price_paise?: number; badge?: string; jlpt_level?: string; image_url?: string; is_mega?: boolean }[];
   const relevantProducts = allProducts.filter(
     (p) =>
       p.jlpt_level === primaryLevel ||
       p.jlpt_level === "N4" ||
-      (p as { is_mega?: boolean }).is_mega ||
+      p.is_mega ||
       (primaryLevel === "N5" && ["N5", "N4"].includes(p.jlpt_level || ""))
   );
   const bundlesToShow =
     relevantProducts.length > 0 ? relevantProducts.slice(0, 4) : allProducts.slice(0, 4);
 
-  const { data: allPosts } = await supabase
-    .from("posts")
-    .select("id, slug, title, summary, seo_description, published_at, og_image_url, jlpt_level, tags")
-    .eq("status", "published")
-    .neq("id", post.id)
-    .order("published_at", { ascending: false })
-    .limit(50);
+  const allPostsRows = await sql`
+    SELECT id, slug, title, summary, seo_description, published_at, og_image_url, jlpt_level, tags
+    FROM posts WHERE status = 'published' AND id != ${post.id as string}
+    ORDER BY published_at DESC LIMIT 50
+  `;
   const related = filterPosts(
-    (allPosts || []) as PostForFilter[],
+    (allPostsRows || []) as PostForFilter[],
     primaryLevel ? primaryLevel.toLowerCase() : "all",
     "all",
     ""
   ).slice(0, 6);
 
-  const { data: comments } = await supabase
-    .from("post_comments")
-    .select("id, author_name, author_email, content, created_at")
-    .eq("post_id", post.id)
-    .eq("status", "approved")
-    .order("created_at", { ascending: true });
+  const commentsRows = await sql`
+    SELECT id, author_name, author_email, content, created_at
+    FROM post_comments WHERE post_id = ${post.id as string} AND status = 'approved'
+    ORDER BY created_at ASC
+  `;
+  const comments = (commentsRows || []) as { id: string; author_name: string; author_email: string; content: string; created_at: string }[];
 
-  const readTime = post.content ? estimateReadTime(post.content) : 0;
-  const isMarkdown = post.content && !post.content.trim().startsWith("<");
+  const contentStr = typeof post.content === "string" ? post.content : "";
+  const readTime = contentStr ? estimateReadTime(contentStr) : 0;
+  const isMarkdown = contentStr && !contentStr.trim().startsWith("<");
 
   return (
     <div className="py-12 sm:py-16 px-4 sm:px-6 pb-24 lg:pb-16">
@@ -157,13 +153,13 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
             <div className="flex gap-8">
               {isMarkdown && (
                 <aside className="hidden xl:block w-48 flex-shrink-0">
-                  <BlogTableOfContents content={post.content || ""} />
+                  <BlogTableOfContents content={contentStr} />
                 </aside>
               )}
               <div className="flex-1 min-w-0">
                 <div className="prose prose-charcoal max-w-none [&_h1]:text-4xl [&_h1]:font-heading [&_h1]:font-bold [&_h2]:text-2xl [&_h2]:font-heading [&_h2]:font-bold [&_h2]:mt-8 [&_h2]:mb-3 [&_h3]:text-xl [&_h3]:font-heading [&_h3]:font-bold [&_h3]:mt-6 [&_h3]:mb-2 [&_p]:mb-4 [&_ul]:mb-4 [&_ol]:mb-4">
-                  {post.content ? (
-                    <BlogArticleContent content={post.content} />
+                  {contentStr ? (
+                    <BlogArticleContent content={contentStr} />
                   ) : null}
                 </div>
               </div>
@@ -191,7 +187,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
               <h2 className="font-heading text-2xl font-bold text-charcoal mb-4">
                 Comments
               </h2>
-              <BlogCommentList comments={comments || []} />
+              <BlogCommentList comments={comments} />
               <div className="mt-6">
                 <h3 className="font-heading text-lg font-semibold text-charcoal mb-3">
                   Add a comment

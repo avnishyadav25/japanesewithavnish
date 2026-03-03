@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createSessionToken } from "@/lib/auth/session";
+import { sendMagicLink } from "@/lib/email";
 
 export async function POST(req: Request) {
   try {
@@ -8,29 +9,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Email required" }, { status: 400 });
     }
 
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!url || !key) {
-      console.error("Magic link: Supabase URL or anon key missing");
-      return NextResponse.json(
-        { error: "Auth not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to .env" },
-        { status: 500 }
-      );
-    }
-
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
     const redirectTo = `${siteUrl.replace(/\/$/, "")}/library`;
+    const token = await createSessionToken(email.trim().toLowerCase());
+    const callbackUrl = `${siteUrl.replace(/\/$/, "")}/api/auth/callback?token=${token}&next=${encodeURIComponent(redirectTo)}`;
 
-    const supabase = await createClient();
-    const { error } = await supabase.auth.signInWithOtp({
-      email: email.trim().toLowerCase(),
-      options: { emailRedirectTo: redirectTo },
-    });
-
-    if (error) {
-      console.error("Magic link error:", error.message);
-      return NextResponse.json({ error: error.message }, { status: 400 });
-    }
+    await sendMagicLink(email.trim(), callbackUrl);
 
     return NextResponse.json({ success: true });
   } catch (e) {

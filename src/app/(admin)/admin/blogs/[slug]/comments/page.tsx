@@ -1,9 +1,11 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { sql } from "@/lib/db";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminCard } from "@/components/admin/AdminCard";
 import { CommentsManager } from "./CommentsManager";
+
+export const dynamic = "force-dynamic";
 
 export default async function AdminBlogCommentsPage({
   params,
@@ -11,21 +13,17 @@ export default async function AdminBlogCommentsPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const supabase = createAdminClient();
+  if (!sql) notFound();
 
-  const { data: post, error: postError } = await supabase
-    .from("posts")
-    .select("id, title, slug")
-    .eq("slug", slug)
-    .single();
+  const postRows = await sql`SELECT id, title, slug FROM posts WHERE slug = ${slug} LIMIT 1`;
+  const post = postRows[0] as { id: string; title: string; slug: string } | undefined;
+  if (!post) notFound();
 
-  if (postError || !post) notFound();
-
-  const { data: comments } = await supabase
-    .from("post_comments")
-    .select("id, author_name, author_email, content, status, created_at")
-    .eq("post_id", post.id)
-    .order("created_at", { ascending: false });
+  const commentsRows = await sql`
+    SELECT id, author_name, author_email, content, status, created_at
+    FROM post_comments WHERE post_id = ${post.id} ORDER BY created_at DESC
+  `;
+  const comments = (commentsRows ?? []) as { id: string; author_name: string; author_email: string; content: string; status: string; created_at: string }[];
 
   return (
     <div>
@@ -47,7 +45,7 @@ export default async function AdminBlogCommentsPage({
         </Link>
       </div>
       <AdminCard>
-        {comments && comments.length > 0 ? (
+        {comments.length > 0 ? (
           <CommentsManager comments={comments} />
         ) : (
           <p className="text-secondary py-8 text-center">No comments yet.</p>

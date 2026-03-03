@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { sql } from "@/lib/db";
 import { ProductCard } from "@/components/ProductCard";
 import { StoreFilters } from "./StoreFilters";
 import { BundleComparisonTable } from "@/components/BundleComparisonTable";
@@ -25,97 +25,42 @@ export default async function StorePage({
   searchParams: Promise<{ level?: string; sort?: string }>;
 }) {
   const { level, sort } = await searchParams;
-  const supabase = await createClient();
 
-  const [{ data: products }, { data: comparisonRow }, { data: faqRow }] = await Promise.all([
-    supabase
-      .from("products")
-      .select("*")
-      .order("sort_order", { ascending: true }),
-    supabase
-      .from("site_settings")
-      .select("value")
-      .eq("key", "bundle_comparison")
-      .maybeSingle(),
-    supabase
-      .from("site_settings")
-      .select("value")
-      .eq("key", "homepage_faq")
-      .maybeSingle(),
-  ]);
+  let items: StoreProduct[];
+  let comparisonValue: unknown = null;
+  let faqValue: unknown = null;
 
-  const items: StoreProduct[] =
-    products && products.length > 0
-      ? (products as StoreProduct[])
-      : [
-        {
-          id: "1",
-          slug: "japanese-n5-mastery-bundle",
-          name: "🔥 Japanese N5 Mastery Bundle",
-          price_paise: 19900,
-          compare_price_paise: 99900,
-          jlpt_level: "N5",
-          badge: "offer",
-          is_mega: false,
-        },
-        {
-          id: "2",
-          slug: "japanese-n4-upgrade-bundle",
-          name: "🎌 Japanese N4 Upgrade Bundle",
-          price_paise: 29900,
-          compare_price_paise: 129900,
-          jlpt_level: "N4",
-          badge: "offer",
-          is_mega: false,
-        },
-        {
-          id: "3",
-          slug: "japanese-n3-power-bundle",
-          name: "⚡ Japanese N3 Power Bundle",
-          price_paise: 39900,
-          compare_price_paise: 169900,
-          jlpt_level: "N3",
-          badge: "offer",
-          is_mega: false,
-        },
-        {
-          id: "4",
-          slug: "japanese-n2-pro-bundle",
-          name: "💼 Japanese N2 Pro Bundle",
-          price_paise: 49900,
-          compare_price_paise: 229900,
-          jlpt_level: "N2",
-          badge: "offer",
-          is_mega: false,
-        },
-        {
-          id: "5",
-          slug: "japanese-n1-elite-bundle",
-          name: "🏆 Japanese N1 Elite Bundle",
-          price_paise: 59900,
-          compare_price_paise: 249900,
-          jlpt_level: "N1",
-          badge: "premium",
-          is_mega: false,
-        },
-        {
-          id: "6",
-          slug: "complete-japanese-n5-n1-mega-bundle",
-          name: "🎌 Japanese Complete N5–N1 Mega Bundle",
-          price_paise: 89900,
-          compare_price_paise: 359900,
-          jlpt_level: null,
-          badge: "premium",
-          is_mega: true,
-        },
-      ];
+  if (sql) {
+    const [productRows, compRows, faqRows] = await Promise.all([
+      sql`SELECT * FROM products ORDER BY sort_order ASC`,
+      sql`SELECT value FROM site_settings WHERE key = 'bundle_comparison' LIMIT 1`,
+      sql`SELECT value FROM site_settings WHERE key = 'homepage_faq' LIMIT 1`,
+    ]);
+    items = (productRows as StoreProduct[])?.length ? (productRows as StoreProduct[]) : [];
+    comparisonValue = (compRows[0] as { value: unknown })?.value ?? null;
+    faqValue = (faqRows[0] as { value: unknown })?.value ?? null;
+  } else {
+    items = [];
+    comparisonValue = null;
+    faqValue = null;
+  }
+
+  const fallbackProducts: StoreProduct[] = [
+    { id: "1", slug: "japanese-n5-mastery-bundle", name: "🔥 Japanese N5 Mastery Bundle", price_paise: 19900, compare_price_paise: 99900, jlpt_level: "N5", badge: "offer", is_mega: false },
+    { id: "2", slug: "japanese-n4-upgrade-bundle", name: "🎌 Japanese N4 Upgrade Bundle", price_paise: 29900, compare_price_paise: 129900, jlpt_level: "N4", badge: "offer", is_mega: false },
+    { id: "3", slug: "japanese-n3-power-bundle", name: "⚡ Japanese N3 Power Bundle", price_paise: 39900, compare_price_paise: 169900, jlpt_level: "N3", badge: "offer", is_mega: false },
+    { id: "4", slug: "japanese-n2-pro-bundle", name: "💼 Japanese N2 Pro Bundle", price_paise: 49900, compare_price_paise: 229900, jlpt_level: "N2", badge: "offer", is_mega: false },
+    { id: "5", slug: "japanese-n1-elite-bundle", name: "🏆 Japanese N1 Elite Bundle", price_paise: 59900, compare_price_paise: 249900, jlpt_level: "N1", badge: "premium", is_mega: false },
+    { id: "6", slug: "complete-japanese-n5-n1-mega-bundle", name: "🎌 Japanese Complete N5–N1 Mega Bundle", price_paise: 89900, compare_price_paise: 359900, jlpt_level: null, badge: "premium", is_mega: true },
+  ];
+  const itemsToUse = items?.length ? items : fallbackProducts;
 
   const levelFilter = level?.toUpperCase();
   let filtered = levelFilter
-    ? items.filter(
+    ? itemsToUse.filter(
       (p) => p.jlpt_level === levelFilter || (levelFilter === "MEGA" && p.is_mega)
     )
-    : items;
+    : itemsToUse;
 
   const sortKey = sort === "price" || sort === "newest" ? sort : "recommended";
   if (sortKey === "price") {
@@ -127,8 +72,8 @@ export default async function StorePage({
   const mega = filtered.find((p) => p.is_mega);
   const rest = filtered.filter((p) => !p.is_mega);
 
-  const comparisonData = (comparisonRow?.value as unknown) || null;
-  const faqItems = ((faqRow?.value as unknown) as { q: string; a: string }[]) || null;
+  const comparisonData = comparisonValue || null;
+  const faqItems = (faqValue as { q: string; a: string }[]) || null;
 
   return (
     <div className="min-h-screen bg-[#FAF8F5]">

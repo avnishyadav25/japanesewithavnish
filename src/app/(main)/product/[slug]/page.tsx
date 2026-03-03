@@ -1,11 +1,32 @@
 import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { AddToCartButton } from "./AddToCartButton";
+import { sql } from "@/lib/db";
+import { ProductSidebarWithCheckout } from "./ProductSidebarWithCheckout";
 import { ProductSchema } from "@/components/JsonLd";
 import { BundleContentsTree } from "@/components/BundleContentsTree";
 import { getBundleContents } from "@/data/bundle-contents";
+
+type ProductWithAssets = {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  who_its_for?: string | null;
+  whats_included?: string[] | unknown;
+  outcome?: string | null;
+  faq?: { q: string; a: string }[] | unknown;
+  no_refunds_note?: string | null;
+  image_url?: string | null;
+  badge?: string | null;
+  jlpt_level?: string | null;
+  price_paise: number;
+  compare_price_paise?: number | null;
+  gallery_images?: string[] | null;
+  is_mega?: boolean | null;
+  preview_url?: string | null;
+  product_assets?: { id: string; display_name: string; storage_path: string; type: string; sort_order?: number }[];
+};
 
 export default async function ProductPage({
   params,
@@ -13,18 +34,21 @@ export default async function ProductPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const supabase = await createClient();
-  const { data: product, error } = await supabase
-    .from("products")
-    .select("*, product_assets(*)")
-    .eq("slug", slug)
-    .single();
 
-  if (error || !product) notFound();
+  let product: ProductWithAssets | null = null;
 
-  const priceRs = product.price_paise / 100;
+  if (!sql) notFound();
+  const productRows = await sql`SELECT * FROM products WHERE slug = ${slug} LIMIT 1` as ProductWithAssets[];
+  const prod = productRows[0];
+  if (!prod) notFound();
+  const assetRows = await sql`SELECT id, display_name, storage_path, type, sort_order FROM product_assets WHERE product_id = ${prod.id} ORDER BY sort_order` as { id: string; display_name: string; storage_path: string; type: string; sort_order?: number }[];
+  product = { ...prod, product_assets: assetRows };
+
+  if (!product) notFound();
+
+  const priceRs = Number(product.price_paise) / 100;
   const compareRs = product.compare_price_paise
-    ? product.compare_price_paise / 100
+    ? Number(product.compare_price_paise) / 100
     : null;
   const discount =
     compareRs && compareRs > priceRs
@@ -40,7 +64,7 @@ export default async function ProductPage({
 
   // Parse who_its_for into bullet list if line-separated
   const whoLines = product.who_its_for
-    ? product.who_its_for.split("\n").map((l: string) => l.trim()).filter(Boolean)
+    ? String(product.who_its_for).split("\n").map((l) => l.trim()).filter(Boolean)
     : [];
 
   const siteUrl =
@@ -261,108 +285,23 @@ export default async function ProductPage({
               )}
             </div>
 
-            {/* ─── Right column: sticky purchase card ─────── */}
-            <aside className="lg:sticky lg:top-24 self-start">
-              <div className="card p-6 mb-4">
-                {/* Badges */}
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {product.badge === "premium" && (
-                    <span className="badge-premium">Premium</span>
-                  )}
-                  {product.badge === "offer" && (
-                    <span className="badge-offer">Offer</span>
-                  )}
-                  {product.jlpt_level && (
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--base)] border border-[var(--divider)] text-secondary font-medium">
-                      JLPT {product.jlpt_level}
-                    </span>
-                  )}
-                </div>
-
-                <h1 className="font-heading text-xl sm:text-2xl font-bold text-charcoal mb-2">
-                  {product.name}
-                </h1>
-
-                {product.description && (
-                  <p className="text-secondary text-sm mb-4 leading-relaxed">
-                    {product.description}
-                  </p>
-                )}
-
-                {/* Price block */}
-                <div className="bg-[var(--base)] rounded-bento p-4 mb-4">
-                  <div className="flex items-baseline gap-2 mb-1">
-                    <span className="text-3xl font-bold text-primary">
-                      ₹{priceRs.toLocaleString("en-IN")}
-                    </span>
-                    {compareRs && (
-                      <span className="text-secondary line-through text-base">
-                        ₹{compareRs.toLocaleString("en-IN")}
-                      </span>
-                    )}
-                  </div>
-                  {discount && savingRs && (
-                    <p className="text-green-700 text-sm font-medium">
-                      You save ₹{savingRs.toLocaleString("en-IN")} ({discount}% off)
-                    </p>
-                  )}
-                </div>
-
-                <AddToCartButton
-                  productId={product.id}
-                  slug={product.slug}
-                  pricePaise={product.price_paise}
-                />
-
-                <ul className="mt-4 space-y-1.5 text-xs text-secondary">
-                  {[
-                    "✓ Instant access after payment",
-                    "✓ Download all materials",
-                    "✓ Lifetime access",
-                    "✓ Secure checkout",
-                  ].map((t) => (
-                    <li key={t}>{t}</li>
-                  ))}
-                </ul>
-
-                <div className="mt-4 pt-4 border-t border-[var(--divider)] space-y-1.5">
-                  <Link
-                    href="/quiz"
-                    className="text-primary text-sm font-medium hover:underline block"
-                  >
-                    Not sure your level? Take the quiz →
-                  </Link>
-                  <Link
-                    href="/store"
-                    className="text-primary text-sm font-medium hover:underline block"
-                  >
-                    View all bundles →
-                  </Link>
-                </div>
-              </div>
-
-              {/* Included teaser in sidebar (first 4 items) */}
-              {included.length > 0 && (
-                <div className="card p-4">
-                  <p className="text-xs font-semibold text-secondary uppercase tracking-wider mb-2">
-                    Includes
-                  </p>
-                  <ul className="space-y-1.5">
-                    {included.slice(0, 4).map((item, i) => (
-                      <li key={i} className="flex items-start gap-2 text-xs text-secondary">
-                        <span className="text-primary mt-0.5 flex-shrink-0">→</span>
-                        {item}
-                      </li>
-                    ))}
-                    {included.length > 4 && (
-                      <li className="text-xs text-secondary pl-4">
-                        + {included.length - 4} more items
-                      </li>
-                    )}
-                  </ul>
-                </div>
-              )}
-            </aside>
+            {/* ─── Right column: sticky purchase card + quick checkout drawer ─────── */}
+            <ProductSidebarWithCheckout
+              product={{
+                id: product.id,
+                name: product.name,
+                slug: product.slug,
+                price_paise: product.price_paise,
+                badge: product.badge,
+                jlpt_level: product.jlpt_level,
+                description: product.description,
+              }}
+              priceRs={priceRs}
+              compareRs={compareRs}
+              discount={discount ?? null}
+              savingRs={savingRs ?? null}
+              included={included}
+            />
           </div>
         </div>
       </div>

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { getAdminSession } from "@/lib/auth/admin";
+import { sql } from "@/lib/db";
 import {
   emailWrapper,
   welcomeNewsletterContent,
@@ -10,39 +10,22 @@ import {
   type EmailProduct,
 } from "@/lib/email-templates";
 
-const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "")
-  .split(",")
-  .map((e) => e.trim().toLowerCase())
-  .filter(Boolean);
-
-async function requireAdmin() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user?.email || !ADMIN_EMAILS.includes(user.email.toLowerCase())) {
-    return null;
-  }
-  return user;
-}
-
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://japanesewithavnish.com";
 
 export async function GET(req: NextRequest) {
-  const user = await requireAdmin();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const admin = await getAdminSession();
+  if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
   const type = searchParams.get("type");
 
   try {
-    const admin = createAdminClient();
-    const { data: products } = await admin
-      .from("products")
-      .select("slug, name, price_paise, image_url, jlpt_level")
-      .order("sort_order", { ascending: true })
-      .limit(6);
-    const productList = productListHtml((products || []) as EmailProduct[], SITE_URL);
+    let products: EmailProduct[] = [];
+    if (sql) {
+      const rows = await sql`SELECT slug, name, price_paise, image_url, jlpt_level FROM products ORDER BY sort_order ASC LIMIT 6`;
+      products = (rows || []) as EmailProduct[];
+    }
+    const productList = productListHtml(products, SITE_URL);
 
     let content = "";
     switch (type) {

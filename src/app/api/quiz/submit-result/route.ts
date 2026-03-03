@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { sql } from "@/lib/db";
 import { sendQuizResults } from "@/lib/email";
 
 const THRESHOLDS = [
@@ -20,18 +20,12 @@ export async function POST(req: Request) {
     const rec = [...THRESHOLDS].reverse().find((t) => (score || 0) >= t.minScore) || THRESHOLDS[0];
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
-    const supabase = createAdminClient();
-    if (newsletterOptIn !== false) {
-      await supabase
-        .from("subscribers")
-        .upsert({ email, source: "quiz" }, { onConflict: "email" });
+    if (sql) {
+      if (newsletterOptIn !== false) {
+        await sql`INSERT INTO subscribers (email, source) VALUES (${email}, 'quiz') ON CONFLICT (email) DO UPDATE SET source = 'quiz'`;
+      }
+      await sql`INSERT INTO quiz_attempts (email, score, total_questions, recommended_level) VALUES (${email}, ${score || 0}, ${total || 10}, ${rec.level})`;
     }
-    await supabase.from("quiz_attempts").insert({
-      email,
-      score: score || 0,
-      total_questions: total || 10,
-      recommended_level: rec.level,
-    });
 
     try {
       await sendQuizResults(

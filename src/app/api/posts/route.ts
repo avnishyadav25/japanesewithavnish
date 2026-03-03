@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { sql } from "@/lib/db";
 
 const VALID_LEVELS = ["n5", "n4", "n3", "n2", "n1", "mega"] as const;
 const VALID_TYPES = ["all", "grammar", "vocabulary", "kanji", "reading", "listening", "tips", "roadmap"] as const;
@@ -17,17 +17,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Invalid type" }, { status: 400 });
   }
 
-  const supabase = await createClient();
-
-  const { data: posts, error } = await supabase
-    .from("posts")
-    .select("id, slug, title, summary, jlpt_level, tags, published_at")
-    .eq("status", "published")
-    .order("published_at", { ascending: false })
-    .limit(100);
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  let posts: { id: string; slug: string; title: string; summary?: string; jlpt_level?: unknown; tags?: unknown; published_at?: string }[] = [];
+  if (sql) {
+    const rows = await sql`
+      SELECT id, slug, title, summary, jlpt_level, tags, published_at
+      FROM posts WHERE status = 'published'
+      ORDER BY published_at DESC LIMIT 100
+    `;
+    posts = (rows ?? []) as typeof posts;
   }
 
   const levels = (l: unknown): string[] =>

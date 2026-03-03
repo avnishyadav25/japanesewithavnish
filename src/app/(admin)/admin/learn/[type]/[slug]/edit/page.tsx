@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { sql } from "@/lib/db";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { LearningContentForm } from "../../../LearningContentForm";
 
@@ -14,26 +14,24 @@ export default async function AdminLearnEditPage({
   const normalized = type.toLowerCase();
   if (!TYPES.includes(normalized as (typeof TYPES)[number])) notFound();
 
-  const supabase = createAdminClient();
-  const { data: item, error } = await supabase
-    .from("learning_content")
-    .select("*")
-    .eq("content_type", normalized)
-    .eq("slug", slug)
-    .single();
-
-  if (error || !item) notFound();
+  if (!sql) notFound();
+  const rows = await sql`
+    SELECT * FROM learning_content
+    WHERE content_type = ${normalized} AND slug = ${slug} LIMIT 1
+  `;
+  const item = rows[0] as Record<string, unknown> | undefined;
+  if (!item) notFound();
 
   return (
     <div>
       <AdminPageHeader
-        title={`Edit ${item.title}`}
+        title={`Edit ${item.title as string}`}
         breadcrumb={[
           { label: "Admin", href: "/admin" },
           { label: "Learning", href: `/admin/learn/${normalized}` },
         ]}
       />
-      <LearningContentForm contentType={normalized} item={item} />
+      <LearningContentForm contentType={normalized} item={item as unknown as Parameters<typeof LearningContentForm>[0]["item"]} />
     </div>
   );
 }

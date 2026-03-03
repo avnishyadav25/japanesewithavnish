@@ -1,47 +1,75 @@
 import Link from "next/link";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { sql } from "@/lib/db";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminCard } from "@/components/admin/AdminCard";
 import { AdminTable } from "@/components/admin/AdminTable";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 
 export default async function AdminDashboardPage() {
-  const supabase = createAdminClient();
-
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  const [
-    { count: totalOrders },
-    { data: revenueData },
-    { count: totalSubscribers },
-    { count: quizAttempts },
-    { count: publishedPosts },
-    { count: learningItems },
-    { count: quizQuestions },
-    { data: recentOrders },
-    { data: last7Days },
-  ] = await Promise.all([
-    supabase.from("orders").select("id", { count: "exact", head: true }),
-    supabase.from("orders").select("total_amount_paise").eq("status", "paid").gte("created_at", monthStart),
-    supabase.from("subscribers").select("id", { count: "exact", head: true }),
-    supabase.from("quiz_attempts").select("id", { count: "exact", head: true }),
-    supabase.from("posts").select("id", { count: "exact", head: true }).eq("status", "published"),
-    supabase.from("learning_content").select("id", { count: "exact", head: true }).eq("status", "published"),
-    supabase.from("quiz_questions").select("id", { count: "exact", head: true }),
-    supabase.from("orders").select("id, user_email, status, total_amount_paise, created_at").order("created_at", { ascending: false }).limit(5),
-    supabase.from("orders").select("created_at, total_amount_paise, status").gte("created_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()).eq("status", "paid"),
-  ]);
+  let totalOrders: number;
+  let revenueThisMonth: number;
+  let totalSubscribers: number;
+  let quizAttempts: number;
+  let publishedPosts: number;
+  let learningItems: number;
+  let quizQuestions: number;
+  let recentOrders: { id: string; user_email: string; status: string; total_amount_paise: number; created_at: string }[];
+  let last7Days: { created_at: string; total_amount_paise: number; status: string }[];
 
-  const revenueThisMonth = revenueData?.reduce((sum, o) => sum + (o.total_amount_paise || 0), 0) ?? 0;
+  if (sql) {
+    const [
+      ordersCountRows,
+      revenueRows,
+      subsCountRows,
+      attemptsCountRows,
+      postsCountRows,
+      learningCountRows,
+      questionsCountRows,
+      recentRows,
+      weekPaidRows,
+    ] = await Promise.all([
+      sql`SELECT COUNT(*)::int AS c FROM orders`,
+      sql`SELECT total_amount_paise FROM orders WHERE status = 'paid' AND created_at >= ${monthStart}`,
+      sql`SELECT COUNT(*)::int AS c FROM subscribers`,
+      sql`SELECT COUNT(*)::int AS c FROM quiz_attempts`,
+      sql`SELECT COUNT(*)::int AS c FROM posts WHERE status = 'published'`,
+      sql`SELECT COUNT(*)::int AS c FROM learning_content WHERE status = 'published'`,
+      sql`SELECT COUNT(*)::int AS c FROM quiz_questions`,
+      sql`SELECT id, user_email, status, total_amount_paise, created_at FROM orders ORDER BY created_at DESC LIMIT 5`,
+      sql`SELECT created_at, total_amount_paise, status FROM orders WHERE created_at >= ${weekAgo} AND status = 'paid'`,
+    ]);
+    totalOrders = (ordersCountRows[0] as { c: number })?.c ?? 0;
+    revenueThisMonth = (revenueRows as { total_amount_paise: number }[]).reduce((sum, o) => sum + Number(o.total_amount_paise || 0), 0);
+    totalSubscribers = (subsCountRows[0] as { c: number })?.c ?? 0;
+    quizAttempts = (attemptsCountRows[0] as { c: number })?.c ?? 0;
+    publishedPosts = (postsCountRows[0] as { c: number })?.c ?? 0;
+    learningItems = (learningCountRows[0] as { c: number })?.c ?? 0;
+    quizQuestions = (questionsCountRows[0] as { c: number })?.c ?? 0;
+    recentOrders = (recentRows as { id: string; user_email: string; status: string; total_amount_paise: number; created_at: string }[]) ?? [];
+    last7Days = (weekPaidRows as { created_at: string; total_amount_paise: number; status: string }[]) ?? [];
+  } else {
+    totalOrders = 0;
+    revenueThisMonth = 0;
+    totalSubscribers = 0;
+    quizAttempts = 0;
+    publishedPosts = 0;
+    learningItems = 0;
+    quizQuestions = 0;
+    recentOrders = [];
+    last7Days = [];
+  }
 
   // Build last 7 days bar chart data
   const dayBars = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - (6 - i));
     const key = d.toISOString().slice(0, 10);
-    const dayOrders = (last7Days || []).filter((o) => o.created_at.slice(0, 10) === key);
-    const revenue = dayOrders.reduce((s, o) => s + (o.total_amount_paise || 0), 0);
+    const dayOrders = (last7Days || []).filter((o) => String(o.created_at).slice(0, 10) === key);
+    const revenue = dayOrders.reduce((s, o) => s + Number(o.total_amount_paise || 0), 0);
     return {
       label: d.toLocaleDateString("en-IN", { weekday: "short" }),
       revenue,
@@ -179,7 +207,7 @@ export default async function AdminDashboardPage() {
                     }
                   />
                 </td>
-                <td className="py-2 px-2 font-medium">₹{(o.total_amount_paise / 100).toLocaleString("en-IN")}</td>
+                <td className="py-2 px-2 font-medium">₹{(Number(o.total_amount_paise) / 100).toLocaleString("en-IN")}</td>
                 <td className="py-2 px-2 text-secondary text-xs">
                   {new Date(o.created_at).toLocaleDateString("en-IN")}
                 </td>

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { createClient } from "@/lib/supabase/server";
+import { sql } from "@/lib/db";
 import { NewsletterForm } from "@/components/NewsletterForm";
 
 const FOOTER_KEYS = [
@@ -12,16 +12,13 @@ const FOOTER_KEYS = [
 ] as const;
 
 async function getFooterSettings() {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("site_settings")
-    .select("key, value")
-    .in("key", FOOTER_KEYS);
   const map: Record<string, string> = {};
-  data?.forEach((r) => {
-    const v = r.value;
-    map[r.key] = typeof v === "string" ? v : "";
-  });
+  if (sql) {
+    const rows = await sql`SELECT key, value FROM site_settings WHERE key = ANY(${FOOTER_KEYS})`;
+    (rows as { key: string; value: unknown }[]).forEach((r) => {
+      map[r.key] = typeof r.value === "string" ? r.value : "";
+    });
+  }
   return map;
 }
 

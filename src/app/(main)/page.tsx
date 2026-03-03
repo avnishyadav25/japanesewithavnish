@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { sql } from "@/lib/db";
 import { HomeBundleCard } from "@/components/HomeBundleCard";
 import { BundleComparisonTable } from "@/components/BundleComparisonTable";
 import { StudyRoadmapMegaCta } from "@/components/StudyRoadmapMegaCta";
@@ -47,36 +47,31 @@ function ComingSoonView() {
 }
 
 async function FullHomeView() {
-  const supabase = await createClient();
+  const settingsKeys = ["bundle_comparison", "study_roadmap", "homepage_feature_strip", "testimonials_about", "homepage_faq"];
 
-  const [productsRes, settingsRes, lessonsRes] = await Promise.all([
-    supabase.from("products").select("*").order("sort_order", { ascending: true }),
-    supabase.from("site_settings").select("key, value").in("key", [
-      "bundle_comparison",
-      "study_roadmap",
-      "homepage_feature_strip",
-      "testimonials_about",
-      "homepage_faq",
-    ]),
-    supabase
-      .from("learning_content")
-      .select("id, slug, title, content_type, jlpt_level")
-      .eq("status", "published")
-      .in("content_type", ["grammar", "vocabulary", "kanji"])
-      .order("created_at", { ascending: false })
-      .limit(6),
-  ]);
+  let products: typeof FALLBACK_PRODUCTS;
+  const settings: Record<string, unknown> = {};
+  let lessons: { id: string; slug: string; title: string; content_type: string; jlpt_level: string | null }[] = [];
 
-  const products = productsRes.data?.length ? productsRes.data : FALLBACK_PRODUCTS;
+  try {
+    if (sql) {
+      const [productRows, settingsRows, lessonRows] = await Promise.all([
+        sql`SELECT * FROM products ORDER BY sort_order ASC`,
+        sql`SELECT key, value FROM site_settings WHERE key = ANY(${settingsKeys})`,
+        sql`SELECT id, slug, title, content_type, jlpt_level FROM learning_content WHERE status = 'published' AND content_type IN ('grammar', 'vocabulary', 'kanji') ORDER BY created_at DESC LIMIT 6`,
+      ]);
+      products = ((productRows as Record<string, unknown>[])?.length ? (productRows as Record<string, unknown>[]) : FALLBACK_PRODUCTS) as typeof FALLBACK_PRODUCTS;
+      (settingsRows as { key: string; value: unknown }[]).forEach((r) => { settings[r.key] = r.value; });
+      lessons = (lessonRows as { id: string; slug: string; title: string; content_type: string; jlpt_level: string | null }[]) ?? [];
+    } else {
+      products = FALLBACK_PRODUCTS;
+    }
+  } catch {
+    products = FALLBACK_PRODUCTS;
+  }
+
   const mega = products.find((p: { is_mega?: boolean }) => p.is_mega);
   const restProducts = products.filter((p: { is_mega?: boolean }) => !p.is_mega);
-
-  const settings: Record<string, unknown> = {};
-  settingsRes.data?.forEach((r: { key: string; value: unknown }) => {
-    settings[r.key] = r.value;
-  });
-
-  const lessons = lessonsRes.data ?? [];
   const TYPE_LABELS: Record<string, string> = {
     grammar: "Grammar",
     vocabulary: "Vocabulary",
@@ -188,7 +183,7 @@ async function FullHomeView() {
                 />
               </div>
             )}
-            {restProducts.map((product: { id: string; slug: string; name: string; price_paise: number; compare_price_paise?: number; jlpt_level?: string; badge?: string; image_url?: string | null }) => (
+            {restProducts.map((product: { id: string; slug: string; name: string; price_paise: number; compare_price_paise?: number; jlpt_level?: string | null; badge?: string; image_url?: string | null }) => (
               <div key={product.id} className="bento-span-2">
                 <HomeBundleCard
                   slug={product.slug}
@@ -263,7 +258,7 @@ async function FullHomeView() {
             </Link>
           </div>
           <div className="bento-grid">
-            {lessons.map((item: { id: string; slug: string; title: string; content_type: string; jlpt_level?: string }) => (
+            {lessons.map((item: { id: string; slug: string; title: string; content_type: string; jlpt_level?: string | null }) => (
               <Link
                 key={item.id}
                 href={`/learn/${item.content_type}/${item.slug}`}

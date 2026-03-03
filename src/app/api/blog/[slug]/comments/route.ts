@@ -1,42 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { sql } from "@/lib/db";
 import {
   sendWelcomeNewsletter,
   sendNewCommentNotification,
 } from "@/lib/email";
 
 export async function GET(
-  req: NextRequest,
+  _req: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
     const { slug } = await params;
-    const supabase = createAdminClient();
-
-    const { data: post, error: postError } = await supabase
-      .from("posts")
-      .select("id")
-      .eq("slug", slug)
-      .eq("status", "published")
-      .single();
-
-    if (postError || !post) {
-      return NextResponse.json({ error: "Post not found" }, { status: 404 });
-    }
-
-    const { data: comments, error } = await supabase
-      .from("post_comments")
-      .select("id, author_name, author_email, content, created_at")
-      .eq("post_id", post.id)
-      .eq("status", "approved")
-      .order("created_at", { ascending: true });
-
-    if (error) {
-      console.error("Comments fetch:", error);
-      return NextResponse.json({ error: "Failed to fetch comments" }, { status: 500 });
-    }
-
-    return NextResponse.json({ comments: comments || [] });
+    if (!sql) return NextResponse.json({ error: "Failed to fetch comments" }, { status: 503 });
+    const postRows = await sql`SELECT id FROM posts WHERE slug = ${slug} AND status = 'published' LIMIT 1`;
+    const post = postRows[0] as { id: string } | undefined;
+    if (!post) return NextResponse.json({ error: "Post not found" }, { status: 404 });
+    const commentsRows = await sql`
+      SELECT id, author_name, author_email, content, created_at
+      FROM post_comments WHERE post_id = ${post.id} AND status = 'approved'
+      ORDER BY created_at ASC
+    `;
+    return NextResponse.json({ comments: commentsRows || [] });
   } catch (e) {
     console.error("Comments GET:", e);
     return NextResponse.json({ error: "Failed" }, { status: 500 });
@@ -66,52 +50,26 @@ export async function POST(
       return NextResponse.json({ error: "Comment must be at least 10 characters" }, { status: 400 });
     }
 
-    const supabase = createAdminClient();
+    if (!sql) return NextResponse.json({ error: "Failed to post comment" }, { status: 503 });
 
-    const { data: post, error: postError } = await supabase
-      .from("posts")
-      .select("id, title")
-      .eq("slug", slug)
-      .eq("status", "published")
-      .single();
+    const postRows = await sql`SELECT id, title FROM posts WHERE slug = ${slug} AND status = 'published' LIMIT 1`;
+    const post = postRows[0] as { id: string; title: string } | undefined;
+    if (!post) return NextResponse.json({ error: "Post not found" }, { status: 404 });
 
-    if (postError || !post) {
-      return NextResponse.json({ error: "Post not found" }, { status: 404 });
-    }
+    const insertRows = await sql`
+      INSERT INTO post_comments (post_id, author_name, author_email, content, status)
+      VALUES (${post.id}, ${name.trim()}, ${trimmedEmail}, ${content.trim()}, 'approved')
+      RETURNING id
+    `;
+    const comment = insertRows[0] as { id: string } | undefined;
 
-    const { data: comment, error: insertError } = await supabase
-      .from("post_comments")
-      .insert({
-        post_id: post.id,
-        author_name: name.trim(),
-        author_email: trimmedEmail,
-        content: content.trim(),
-        status: "approved",
-      })
-      .select("id")
-      .single();
+    const existingSub = await sql`SELECT id FROM subscribers WHERE email = ${trimmedEmail} LIMIT 1`;
+    const isNewSubscriber = existingSub.length === 0;
 
-    if (insertError) {
-      console.error("Comment insert:", insertError);
-      return NextResponse.json({ error: "Failed to post comment" }, { status: 500 });
-    }
-
-    const { data: existingSub } = await supabase
-      .from("subscribers")
-      .select("id")
-      .eq("email", trimmedEmail)
-      .single();
-
-    const isNewSubscriber = !existingSub;
-
-    await supabase.from("subscribers").upsert(
-      {
-        email: trimmedEmail,
-        name: name.trim(),
-        source: "blog_comment",
-      },
-      { onConflict: "email" }
-    );
+    await sql`
+      INSERT INTO subscribers (email, name, source) VALUES (${trimmedEmail}, ${name.trim()}, 'blog_comment')
+      ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name, source = EXCLUDED.source
+    `;
 
     if (isNewSubscriber) {
       sendWelcomeNewsletter(trimmedEmail, name.trim()).catch((err) =>
@@ -123,12 +81,10 @@ export async function POST(
     const postUrl = `${siteUrl.replace(/\/$/, "")}/blog/${slug}`;
     const commentPreview = content.trim().replace(/\s+/g, " ").slice(0, 120);
 
-    const { data: previousCommenters } = await supabase
-      .from("post_comments")
-      .select("author_email, author_name")
-      .eq("post_id", post.id)
-      .eq("status", "approved")
-      .neq("author_email", trimmedEmail);
+    const previousCommenters = await sql`
+      SELECT author_email, author_name FROM post_comments
+      WHERE post_id = ${post.id} AND status = 'approved' AND author_email != ${trimmedEmail}
+    ` as { author_email: string; author_name: string }[];
 
     const uniqueEmails = new Map<string, string>();
     for (const c of previousCommenters || []) {
@@ -137,9 +93,9 @@ export async function POST(
       }
     }
 
-    const notifyPromises = Array.from(uniqueEmails.entries()).map(([email, recipientName]) =>
+    const notifyPromises = Array.from(uniqueEmails.entries()).map(([emailAddr, recipientName]) =>
       sendNewCommentNotification(
-        email,
+        emailAddr,
         recipientName,
         post.title,
         postUrl,

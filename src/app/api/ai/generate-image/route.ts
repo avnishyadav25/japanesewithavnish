@@ -1,23 +1,26 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { getAdminSession } from "@/lib/auth/admin";
 import { getImagePrompt, type ImageType } from "@/lib/ai/image-prompts";
 
-const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "")
-  .split(",")
-  .map((e) => e.trim().toLowerCase())
-  .filter(Boolean);
-
 const validImageTypes: ImageType[] = ["product", "blog", "newsletter", "page", "learning"];
-const BUCKET = "files";
+
+function getR2Client(): S3Client | null {
+  const endpoint = process.env.R2_ENDPOINT;
+  const accessKey = process.env.R2_ACCESS_KEY_ID;
+  const secretKey = process.env.R2_SECRET_ACCESS_KEY;
+  if (!endpoint || !accessKey || !secretKey) return null;
+  return new S3Client({
+    region: "auto",
+    endpoint,
+    credentials: { accessKeyId: accessKey, secretAccessKey: secretKey },
+  });
+}
 
 export async function POST(req: Request) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user?.email || !ADMIN_EMAILS.includes(user.email.toLowerCase())) {
+    const admin = await getAdminSession();
+    if (!admin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -79,36 +82,33 @@ export async function POST(req: Request) {
       (p: { inlineData?: { mimeType?: string; data?: string } }) => p.inlineData?.data
     );
     if (imagePart?.inlineData?.data) {
-      const admin = createAdminClient();
       const mime = imagePart.inlineData.mimeType || "image/png";
       const ext = mime.includes("jpeg") || mime.includes("jpg") ? "jpg" : "png";
-      const folder = imageType; // blog | product | newsletter | page | learning
-      const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const folder = imageType;
+      const key = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
-      const { data: bucketList } = await admin.storage.listBuckets();
-      const bucketExists = bucketList?.some((b) => b.name === BUCKET);
-      if (!bucketExists) {
-        await admin.storage.createBucket(BUCKET, { public: true });
-      }
+      const r2 = getR2Client();
+      const bucket = process.env.R2_BUCKET_NAME;
+      const bucketUrl = process.env.R2_BUCKET_URL?.replace(/\/$/, "");
 
-      const buf = Buffer.from(imagePart.inlineData.data, "base64");
-      const { error: uploadErr } = await admin.storage.from(BUCKET).upload(path, buf, {
-        contentType: mime,
-        upsert: true,
-      });
-
-      if (uploadErr) {
-        console.error("Storage upload:", uploadErr);
+      if (!r2 || !bucket || !bucketUrl) {
         return NextResponse.json(
-          { error: `Upload failed: ${uploadErr.message}` },
-          { status: 500 }
+          { error: "R2 not configured. Set R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME, R2_BUCKET_URL." },
+          { status: 503 }
         );
       }
 
-      const {
-        data: { publicUrl },
-      } = admin.storage.from(BUCKET).getPublicUrl(path);
+      const buf = Buffer.from(imagePart.inlineData.data, "base64");
+      await r2.send(
+        new PutObjectCommand({
+          Bucket: bucket,
+          Key: key,
+          Body: buf,
+          ContentType: mime,
+        })
+      );
 
+      const publicUrl = `${bucketUrl}/${key}`;
       return NextResponse.json({ imageUrl: publicUrl, content: text });
     }
 

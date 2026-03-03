@@ -17,12 +17,27 @@ CREATE INDEX IF NOT EXISTS idx_post_comments_status ON post_comments(status);
 
 ALTER TABLE post_comments ENABLE ROW LEVEL SECURITY;
 
--- Public read approved comments
-CREATE POLICY "Public read approved post_comments" ON post_comments
-  FOR SELECT USING (status = 'approved');
+-- Public read/insert policies for comments (idempotent)
+DO $$
+BEGIN
+  -- Public read approved comments
+  BEGIN
+    CREATE POLICY "Public read approved post_comments" ON post_comments
+      FOR SELECT USING (status = 'approved');
+  EXCEPTION
+    WHEN duplicate_object THEN
+      NULL;
+  END;
 
--- Public insert (anyone can submit a comment)
-CREATE POLICY "Public insert post_comments" ON post_comments
-  FOR INSERT WITH CHECK (true);
+  -- Public insert (anyone can submit a comment)
+  BEGIN
+    CREATE POLICY "Public insert post_comments" ON post_comments
+      FOR INSERT WITH CHECK (true);
+  EXCEPTION
+    WHEN duplicate_object THEN
+      NULL;
+  END;
+END;
+$$;
 
 -- RLS: UPDATE/DELETE handled by service role (admin API)

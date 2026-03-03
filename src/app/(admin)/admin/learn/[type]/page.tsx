@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { sql } from "@/lib/db";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminCard } from "@/components/admin/AdminCard";
 import { AdminTable } from "@/components/admin/AdminTable";
@@ -25,13 +25,15 @@ export default async function AdminLearnPage({
   const normalized = type.toLowerCase();
   if (!TYPES.includes(normalized as (typeof TYPES)[number])) notFound();
 
-  const supabase = createAdminClient();
-  const { data: items } = await supabase
-    .from("learning_content")
-    .select("id, slug, title, jlpt_level, status, sort_order")
-    .eq("content_type", normalized)
-    .order("sort_order")
-    .order("created_at", { ascending: false });
+  let items: { id: string; slug: string; title: string; jlpt_level: string | null; status: string; sort_order: number }[] = [];
+  if (sql) {
+    const rows = await sql`
+      SELECT id, slug, title, jlpt_level, status, sort_order
+      FROM learning_content WHERE content_type = ${normalized}
+      ORDER BY sort_order, created_at DESC
+    `;
+    items = (rows ?? []) as typeof items;
+  }
 
   return (
     <div>
@@ -43,7 +45,7 @@ export default async function AdminLearnPage({
         ]}
         action={{ label: "Add", href: `/admin/learn/${normalized}/new` }}
       />
-      {items && items.length > 0 ? (
+      {items.length > 0 ? (
         <AdminCard>
           <AdminTable headers={["Title", "JLPT", "Status", "Actions"]}>
             {items.map((item) => (

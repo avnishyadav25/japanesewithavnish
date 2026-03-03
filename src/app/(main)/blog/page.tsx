@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { sql } from "@/lib/db";
 import { filterPosts, type PostForFilter } from "@/lib/blog-filters";
 import { BlogFilterBar } from "@/components/blog/BlogFilterBar";
 import { BlogPostCard } from "@/components/blog/BlogPostCard";
@@ -17,24 +17,18 @@ export default async function BlogPage({
   const search = params.search || "";
   const page = Math.max(1, parseInt(params.page || "1", 10));
 
-  const supabase = await createClient();
+  let allPosts: PostForFilter[] = [];
+  let featuredSlugs: string[] = [];
 
-  const [postsRes, settingsRes] = await Promise.all([
-    supabase
-      .from("posts")
-      .select("id, slug, title, summary, seo_description, published_at, og_image_url, jlpt_level, tags")
-      .eq("status", "published")
-      .order("published_at", { ascending: false })
-      .limit(100),
-    supabase
-      .from("site_settings")
-      .select("key, value")
-      .eq("key", "blog_featured_posts")
-      .maybeSingle(),
-  ]);
-
-  const allPosts = (postsRes.data || []) as PostForFilter[];
-  const featuredSlugs = (settingsRes.data?.value as string[]) || [];
+  if (sql) {
+    const [postsRows, settingsRows] = await Promise.all([
+      sql`SELECT id, slug, title, summary, seo_description, published_at, og_image_url, jlpt_level, tags FROM posts WHERE status = 'published' ORDER BY published_at DESC LIMIT 100`,
+      sql`SELECT value FROM site_settings WHERE key = 'blog_featured_posts' LIMIT 1`,
+    ]);
+    allPosts = (postsRows || []) as PostForFilter[];
+    const settingsRow = settingsRows[0] as { value: string[] } | undefined;
+    featuredSlugs = (settingsRow?.value || []) as string[];
+  }
   const filtered = filterPosts(allPosts, level, type, search);
 
   const featuredPosts = featuredSlugs.length >= 2

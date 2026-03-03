@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { sql } from "@/lib/db";
 import { JLPTContent } from "@/components/jlpt/JLPTContent";
 import { JLPT_LEVELS, type JLPTLevel } from "@/data/jlpt-levels";
 
@@ -36,26 +36,20 @@ export default async function JLPTPage({
       ? (levelParam.toLowerCase() as JLPTLevel)
       : "n5";
 
-  const supabase = await createClient();
+  let allPosts: Post[] = [];
+  let pinnedByLevel: Record<string, string[]> = {};
 
-  const [postsRes, settingsRes] = await Promise.all([
-    supabase
-      .from("posts")
-      .select("id, slug, title, summary, jlpt_level, tags, published_at")
-      .eq("status", "published")
-      .order("published_at", { ascending: false })
-      .limit(100),
-    supabase
-      .from("site_settings")
-      .select("key, value")
-      .eq("key", "jlpt_pinned_posts")
-      .maybeSingle(),
-  ]);
+  if (sql) {
+    const [postsRows, settingsRows] = await Promise.all([
+      sql`SELECT id, slug, title, summary, jlpt_level, tags, published_at FROM posts WHERE status = 'published' ORDER BY published_at DESC LIMIT 100`,
+      sql`SELECT value FROM site_settings WHERE key = 'jlpt_pinned_posts' LIMIT 1`,
+    ]);
+    allPosts = (postsRows ?? []) as Post[];
+    const settingsRow = (settingsRows[0] as { value: Record<string, string[]> | null } | undefined);
+    pinnedByLevel = settingsRow?.value ?? {};
+  }
 
-  const allPosts = (postsRes.data ?? []) as Post[];
   const initialPosts = filterPostsByLevel(allPosts, initialLevel);
-
-  const pinnedByLevel = (settingsRes.data?.value as Record<string, string[]> | null) ?? {};
 
   return (
     <div className="py-12 sm:py-16 px-4 sm:px-6">

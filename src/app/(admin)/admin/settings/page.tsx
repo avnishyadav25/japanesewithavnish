@@ -1,4 +1,4 @@
-import { createAdminClient } from "@/lib/supabase/admin";
+import { sql } from "@/lib/db";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { CompanySettingsForm } from "./CompanySettingsForm";
 
@@ -15,19 +15,20 @@ export default async function AdminSettingsPage() {
   const settings: Record<string, string | unknown> = {};
   const homepageSettings: Record<string, unknown> = {};
   try {
-    const supabase = createAdminClient();
-    const { data: rows } = await supabase.from("site_settings").select("key, value");
-    rows?.forEach((r) => {
-      const v = r.value;
-      if (HOMEPAGE_KEYS.includes(r.key)) {
-        homepageSettings[r.key] = v ?? null;
-        settings[r.key] = v ?? null;
-      } else {
-        settings[r.key] = v == null ? "" : String(v);
-      }
-    });
+    if (sql) {
+      const rows = (await sql`SELECT key, value FROM site_settings`) as { key: string; value: unknown }[];
+      (rows ?? []).forEach((r) => {
+        const v = r.value;
+        if (HOMEPAGE_KEYS.includes(r.key)) {
+          homepageSettings[r.key] = v ?? null;
+          settings[r.key] = v ?? null;
+        } else {
+          settings[r.key] = v == null ? "" : String(v);
+        }
+      });
+    }
   } catch {
-    // Table may not exist yet; run migration 004_site_settings.sql
+    // Table may not exist yet
   }
 
   return (

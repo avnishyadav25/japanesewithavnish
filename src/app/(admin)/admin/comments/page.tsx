@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { sql } from "@/lib/db";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminCard } from "@/components/admin/AdminCard";
 import { AdminTable } from "@/components/admin/AdminTable";
@@ -7,20 +7,22 @@ import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 
 export default async function AdminCommentsPage() {
-  const supabase = createAdminClient();
-  const { data: comments } = await supabase
-    .from("post_comments")
-    .select("id, author_name, author_email, content, status, created_at, post_id")
-    .order("created_at", { ascending: false })
-    .limit(200);
+  let items: { id: string; author_name: string; author_email: string; content: string; status: string; created_at: string; post_id: string }[] = [];
+  const postMap = new Map<string, { id: string; title: string; slug: string }>();
 
-  const items = comments || [];
-  const postIds = Array.from(new Set(items.map((c) => c.post_id)));
-  const { data: posts } =
-    postIds.length > 0
-      ? await supabase.from("posts").select("id, title, slug").in("id", postIds)
-      : { data: [] };
-  const postMap = new Map((posts || []).map((p) => [p.id, p]));
+  if (sql) {
+    const commentsRows = await sql`
+      SELECT id, author_name, author_email, content, status, created_at, post_id
+      FROM post_comments ORDER BY created_at DESC LIMIT 200
+    `;
+    items = (commentsRows ?? []) as typeof items;
+    const postIds = Array.from(new Set(items.map((c) => c.post_id)));
+    if (postIds.length > 0) {
+      const postsRows = await sql`SELECT id, title, slug FROM posts WHERE id = ANY(${postIds})`;
+      const postsList = (postsRows ?? []) as { id: string; title: string; slug: string }[];
+      postsList.forEach((p) => postMap.set(p.id, p));
+    }
+  }
 
   return (
     <div>

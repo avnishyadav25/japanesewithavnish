@@ -12,16 +12,16 @@ interface Post {
 }
 
 export async function RecentBlogSection() {
-  const { createClient } = await import("@/lib/supabase/server");
-  const supabase = await createClient();
-  const { data: posts } = await supabase
-    .from("posts")
-    .select("id, slug, title, summary, seo_description, published_at, og_image_url")
-    .eq("status", "published")
-    .order("published_at", { ascending: false })
-    .limit(6);
-
-  const items = (posts ?? []) as Post[];
+  const { sql } = await import("@/lib/db");
+  let items: Post[] = [];
+  if (sql) {
+    const rows = await sql`
+      SELECT id, slug, title, summary, seo_description, published_at, og_image_url
+      FROM posts WHERE status = 'published'
+      ORDER BY published_at DESC LIMIT 6
+    `;
+    items = (rows ?? []) as Post[];
+  }
 
   if (items.length === 0) return null;
 

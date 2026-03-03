@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { sql } from "@/lib/db";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminCard } from "@/components/admin/AdminCard";
 import { AdminTable } from "@/components/admin/AdminTable";
@@ -13,32 +13,27 @@ const LEVEL_COLORS: Record<string, string> = {
 };
 
 export default async function AdminQuizPage() {
-  const supabase = createAdminClient();
-  const [
-    { data: questions, count: questionCount },
-    { data: thresholds },
-    { data: attempts },
-    { data: attemptStats },
-  ] = await Promise.all([
-    supabase
-      .from("quiz_questions")
-      .select("id, question_text, jlpt_level, sort_order, correct_answer", { count: "exact" })
-      .order("sort_order"),
-    supabase
-      .from("quiz_thresholds")
-      .select("level, min_score, recommended_product_id")
-      .order("level"),
-    supabase
-      .from("quiz_attempts")
-      .select("id, email, score, recommended_level, created_at")
-      .order("created_at", { ascending: false })
-      .limit(20),
-    supabase
-      .from("quiz_attempts")
-      .select("recommended_level"),
-  ]);
+  const letterFromIndex = (i: number) => String.fromCharCode(65 + i);
+  let questions: { id: string; question_text: string; jlpt_level: string | null; sort_order: number; correct_index: number }[] = [];
+  let thresholds: { level: string; min_score: number; recommended_product_id: string | null }[] = [];
+  let attempts: { id: string; email: string; score: number; recommended_level: string | null; created_at: string }[] = [];
+  let attemptStats: { recommended_level: string | null }[] = [];
 
-  const levelCounts = (attemptStats || []).reduce<Record<string, number>>((acc, a) => {
+  if (sql) {
+    const [questionsRows, thresholdsRows, attemptsRows, statsRows] = await Promise.all([
+      sql`SELECT id, question_text, jlpt_level, sort_order, correct_index FROM quiz_questions ORDER BY sort_order`,
+      sql`SELECT level, min_score, recommended_product_id FROM quiz_thresholds ORDER BY level`,
+      sql`SELECT id, email, score, recommended_level, created_at FROM quiz_attempts ORDER BY created_at DESC LIMIT 20`,
+      sql`SELECT recommended_level FROM quiz_attempts`,
+    ]);
+    questions = (questionsRows ?? []) as typeof questions;
+    thresholds = (thresholdsRows ?? []) as typeof thresholds;
+    attempts = (attemptsRows ?? []) as typeof attempts;
+    attemptStats = (statsRows ?? []) as typeof attemptStats;
+  }
+
+  const questionCount = questions.length;
+  const levelCounts = attemptStats.reduce<Record<string, number>>((acc, a) => {
     if (a.recommended_level) acc[a.recommended_level] = (acc[a.recommended_level] || 0) + 1;
     return acc;
   }, {});
@@ -51,11 +46,10 @@ export default async function AdminQuizPage() {
         action={{ label: "New Question", href: "/admin/quiz/questions/new" }}
       />
 
-      {/* Stats */}
       <div className="bento-grid mb-8">
         {[
-          { label: "Total Questions", value: questionCount ?? 0 },
-          { label: "Total Attempts", value: attempts?.length ?? 0 },
+          { label: "Total Questions", value: questionCount },
+          { label: "Total Attempts", value: attempts.length },
           ...["N5", "N4", "N3", "N2", "N1"].map((l) => ({
             label: `${l} Recommended`,
             value: levelCounts[l] ?? 0,
@@ -72,18 +66,17 @@ export default async function AdminQuizPage() {
         ))}
       </div>
 
-      {/* Questions table */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-heading text-lg font-bold text-charcoal">
-            Questions ({questionCount ?? 0})
+            Questions ({questionCount})
           </h2>
           <Link href="/admin/quiz/questions/new" className="btn-primary text-sm px-4 py-2 h-auto">
             + New Question
           </Link>
         </div>
         <AdminCard>
-          {questions && questions.length > 0 ? (
+          {questions.length > 0 ? (
             <AdminTable headers={["#", "Question", "Level", "Answer", "Actions"]}>
               {questions.map((q, i) => (
                 <tr key={q.id} className="border-b border-[var(--divider)] hover:bg-[var(--base)] transition-colors">
@@ -100,7 +93,7 @@ export default async function AdminQuizPage() {
                       <span className="text-secondary text-xs">—</span>
                     )}
                   </td>
-                  <td className="py-2 px-2 text-secondary text-xs font-mono">{q.correct_answer}</td>
+                  <td className="py-2 px-2 text-secondary text-xs font-mono">{letterFromIndex(q.correct_index)}</td>
                   <td className="py-2 px-2">
                     <Link
                       href={`/admin/quiz/questions/${q.id}/edit`}
@@ -123,13 +116,12 @@ export default async function AdminQuizPage() {
         </AdminCard>
       </div>
 
-      {/* Thresholds */}
       <div className="mb-8">
         <h2 className="font-heading text-lg font-bold text-charcoal mb-4">
           Level Thresholds
         </h2>
         <AdminCard>
-          {thresholds && thresholds.length > 0 ? (
+          {thresholds.length > 0 ? (
             <AdminTable headers={["Level", "Min Score", "Recommended Product"]}>
               {thresholds.map((t) => (
                 <tr key={t.level} className="border-b border-[var(--divider)]">
@@ -145,16 +137,15 @@ export default async function AdminQuizPage() {
             </AdminTable>
           ) : (
             <p className="text-secondary text-sm py-4">
-              No thresholds configured. Add rows to <code className="bg-[var(--base)] px-1 rounded">quiz_thresholds</code> table in Supabase.
+              No thresholds configured. Add rows to <code className="bg-[var(--base)] px-1 rounded">quiz_thresholds</code> table.
             </p>
           )}
         </AdminCard>
       </div>
 
-      {/* Recent Attempts */}
       <h2 className="font-heading text-lg font-bold text-charcoal mb-4">Recent Attempts</h2>
       <AdminCard>
-        {attempts && attempts.length > 0 ? (
+        {attempts.length > 0 ? (
           <AdminTable headers={["Email", "Score", "Level", "Date"]}>
             {attempts.map((a) => (
               <tr key={a.id} className="border-b border-[var(--divider)]">

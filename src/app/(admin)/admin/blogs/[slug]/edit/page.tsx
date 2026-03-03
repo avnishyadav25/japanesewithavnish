@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { sql } from "@/lib/db";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { BlogPostForm } from "../../BlogPostForm";
 
@@ -9,14 +9,11 @@ export default async function AdminBlogsEditPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const supabase = createAdminClient();
-  const { data: post, error } = await supabase
-    .from("posts")
-    .select("*")
-    .eq("slug", slug)
-    .single();
+  if (!sql) notFound();
 
-  if (error || !post) notFound();
+  const rows = await sql`SELECT * FROM posts WHERE slug = ${slug} LIMIT 1`;
+  const post = rows[0] as Record<string, unknown> | undefined;
+  if (!post) notFound();
 
   return (
     <div>
@@ -25,10 +22,10 @@ export default async function AdminBlogsEditPage({
         breadcrumb={[
           { label: "Admin", href: "/admin" },
           { label: "Blogs", href: "/admin/blogs" },
-          { label: post.title },
+          { label: post.title as string },
         ]}
       />
-      <BlogPostForm post={post} />
+      <BlogPostForm post={post as unknown as Parameters<typeof BlogPostForm>[0]["post"]} />
     </div>
   );
 }

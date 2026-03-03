@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { sql } from "@/lib/db";
 
 export async function POST(req: NextRequest) {
   try {
@@ -8,14 +8,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Code and productId required" }, { status: 400 });
     }
 
-    const supabase = await createClient();
-    const { data: coupon, error } = await supabase
-      .from("coupons")
-      .select("id, code, discount_type, discount_value, product_ids, max_uses, used_count, expires_at")
-      .eq("code", code.toUpperCase().trim())
-      .single();
+    if (!sql) {
+      return NextResponse.json({ error: "Database not configured" }, { status: 500 });
+    }
 
-    if (error || !coupon) {
+    const codeUpper = code.toUpperCase().trim();
+    const couponRows = await sql`
+      SELECT id, discount_type, discount_value, product_ids, max_uses, used_count, expires_at
+      FROM coupons WHERE code = ${codeUpper} LIMIT 1
+    ` as { id: string; discount_type: string; discount_value: number; product_ids: string[] | null; max_uses: number | null; used_count: number; expires_at: string | null }[];
+    const coupon = couponRows[0] ?? null;
+    let pricePaise = 0;
+    if (coupon) {
+      const prodRows = await sql`SELECT price_paise FROM products WHERE id = ${productId} LIMIT 1` as { price_paise: number }[];
+      pricePaise = Number(prodRows[0]?.price_paise ?? 0);
+    }
+
+    if (!coupon) {
       return NextResponse.json({ valid: false, error: "Invalid coupon" });
     }
 
@@ -23,17 +32,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ valid: false, error: "Coupon expired" });
     }
 
-    if (coupon.max_uses != null && (coupon.used_count ?? 0) >= coupon.max_uses) {
+    if (coupon.max_uses != null && (Number(coupon.used_count ?? 0) >= coupon.max_uses)) {
       return NextResponse.json({ valid: false, error: "Coupon limit reached" });
     }
 
-    const productIds = coupon.product_ids as string[] | null;
+    const productIds = coupon.product_ids;
     if (productIds && productIds.length > 0 && !productIds.includes(productId)) {
       return NextResponse.json({ valid: false, error: "Coupon not valid for this product" });
     }
-
-    const { data: prod } = await supabase.from("products").select("price_paise").eq("id", productId).single();
-    const pricePaise = prod?.price_paise ?? 0;
     let discountPaise = 0;
     if (coupon.discount_type === "percent") {
       discountPaise = Math.round((pricePaise * coupon.discount_value) / 100);

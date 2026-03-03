@@ -1,9 +1,7 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import { createClient } from "@/lib/supabase/server";
+import { getAdminSession } from "@/lib/auth/admin";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
-
-const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
 
 export default async function AdminLayout({
   children,
@@ -15,10 +13,8 @@ export default async function AdminLayout({
     return <div className="min-h-screen bg-base">{children}</div>;
   }
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user?.email || !ADMIN_EMAILS.includes(user.email.toLowerCase())) {
+  const admin = await getAdminSession();
+  if (!admin) {
     redirect("/admin/login");
   }
 

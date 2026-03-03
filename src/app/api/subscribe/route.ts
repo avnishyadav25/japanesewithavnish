@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { sql } from "@/lib/db";
 import { sendWelcomeNewsletter } from "@/lib/email";
 
 export async function POST(req: NextRequest) {
@@ -15,30 +15,21 @@ export async function POST(req: NextRequest) {
     }
 
     const subscribeSource = source && typeof source === "string" ? source : "footer";
+    const nameVal = name && typeof name === "string" ? name.trim() : null;
 
-    const supabase = createAdminClient();
-    const { data: existing } = await supabase
-      .from("subscribers")
-      .select("id")
-      .eq("email", trimmed)
-      .single();
-
-    const { error } = await supabase.from("subscribers").upsert(
-      {
-        email: trimmed,
-        name: name && typeof name === "string" ? name.trim() : null,
-        source: subscribeSource,
-      },
-      { onConflict: "email" }
-    );
-
-    if (error) {
-      console.error("Subscribe:", error);
-      return NextResponse.json({ error: "Failed to subscribe" }, { status: 500 });
+    if (!sql) {
+      return NextResponse.json({ error: "Database not configured" }, { status: 500 });
     }
 
-    if (!existing) {
-      sendWelcomeNewsletter(trimmed, name?.trim()).catch((err) =>
+    const existing = await sql`SELECT id FROM subscribers WHERE email = ${trimmed} LIMIT 1`;
+    await sql`
+      INSERT INTO subscribers (email, name, source)
+      VALUES (${trimmed}, ${nameVal}, ${subscribeSource})
+      ON CONFLICT (email) DO UPDATE SET name = COALESCE(EXCLUDED.name, subscribers.name), source = EXCLUDED.source
+    `;
+
+    if (!existing?.length) {
+      sendWelcomeNewsletter(trimmed, nameVal ?? undefined).catch((err) =>
         console.error("Welcome email:", err)
       );
     }

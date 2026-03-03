@@ -1,21 +1,13 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getAdminSession } from "@/lib/auth/admin";
 import { getPrompt, type ContentType } from "@/lib/ai/prompts";
-
-const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "")
-  .split(",")
-  .map((e) => e.trim().toLowerCase())
-  .filter(Boolean);
 
 const DEEPSEEK_API = "https://api.deepseek.com/v1/chat/completions";
 
 export async function POST(req: Request) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user?.email || !ADMIN_EMAILS.includes(user.email.toLowerCase())) {
+    const admin = await getAdminSession();
+    if (!admin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

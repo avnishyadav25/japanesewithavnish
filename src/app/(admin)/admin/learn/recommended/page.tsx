@@ -1,4 +1,4 @@
-import { createAdminClient } from "@/lib/supabase/admin";
+import { sql } from "@/lib/db";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { LearnRecommendedForm } from "./LearnRecommendedForm";
 
@@ -13,14 +13,12 @@ const LEVEL_LABELS: Record<string, string> = {
 };
 
 export default async function AdminLearnRecommendedPage() {
-  const supabase = createAdminClient();
-  const { data: setting } = await supabase
-    .from("site_settings")
-    .select("value")
-    .eq("key", "learn_recommended")
-    .maybeSingle();
-
-  const value = (setting?.value as Record<string, string[]>) || {};
+  let value: Record<string, string[]> = {};
+  if (sql) {
+    const rows = await sql`SELECT value FROM site_settings WHERE key = 'learn_recommended' LIMIT 1`;
+    const setting = rows[0] as { value: Record<string, string[]> } | undefined;
+    value = (setting?.value as Record<string, string[]>) || {};
+  }
   const initial: Record<string, string[]> = {};
   for (const level of LEVELS) {
     initial[level] = Array.isArray(value[level]) ? value[level] : [];

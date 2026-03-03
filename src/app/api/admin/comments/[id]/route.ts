@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { getAdminSession } from "@/lib/auth/admin";
+import { sql } from "@/lib/db";
 import { sendCommunityGuidelinesEmail } from "@/lib/email";
 import {
   emailWrapper,
@@ -9,28 +9,12 @@ import {
   type EmailProduct,
 } from "@/lib/email-templates";
 
-const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "")
-  .split(",")
-  .map((e) => e.trim().toLowerCase())
-  .filter(Boolean);
-
-async function requireAdmin() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user?.email || !ADMIN_EMAILS.includes(user.email.toLowerCase())) {
-    return null;
-  }
-  return user;
-}
-
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const user = await requireAdmin();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const admin = await getAdminSession();
+  if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
   const preview = searchParams.get("preview");
@@ -40,26 +24,15 @@ export async function GET(
 
   try {
     const { id } = await params;
-    const admin = createAdminClient();
-    const { data: comment, error: fetchError } = await admin
-      .from("post_comments")
-      .select("id, author_name, author_email, post_id")
-      .eq("id", id)
-      .single();
+    if (!sql) return NextResponse.json({ error: "Failed" }, { status: 503 });
 
-    if (fetchError || !comment) {
-      return NextResponse.json({ error: "Comment not found" }, { status: 404 });
-    }
+    const commentRows = await sql`SELECT id, author_name, author_email, post_id FROM post_comments WHERE id = ${id} LIMIT 1`;
+    const comment = commentRows[0] as { id: string; author_name: string; author_email: string; post_id: string } | undefined;
+    if (!comment) return NextResponse.json({ error: "Comment not found" }, { status: 404 });
 
-    const { data: post } = await admin
-      .from("posts")
-      .select("slug, title")
-      .eq("id", comment.post_id)
-      .single();
-
-    if (!post) {
-      return NextResponse.json({ error: "Post not found" }, { status: 404 });
-    }
+    const postRows = await sql`SELECT slug, title FROM posts WHERE id = ${comment.post_id} LIMIT 1`;
+    const post = postRows[0] as { slug: string; title: string } | undefined;
+    if (!post) return NextResponse.json({ error: "Post not found" }, { status: 404 });
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://japanesewithavnish.com";
     const postUrl = `${siteUrl.replace(/\/$/, "")}/blog/${post.slug}`;
@@ -68,12 +41,8 @@ export async function GET(
       post.title,
       postUrl
     );
-    const { data: products } = await admin
-      .from("products")
-      .select("slug, name, price_paise, image_url, jlpt_level")
-      .order("sort_order", { ascending: true })
-      .limit(6);
-    const productList = productListHtml((products || []) as EmailProduct[], siteUrl);
+    const productRows = await sql`SELECT slug, name, price_paise, image_url, jlpt_level FROM products ORDER BY sort_order ASC LIMIT 6`;
+    const productList = productListHtml((productRows || []) as EmailProduct[], siteUrl);
     const html = emailWrapper(content, productList);
 
     return new NextResponse(html, {
@@ -86,24 +55,16 @@ export async function GET(
 }
 
 export async function DELETE(
-  req: NextRequest,
+  _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const user = await requireAdmin();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const admin = await getAdminSession();
+  if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
     const { id } = await params;
-    const admin = createAdminClient();
-    const { error } = await admin
-      .from("post_comments")
-      .update({ status: "removed" })
-      .eq("id", id);
-
-    if (error) {
-      console.error("Comment remove:", error);
-      return NextResponse.json({ error: "Failed to remove comment" }, { status: 500 });
-    }
+    if (!sql) return NextResponse.json({ error: "Failed" }, { status: 503 });
+    await sql`UPDATE post_comments SET status = 'removed' WHERE id = ${id}`;
     return NextResponse.json({ success: true });
   } catch (e) {
     console.error("Comment DELETE:", e);
@@ -115,8 +76,8 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const user = await requireAdmin();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const admin = await getAdminSession();
+  if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
     const { id } = await params;
@@ -127,26 +88,15 @@ export async function POST(
       return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }
 
-    const admin = createAdminClient();
-    const { data: comment, error: fetchError } = await admin
-      .from("post_comments")
-      .select("id, author_name, author_email, post_id")
-      .eq("id", id)
-      .single();
+    if (!sql) return NextResponse.json({ error: "Failed" }, { status: 503 });
 
-    if (fetchError || !comment) {
-      return NextResponse.json({ error: "Comment not found" }, { status: 404 });
-    }
+    const commentRows = await sql`SELECT id, author_name, author_email, post_id FROM post_comments WHERE id = ${id} LIMIT 1`;
+    const comment = commentRows[0] as { author_name: string; author_email: string; post_id: string } | undefined;
+    if (!comment) return NextResponse.json({ error: "Comment not found" }, { status: 404 });
 
-    const { data: post } = await admin
-      .from("posts")
-      .select("slug, title")
-      .eq("id", comment.post_id)
-      .single();
-
-    if (!post) {
-      return NextResponse.json({ error: "Post not found" }, { status: 404 });
-    }
+    const postRows = await sql`SELECT slug, title FROM posts WHERE id = ${comment.post_id} LIMIT 1`;
+    const post = postRows[0] as { slug: string; title: string } | undefined;
+    if (!post) return NextResponse.json({ error: "Post not found" }, { status: 404 });
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://japanesewithavnish.com";
     const postUrl = `${siteUrl.replace(/\/$/, "")}/blog/${post.slug}`;
