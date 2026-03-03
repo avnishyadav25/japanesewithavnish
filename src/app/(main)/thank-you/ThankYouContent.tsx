@@ -51,7 +51,7 @@ export function ThankYouContent({ orderId }: { orderId: string | undefined }) {
                   rel="noopener noreferrer"
                   className="btn-primary inline-flex justify-center"
                 >
-                  Access My Library
+                  Access Store
                 </a>
                 <Link
                   href={urls.orderDetailUrl}
@@ -72,7 +72,7 @@ export function ThankYouContent({ orderId }: { orderId: string | undefined }) {
           ) : (
             <div className="flex flex-col sm:flex-row gap-3 mt-2">
               <Link href="/library" className="btn-primary">
-                Go to My Library
+                Go to Store
               </Link>
               <Link href="/learn" className="btn-secondary">
                 Continue learning

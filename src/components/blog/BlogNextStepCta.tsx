@@ -14,7 +14,7 @@ export function BlogNextStepCta() {
           Browse Bundles
         </Link>
         <Link href="/login" className="text-primary font-medium hover:underline py-2">
-          My Library
+          Store
         </Link>
       </div>
     </div>

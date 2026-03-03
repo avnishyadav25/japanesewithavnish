@@ -16,7 +16,6 @@ export async function POST(req: Request) {
       jlpt_level,
       tags,
       status,
-      published_at,
       seo_title,
       seo_description,
       og_image_url,
@@ -32,7 +31,7 @@ export async function POST(req: Request) {
     const slugVal = String(slug).trim();
     const titleVal = String(title).trim();
     const statusVal = status === "published" ? "published" : "draft";
-    const publishedAtVal = statusVal === "published" && published_at ? published_at : null;
+    const publishedAtVal = statusVal === "published" ? new Date().toISOString() : null;
 
     try {
       const rows = await sql`

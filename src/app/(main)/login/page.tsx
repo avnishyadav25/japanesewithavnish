@@ -32,7 +32,7 @@ export default function LoginPage() {
       <div className="max-w-[1200px] mx-auto">
         <div className="bento-grid">
           <div className="bento-span-4 bento-row-2 card flex flex-col justify-center">
-            <h1 className="font-heading text-2xl font-bold text-charcoal mb-2">Access My Library</h1>
+            <h1 className="font-heading text-2xl font-bold text-charcoal mb-2">Access Store</h1>
             <p className="text-secondary mb-8">
               Enter your email to receive a magic link. No password needed.
             </p>

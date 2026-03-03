@@ -34,6 +34,9 @@ export default async function AdminProductsPage() {
         title="Products"
         breadcrumb={[{ label: "Admin", href: "/admin" }]}
       />
+      <p className="text-sm text-secondary mb-4">
+        <a href="/admin/ai-logs?entityType=product" className="text-primary hover:underline">AI history</a>
+      </p>
       <ProductListClient products={products} />
     </div>
   );

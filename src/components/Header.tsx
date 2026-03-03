@@ -43,7 +43,7 @@ export function Header() {
             className="flex items-center gap-2.5 font-heading font-bold text-[#FAF8F5] hover:text-primary transition-colors"
           >
             <Image
-              src="/logo.png"
+              src="/logo-dark.png"
               alt="Japanese with Avnish"
               width={32}
               height={32}
@@ -73,10 +73,10 @@ export function Header() {
               Free N5 Pack
             </Link>
             <Link
-              href="/login"
+              href="/store"
               className="bg-primary text-white font-semibold py-2 px-[18px] rounded-md hover:bg-white hover:text-primary transition-colors text-sm"
             >
-              My Library
+              Store
             </Link>
           </div>
 
@@ -138,11 +138,11 @@ export function Header() {
           </nav>
           <div className="mt-auto pt-4 border-t border-[#EEEEEE]/30">
             <Link
-              href="/login"
+              href="/store"
               onClick={() => setMobileOpen(false)}
               className="block w-full text-center bg-primary text-white font-semibold py-3 px-4 rounded-md hover:bg-white hover:text-primary transition-colors"
             >
-              My Library
+              Store
             </Link>
           </div>
         </div>

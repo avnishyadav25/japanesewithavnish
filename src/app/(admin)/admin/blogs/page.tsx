@@ -47,6 +47,9 @@ export default async function AdminBlogsPage() {
         breadcrumb={[{ label: "Admin", href: "/admin" }]}
         action={{ label: "New post", href: "/admin/blogs/new" }}
       />
+      <p className="text-sm text-secondary mb-4">
+        <a href="/admin/ai-logs?entityType=post" className="text-primary hover:underline">AI history</a> (content & image generations for posts)
+      </p>
       <BlogListClient
         posts={posts}
         stats={{ total, published, draft, thisMonth }}

@@ -101,7 +101,7 @@ export default async function StartHerePage() {
                   <span>📦</span> Browse Bundles
                 </Link>
                 <Link href="/library" className="flex items-center gap-2 text-charcoal hover:text-primary font-medium transition-colors">
-                  <span>📚</span> Open My Library
+                  <span>📚</span> Open Store
                 </Link>
               </div>
             </div>
@@ -135,7 +135,7 @@ export default async function StartHerePage() {
               <p className="text-secondary text-sm mb-4">
                 After purchase, log in anytime via email and download your material.
               </p>
-              <Link href="/library" className="text-primary font-medium hover:underline">My Library →</Link>
+              <Link href="/library" className="text-primary font-medium hover:underline">Store →</Link>
             </div>
           </div>
         </div>

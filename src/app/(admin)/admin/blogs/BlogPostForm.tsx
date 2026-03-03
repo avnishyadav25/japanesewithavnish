@@ -27,6 +27,7 @@ type Post = {
 export function BlogPostForm({ post }: { post?: Post }) {
   const router = useRouter();
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [summaryLoading, setSummaryLoading] = useState(false);
   const [imageModalOpen, setImageModalOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [form, setForm] = useState({
@@ -112,7 +113,33 @@ export function BlogPostForm({ post }: { post?: Post }) {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-charcoal mb-1">Summary</label>
+            <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
+              <label className="block text-sm font-medium text-charcoal">Summary</label>
+              <button
+                type="button"
+                disabled={summaryLoading || !form.slug || !form.content}
+                onClick={async () => {
+                  setSummaryLoading(true);
+                  try {
+                    const res = await fetch("/api/ai/blog-summary", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ slug: form.slug }),
+                    });
+                    const data = await res.json();
+                    if (data.error) throw new Error(data.error);
+                    if (typeof data.summary === "string") update("summary", data.summary);
+                  } catch {
+                    // no-op; could add toast
+                  } finally {
+                    setSummaryLoading(false);
+                  }
+                }}
+                className="text-sm text-primary hover:underline disabled:opacity-50 disabled:pointer-events-none"
+              >
+                {summaryLoading ? "Generating…" : "Create summary (AI)"}
+              </button>
+            </div>
             <textarea
               value={form.summary}
               onChange={(e) => update("summary", e.target.value)}

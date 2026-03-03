@@ -10,6 +10,34 @@ import { BlogArticleContent } from "@/components/blog/BlogArticleContent";
 import { BlogNextStepCta } from "@/components/blog/BlogNextStepCta";
 import { BlogPostCard } from "@/components/blog/BlogPostCard";
 import { filterPosts, type PostForFilter } from "@/lib/blog-filters";
+import { ContentAnalytics } from "@/components/ContentAnalytics";
+import { ArticleSchema } from "@/components/JsonLd";
+
+const BASE = process.env.NEXT_PUBLIC_SITE_URL || "https://japanesewithavnish.com";
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  if (!sql) return {};
+  const rows = await sql`
+    SELECT title, seo_title, seo_description, og_image_url
+    FROM posts WHERE slug = ${slug} AND status = 'published' LIMIT 1
+  ` as { title: string; seo_title: string | null; seo_description: string | null; og_image_url: string | null }[];
+  const p = rows[0];
+  if (!p) return {};
+  const title = p.seo_title?.trim() || p.title;
+  const description = p.seo_description?.trim() || undefined;
+  return {
+    title: title ? `${title} | Japanese with Avnish` : undefined,
+    description,
+    openGraph: {
+      title: title || undefined,
+      description: description || undefined,
+      images: p.og_image_url ? [{ url: p.og_image_url }] : undefined,
+      type: "article",
+      url: `${BASE}/blog/${slug}`,
+    },
+  };
+}
 
 function estimateReadTime(content: string): number {
   const text = content.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
@@ -73,8 +101,17 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
   const readTime = contentStr ? estimateReadTime(contentStr) : 0;
   const isMarkdown = contentStr && !contentStr.trim().startsWith("<");
 
+  const postUrl = `${BASE}/blog/${slug}`;
   return (
     <div className="py-12 sm:py-16 px-4 sm:px-6 pb-24 lg:pb-16">
+      <ArticleSchema
+        title={post.title}
+        description={post.seo_description || post.summary || undefined}
+        url={postUrl}
+        image={post.og_image_url || undefined}
+        datePublished={post.published_at || undefined}
+      />
+      <ContentAnalytics content_type="blog" content_id={post.id as string} trackDuration />
       <div className="max-w-[1200px] mx-auto">
         <div className="grid lg:grid-cols-[1fr_280px] gap-8">
           <div>

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getAdminSession } from "@/lib/auth/admin";
 import { getImagePrompt, type ImageType } from "@/lib/ai/image-prompts";
+import { insertAiLog } from "@/lib/ai-logs";
 
 const validImageTypes: ImageType[] = ["product", "blog", "newsletter", "page", "learning"];
 
@@ -109,6 +110,16 @@ export async function POST(req: Request) {
       );
 
       const publicUrl = `${bucketUrl}/${key}`;
+      const admin = await getAdminSession();
+      await insertAiLog({
+        log_type: "image_generate",
+        content_type: imageType,
+        entity_type: imageType === "blog" ? "post" : imageType === "product" ? "product" : imageType === "newsletter" ? "newsletter" : undefined,
+        model_used: "gemini",
+        prompt_sent: userPrompt,
+        result_preview: publicUrl,
+        admin_email: admin?.email,
+      });
       return NextResponse.json({ imageUrl: publicUrl, content: text });
     }
 

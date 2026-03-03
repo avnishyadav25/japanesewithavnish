@@ -48,3 +48,33 @@ export function ProductSchema({
     />
   );
 }
+
+export function ArticleSchema({
+  title,
+  description,
+  url,
+  image,
+  datePublished,
+}: {
+  title: string;
+  description?: string;
+  url: string;
+  image?: string;
+  datePublished?: string;
+}) {
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: title,
+    description: description || title,
+    url,
+    ...(image && { image: [image] }),
+    ...(datePublished && { datePublished }),
+  };
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+    />
+  );
+}

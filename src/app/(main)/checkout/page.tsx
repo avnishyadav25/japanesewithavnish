@@ -25,7 +25,7 @@ function CheckoutLoadingSkeleton() {
             <h2 className="font-heading text-lg font-bold text-charcoal mb-3">What you&apos;ll get</h2>
             <ul className="text-secondary text-sm space-y-1 mb-4">
               <li>Instant access link by email after payment.</li>
-              <li>Lifetime access to your bundles in My Library.</li>
+              <li>Lifetime access to your bundles in the Store.</li>
               <li>Download PDFs and audio anytime on any device.</li>
             </ul>
             <p className="text-secondary text-sm">Secure payment handled by Razorpay.</p>
@@ -105,7 +105,7 @@ function CheckoutContent() {
             <h2 className="font-heading text-lg font-bold text-charcoal mb-3">What you&apos;ll get</h2>
             <ul className="text-secondary text-sm space-y-1 mb-4">
               <li>Instant access link by email after payment.</li>
-              <li>Lifetime access to your bundles in My Library.</li>
+              <li>Lifetime access to your bundles in the Store.</li>
               <li>Download PDFs and audio anytime on any device.</li>
             </ul>
             <p className="text-secondary text-sm mb-2">

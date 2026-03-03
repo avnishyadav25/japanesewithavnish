@@ -39,6 +39,7 @@ export function GenerateContentModal({
   const [topic, setTopic] = useState(initialContext.topic ?? "");
   const [tags, setTags] = useState(initialContext.tags ?? "");
   const [description, setDescription] = useState(initialContext.description ?? "");
+  const [customPrompt, setCustomPrompt] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -46,6 +47,7 @@ export function GenerateContentModal({
       setTopic(initialContext.topic ?? "");
       setTags(initialContext.tags ?? "");
       setDescription(initialContext.description ?? "");
+      setCustomPrompt("");
     }
   }, [open, initialContext.topic, initialContext.tags, initialContext.description]);
 
@@ -56,6 +58,7 @@ export function GenerateContentModal({
     description: description || undefined,
   };
   const previewPrompt = getPrompt(contentType, context);
+  const promptToSend = customPrompt.trim() || previewPrompt;
 
   async function handleGenerate() {
     setLoading(true);
@@ -63,7 +66,7 @@ export function GenerateContentModal({
       const res = await fetch("/api/ai/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contentType, context }),
+        body: JSON.stringify({ contentType, context, customPrompt: promptToSend }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -143,11 +146,16 @@ export function GenerateContentModal({
 
           <div>
             <label className="block text-sm font-medium text-charcoal mb-1">
-              Prompt (preview)
+              Prompt (editable)
             </label>
-            <div className="p-3 bg-[var(--base)] rounded-bento text-sm text-charcoal font-mono border border-[var(--divider)] max-h-32 overflow-y-auto">
-              {previewPrompt}
-            </div>
+            <textarea
+              value={customPrompt || previewPrompt}
+              onChange={(e) => setCustomPrompt(e.target.value)}
+              rows={8}
+              className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal text-sm font-mono"
+              placeholder={previewPrompt}
+            />
+            <p className="text-xs text-secondary mt-1">Edit the prompt above if needed, then click Generate.</p>
           </div>
 
           <div className="flex gap-3 pt-2">

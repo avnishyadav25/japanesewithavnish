@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
         content = `
           <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">Hi Alex,</p>
           <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">Thank you for your purchase! Your digital bundle is ready.</p>
-          <p style="margin:0 0 24px;"><a href="${libUrl}" style="background:#D0021B;color:white;padding:12px 26px;text-decoration:none;border-radius:8px;display:inline-block;font-weight:600;">Access My Library</a></p>
+          <p style="margin:0 0 24px;"><a href="${libUrl}" style="background:#D0021B;color:white;padding:12px 26px;text-decoration:none;border-radius:8px;display:inline-block;font-weight:600;">Access Store</a></p>
           <p style="font-size:14px;line-height:1.6;margin:0;color:#555;">Order ID: ord_abc123</p>
           <p style="font-size:14px;line-height:1.6;margin:8px 0 0;color:#555;">You can access your downloads anytime by logging in with this email.</p>
           <p style="font-size:14px;line-height:1.6;margin:16px 0 0;">— Japanese with Avnish</p>
@@ -79,7 +79,7 @@ export async function GET(req: NextRequest) {
         return new NextResponse(
           `<!DOCTYPE html><html><body style="font-family:system-ui;padding:24px;">
             <p>Click the link below to access your library:</p>
-            <p><a href="${magicUrl}" style="color:#D0021B;font-weight:600;">Access My Library</a></p>
+            <p><a href="${magicUrl}" style="color:#D0021B;font-weight:600;">Access Store</a></p>
             <p>This link expires in 1 hour.</p>
             <p>If you didn't request this, you can ignore this email.</p>
           </body></html>`,

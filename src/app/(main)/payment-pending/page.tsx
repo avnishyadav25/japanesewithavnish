@@ -17,7 +17,7 @@ export default function PaymentPendingPage() {
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-3">
             <Link href="/library" className="btn-secondary">
-              Go to My Library
+              Go to Store
             </Link>
             <Link href="/store" className="btn-primary">
               Back to Store

@@ -27,7 +27,7 @@ export default async function LibraryPage() {
           <div className="bento-grid">
             <div className="bento-span-4 bento-row-2 card flex flex-col justify-center">
               <h1 className="font-heading text-3xl sm:text-4xl font-bold text-charcoal mb-2">
-                Access My Library
+                Access Store
               </h1>
               <p className="text-secondary mb-6">
                 Enter your email to receive a magic link. No password needed.
@@ -66,7 +66,7 @@ export default async function LibraryPage() {
           <>
             <div className="mb-10">
               <h1 className="font-heading text-3xl sm:text-4xl font-bold text-charcoal mb-2">
-                My Library
+                Store
               </h1>
               <p className="text-secondary">
                 Your purchased bundles and downloads.

@@ -37,6 +37,7 @@ const navGroups = [
   {
     label: "Audience",
     items: [
+      { href: "/admin/newsletters", label: "Newsletters" },
       { href: "/admin/newsletter/subscribers", label: "Subscribers" },
       { href: "/admin/newsletter/settings", label: "Newsletter Settings" },
       { href: "/admin/emailtemplate", label: "Email Templates" },
@@ -44,7 +45,12 @@ const navGroups = [
   },
   {
     label: "Settings",
-    items: [{ href: "/admin/settings", label: "Company Settings" }],
+    items: [
+      { href: "/admin/settings", label: "Company Settings" },
+      { href: "/admin/social", label: "Prepare for social" },
+      { href: "/admin/analytics", label: "Analytics" },
+      { href: "/admin/ai-logs", label: "AI history" },
+    ],
   },
 ];
 

@@ -9,7 +9,7 @@ const FAQ = [
   },
   {
     q: "How do I access downloads later?",
-    a: "Log in to My Library with the email you used at checkout. All your purchases are stored there for lifetime access.",
+    a: "Log in to the Store with the email you used at checkout. All your purchases are stored there for lifetime access.",
   },
   {
     q: "Can I use on mobile?",

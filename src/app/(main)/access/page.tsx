@@ -83,7 +83,7 @@ export default async function AccessPage({
         </div>
         <div className="mb-10">
           <h1 className="font-heading text-3xl sm:text-4xl font-bold text-charcoal mb-2">
-            My Library
+            Store
           </h1>
           <p className="text-secondary">
             Your purchased bundles and downloads.

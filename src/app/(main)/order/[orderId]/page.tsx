@@ -183,7 +183,7 @@ export default async function OrderDetailPage({
                 rel="noopener noreferrer"
                 className="btn-primary inline-flex justify-center"
               >
-                Access My Library
+                Access Store
               </a>
               <Link href={`/access?token=${token}`} className="btn-secondary inline-flex justify-center">
                 Open library on site

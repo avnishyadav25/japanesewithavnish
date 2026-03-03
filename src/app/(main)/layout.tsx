@@ -2,6 +2,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { AnnouncementBar } from "@/components/AnnouncementBar";
 import { NewsletterSection } from "@/components/NewsletterSection";
+import { ChatPanel } from "@/components/ChatPanel";
 import { Suspense } from "react";
 import { PathnameGuard } from "./pathname-guard";
 
@@ -30,6 +31,7 @@ export default function MainLayout({
             </PathnameGuard>
           </Suspense>
           <Footer />
+          <ChatPanel />
         </>
       )}
     </div>

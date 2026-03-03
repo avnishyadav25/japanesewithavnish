@@ -20,7 +20,6 @@ export async function PUT(
       jlpt_level,
       tags,
       status,
-      published_at,
       seo_title,
       seo_description,
       og_image_url,
@@ -34,7 +33,7 @@ export async function PUT(
     if (!sql) return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
 
     const statusVal = status === "published" ? "published" : "draft";
-    const publishedAtVal = statusVal === "published" && published_at ? published_at : null;
+    const publishedAtVal = statusVal === "published" ? new Date().toISOString() : null;
 
     try {
       await sql`

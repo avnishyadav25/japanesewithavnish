@@ -4,6 +4,7 @@ import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminCard } from "@/components/admin/AdminCard";
 import { AdminTable } from "@/components/admin/AdminTable";
 import { StatusBadge } from "@/components/admin/StatusBadge";
+import { SitemapPingButton } from "@/components/admin/SitemapPingButton";
 
 export default async function AdminDashboardPage() {
   const now = new Date();
@@ -160,6 +161,13 @@ export default async function AdminDashboardPage() {
               <span className="font-heading font-bold text-charcoal text-lg">{item.value}</span>
             </Link>
           ))}
+        </div>
+
+        {/* Sitemap ping */}
+        <div className="bento-span-2 card flex flex-col gap-4">
+          <h2 className="font-heading font-bold text-charcoal text-sm">SEO</h2>
+          <p className="text-secondary text-xs">Notify Google &amp; Bing that the sitemap was updated.</p>
+          <SitemapPingButton />
         </div>
       </div>
 

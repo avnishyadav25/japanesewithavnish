@@ -27,7 +27,7 @@ const quickLinks = [
   { href: "/quiz", label: "Quiz" },
   { href: "/store", label: "Store" },
   { href: "/blog", label: "Blog" },
-  { href: "/login", label: "My Library" },
+  { href: "/store", label: "Store" },
 ];
 
 const policyLinks = [

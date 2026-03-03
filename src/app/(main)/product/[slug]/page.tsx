@@ -6,6 +6,7 @@ import { ProductSidebarWithCheckout } from "./ProductSidebarWithCheckout";
 import { ProductSchema } from "@/components/JsonLd";
 import { BundleContentsTree } from "@/components/BundleContentsTree";
 import { getBundleContents } from "@/data/bundle-contents";
+import { ContentAnalytics } from "@/components/ContentAnalytics";
 
 type ProductWithAssets = {
   id: string;
@@ -73,6 +74,7 @@ export default async function ProductPage({
 
   return (
     <>
+      <ContentAnalytics content_type="product" content_id={product.id} trackDuration />
       <ProductSchema
         name={product.name}
         description={product.description || undefined}

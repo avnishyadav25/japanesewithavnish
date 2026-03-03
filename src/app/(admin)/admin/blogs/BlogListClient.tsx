@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useState, useMemo } from "react";
 
 type Post = {
@@ -268,6 +269,7 @@ function TableView({
                                 className="accent-primary"
                             />
                         </th>
+                        <th className="py-3 px-3 text-left font-medium text-charcoal w-16">Image</th>
                         <th className="py-3 px-3 text-left font-medium text-charcoal">Title</th>
                         <th className="py-3 px-3 text-left font-medium text-charcoal">Status</th>
                         <th className="py-3 px-3 text-left font-medium text-charcoal">JLPT</th>
@@ -295,6 +297,22 @@ function TableView({
                                         onChange={() => onToggle(p.id)}
                                         className="accent-primary"
                                     />
+                                </td>
+                                <td className="py-2 px-3">
+                                    {p.og_image_url ? (
+                                        <span className="relative block w-12 h-12 rounded overflow-hidden bg-[var(--base)] shrink-0">
+                                            <Image
+                                                src={p.og_image_url}
+                                                alt=""
+                                                width={48}
+                                                height={48}
+                                                className="object-cover w-full h-full"
+                                                unoptimized={p.og_image_url.startsWith("http")}
+                                            />
+                                        </span>
+                                    ) : (
+                                        <span className="w-12 h-12 rounded bg-[var(--divider)] flex items-center justify-center text-secondary text-xs">—</span>
+                                    )}
                                 </td>
                                 <td className="py-2 px-3 font-medium text-charcoal max-w-xs">
                                     <span className="line-clamp-1">{p.title}</span>
@@ -351,13 +369,27 @@ function GridView({
                             checked={selected.has(p.id)}
                             onChange={() => onToggle(p.id)}
                             onClick={(e) => e.stopPropagation()}
-                            className="absolute top-3 right-3 accent-primary"
+                            className="absolute top-3 right-3 accent-primary z-10"
                         />
-                        <div className="flex flex-wrap gap-1 mb-2">
+                        {p.og_image_url ? (
+                            <div className="relative w-full aspect-video mb-2 rounded-t overflow-hidden bg-[var(--base)]">
+                                <Image
+                                    src={p.og_image_url}
+                                    alt=""
+                                    fill
+                                    className="object-cover"
+                                    unoptimized={p.og_image_url.startsWith("http")}
+                                    sizes="(max-width: 640px) 100vw, 33vw"
+                                />
+                            </div>
+                        ) : (
+                            <div className="w-full aspect-video mb-2 rounded-t bg-[var(--divider)]" />
+                        )}
+                        <div className="flex flex-wrap gap-1 mb-2 px-1">
                             {levels.map((l) => <LevelBadge key={l} level={l} />)}
                             <StatusDot status={p.status} />
                         </div>
-                        <h3 className="font-heading font-bold text-charcoal text-sm line-clamp-2 mb-1">{p.title}</h3>
+                        <h3 className="font-heading font-bold text-charcoal text-sm line-clamp-2 mb-1 px-1">{p.title}</h3>
                         {p.summary && <p className="text-secondary text-xs line-clamp-2 mb-3">{p.summary}</p>}
                         <div className="flex gap-3 mt-auto pt-2 border-t border-[var(--divider)]">
                             <Link

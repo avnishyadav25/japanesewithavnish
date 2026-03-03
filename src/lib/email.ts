@@ -50,7 +50,7 @@ async function sendMail(to: string, subject: string, html: string): Promise<{ id
   }
 }
 
-async function getProductsForEmail(): Promise<EmailProduct[]> {
+export async function getProductsForEmail(): Promise<EmailProduct[]> {
   try {
     if (!sql) return [];
     const rows = await sql`SELECT slug, name, price_paise, image_url, jlpt_level FROM products ORDER BY sort_order ASC LIMIT 6`;
@@ -66,7 +66,7 @@ export async function sendMagicLink(email: string, magicLinkUrl: string) {
     "Login to Japanese with Avnish",
     `
       <p>Click the link below to access your library:</p>
-      <p><a href="${magicLinkUrl}" style="color:#D0021B;font-weight:600;">Access My Library</a></p>
+      <p><a href="${magicLinkUrl}" style="color:#D0021B;font-weight:600;">Access Store</a></p>
       <p>This link expires in 1 hour.</p>
       <p>If you didn't request this, you can ignore this email.</p>
     `
@@ -93,7 +93,7 @@ export async function sendOrderConfirmation(
   const content = `
     <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">Hi ${name},</p>
     <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">Thank you for your purchase! Your digital bundle is ready.</p>
-    <p style="margin:0 0 16px;"><a href="${accessUrl}" style="background:#D0021B;color:white;padding:12px 26px;text-decoration:none;border-radius:8px;display:inline-block;font-weight:600;">Access My Library</a></p>
+    <p style="margin:0 0 16px;"><a href="${accessUrl}" style="background:#D0021B;color:white;padding:12px 26px;text-decoration:none;border-radius:8px;display:inline-block;font-weight:600;">Access Store</a></p>
     <p style="margin:0 0 16px;"><a href="${orderDetailUrl}" style="color:#D0021B;font-weight:600;">View order details</a></p>
     <p style="font-size:14px;line-height:1.6;margin:0;color:#555;">Order ID: ${orderId}</p>
     <p style="font-size:14px;line-height:1.6;margin:8px 0 0;color:#555;">You can return to your library anytime using the link above (it stays valid for 30 days).</p>
