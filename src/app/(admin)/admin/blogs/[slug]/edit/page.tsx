@@ -24,6 +24,9 @@ export default async function AdminBlogsEditPage({
           { label: "Blogs", href: "/admin/blogs" },
           { label: post.title as string },
         ]}
+        actions={[
+          { label: "Social generator", href: `/admin/social/prepare?type=blog&slug=${encodeURIComponent(slug)}` },
+        ]}
       />
       <BlogPostForm post={post as unknown as Parameters<typeof BlogPostForm>[0]["post"]} />
     </div>

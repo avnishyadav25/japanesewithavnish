@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { getAdminSession } from "@/lib/auth/admin";
 
 const DEEPSEEK_API = "https://api.deepseek.com/v1/chat/completions";
 
@@ -73,6 +74,22 @@ export async function POST(req: Request) {
 
     const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
     const reply = (data.choices?.[0]?.message?.content ?? "").trim();
+
+    // Log this turn for admin test sessions
+    const sessionId = typeof body.session_id === "string" ? body.session_id.trim() : null;
+    const admin = await getAdminSession();
+    if (sessionId && admin?.email && sql) {
+      try {
+        await sql`
+          INSERT INTO admin_chat_logs (session_id, admin_email, role, content)
+          VALUES (${sessionId}::uuid, ${admin.email}, 'user', ${userMessage}),
+                 (${sessionId}::uuid, ${admin.email}, 'assistant', ${reply})
+        `;
+      } catch (logErr) {
+        console.error("Admin chat log insert:", logErr);
+      }
+    }
+
     return NextResponse.json({ reply, role: "assistant" });
   } catch (e) {
     console.error("Chat:", e);

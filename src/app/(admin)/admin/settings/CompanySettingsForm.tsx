@@ -2,42 +2,8 @@
 
 import { useState } from "react";
 import { AdminCard } from "@/components/admin/AdminCard";
+import { ChatbotContextCard } from "@/components/admin/ChatbotContextCard";
 import { HomepageSettingsForm } from "./HomepageSettingsForm";
-
-function ChatbotContextCard() {
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  return (
-    <AdminCard>
-      <h2 className="font-heading font-bold text-charcoal mb-4">Chatbot (japani-bhai)</h2>
-      <p className="text-secondary text-sm mb-4">
-        Pull the latest blogs, products, and support info into the chatbot context so japani-bhai can answer visitors accurately.
-      </p>
-      <button
-        type="button"
-        disabled={loading}
-        onClick={async () => {
-          setLoading(true);
-          setMessage(null);
-          try {
-            const res = await fetch("/api/admin/chatbot-context/pull", { method: "POST" });
-            const data = await res.json();
-            if (res.ok) setMessage(`Updated. Context length: ${data.length ?? 0} chars.`);
-            else setMessage(data.error || "Failed");
-          } catch {
-            setMessage("Failed");
-          } finally {
-            setLoading(false);
-          }
-        }}
-        className="btn-primary"
-      >
-        {loading ? "Updating…" : "Update chatbot context"}
-      </button>
-      {message && <p className="mt-2 text-sm text-secondary">{message}</p>}
-    </AdminCard>
-  );
-}
 
 type Settings = Record<string, string | unknown>;
 

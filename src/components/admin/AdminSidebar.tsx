@@ -10,6 +10,7 @@ const navGroups = [
     label: "Main",
     items: [
       { href: "/admin", label: "Dashboard" },
+      { href: "/admin/chatbot", label: "Chatbot" },
       { href: "/admin/products", label: "Products" },
       { href: "/admin/orders", label: "Orders" },
       { href: "/admin/quiz", label: "Quiz" },
@@ -47,7 +48,7 @@ const navGroups = [
     label: "Settings",
     items: [
       { href: "/admin/settings", label: "Company Settings" },
-      { href: "/admin/social", label: "Prepare for social" },
+      { href: "/admin/social/prepare", label: "Prepare for social" },
       { href: "/admin/analytics", label: "Analytics" },
       { href: "/admin/ai-logs", label: "AI history" },
     ],

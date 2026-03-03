@@ -38,6 +38,9 @@ export default async function EditNewsletterPage({ params }: { params: Promise<{
           { label: "Admin", href: "/admin" },
           { label: "Newsletters", href: "/admin/newsletters" },
         ]}
+        actions={[
+          { label: "Social generator", href: `/admin/social/prepare?type=newsletter&slug=${encodeURIComponent(newsletter.slug)}` },
+        ]}
       />
       <NewsletterForm newsletter={newsletter} />
     </div>

@@ -27,6 +27,9 @@ export default async function AdminProductEditPage({
           { label: "Products", href: "/admin/products" },
           { label: "Edit", href: `/admin/products/${product.id}/edit` },
         ]}
+        actions={[
+          { label: "Social generator", href: `/admin/social/prepare?type=product&slug=${encodeURIComponent((product.slug as string) || "")}` },
+        ]}
       />
       <ProductEditForm product={product as unknown as Parameters<typeof ProductEditForm>[0]["product"]} />
     </div>

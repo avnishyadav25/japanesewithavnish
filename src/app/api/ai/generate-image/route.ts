@@ -38,12 +38,31 @@ export async function POST(req: Request) {
 
     const body = await req.json();
     const imageType = body.imageType as ImageType;
+    const promptOverride = body.prompt as string | undefined;
+    const aspectRatio = body.aspectRatio as string | undefined;
+    const referenceImageUrl = body.referenceImageUrl as string | undefined;
+
     if (!imageType || !validImageTypes.includes(imageType)) {
       return NextResponse.json({ error: "Invalid imageType" }, { status: 400 });
     }
 
     const context = (body.context as Record<string, string>) || {};
-    const userPrompt = (body.prompt as string) || getImagePrompt(imageType, context);
+    let userPrompt: string =
+      promptOverride?.trim() || getImagePrompt(imageType, context);
+    if (aspectRatio?.trim()) {
+      userPrompt = `${userPrompt}\nAspect ratio ${aspectRatio.trim()}.`;
+    }
+    if (referenceImageUrl?.trim()) {
+      userPrompt = `${userPrompt}
+
+Use the reference image for style and mood. Clean flat-vector educational style. Minimal study desk with open notebook, hiragana chart (あ い う え お), katakana chart (カ キ ク ケ コ), simple kanji cards (日, 学, 語), pencil, and headphones where relevant. Background soft off-white (#FAF8F5) with subtle cherry blossom petals and faint torii gate outline. Calm academic atmosphere, lots of white space, balanced composition. Style: flat vector illustration, minimal Japanese aesthetic, clean typography. Lighting bright and soft. Include Japanese student or learner silhouette if it fits the scene. Negative prompt: no anime, no people faces, no clutter, no neon colors.`;
+    }
+
+    // Reel (9:16) and carousel/post (1:1): ensure site URL at bottom
+    const ar = aspectRatio?.trim()?.toLowerCase();
+    if (ar === "9:16" || ar === "1:1") {
+      userPrompt = `${userPrompt}\n\nAt the bottom of the image, display the text japanesewithavnish.com in clean, readable typography (subtle but legible).`;
+    }
 
     const geminiRes = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${geminiImageModel}:generateContent?key=${key}`,
