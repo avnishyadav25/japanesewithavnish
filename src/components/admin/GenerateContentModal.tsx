@@ -40,6 +40,7 @@ export function GenerateContentModal({
   const [tags, setTags] = useState(initialContext.tags ?? "");
   const [description, setDescription] = useState(initialContext.description ?? "");
   const [customPrompt, setCustomPrompt] = useState("");
+  const [contentLLM, setContentLLM] = useState<"deepseek" | "gemini">("deepseek");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -66,7 +67,7 @@ export function GenerateContentModal({
       const res = await fetch("/api/ai/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contentType, context, customPrompt: promptToSend }),
+        body: JSON.stringify({ contentType, context, customPrompt: promptToSend, content_llm: contentLLM }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -142,6 +143,20 @@ export function GenerateContentModal({
               rows={2}
               className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-charcoal mb-1">
+              Content model
+            </label>
+            <select
+              value={contentLLM}
+              onChange={(e) => setContentLLM(e.target.value as "deepseek" | "gemini")}
+              className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal bg-white"
+            >
+              <option value="deepseek">DeepSeek</option>
+              <option value="gemini">Gemini</option>
+            </select>
           </div>
 
           <div>

@@ -42,10 +42,11 @@ export async function POST(req: Request) {
         ? "Generate the product copy. Return ONLY a valid JSON object with keys: description, who_its_for, outcome, whats_included, faq, no_refunds_note, image_prompt. No markdown code blocks, no extra text."
         : "Generate the content as described.";
 
-    const contentLLM = (process.env.CONTENT_LLM || "deepseek").toLowerCase();
+    const contentLLM = ((body.content_llm as string) || process.env.CONTENT_LLM || "deepseek").toLowerCase();
+    const model = contentLLM === "gemini" ? "gemini" : "deepseek";
     let raw: string;
 
-    if (contentLLM === "gemini") {
+    if (model === "gemini") {
       const geminiKey = process.env.GEMINI_API_KEY;
       if (!geminiKey) return NextResponse.json({ error: "Gemini not configured" }, { status: 503 });
       const geminiRes = await fetch(
@@ -125,7 +126,7 @@ export async function POST(req: Request) {
               log_type: "content_generate",
               content_type: contentType,
               entity_type: "post",
-              model_used: contentLLM,
+              model_used: model,
               prompt_sent: systemPrompt,
               result_preview: typeof out.content === "string" ? out.content.slice(0, 500) : JSON.stringify(out).slice(0, 500),
               admin_email: admin?.email,
@@ -146,7 +147,7 @@ export async function POST(req: Request) {
               log_type: "content_generate",
               content_type: contentType,
               entity_type: "product",
-              model_used: contentLLM,
+              model_used: model,
               prompt_sent: systemPrompt,
               result_preview: JSON.stringify(out).slice(0, 500),
               admin_email: admin?.email,
@@ -162,7 +163,7 @@ export async function POST(req: Request) {
     await insertAiLog({
       log_type: "content_generate",
       content_type: contentType,
-      model_used: contentLLM,
+      model_used: model,
       prompt_sent: systemPrompt,
       result_preview: raw.slice(0, 500),
       admin_email: admin?.email,
