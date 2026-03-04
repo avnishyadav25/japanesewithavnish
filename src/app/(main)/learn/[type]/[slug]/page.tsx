@@ -1,15 +1,19 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
+import {
+  LEARN_CONTENT_TYPES,
+  LEARN_TYPE_LABELS,
+  type LearnContentType,
+  type LearnItemForFilter,
+} from "@/lib/learn-filters";
+import { LessonMetaContent } from "@/components/learn/LessonMetaContent";
+import { LearnLessonCard } from "@/components/learn/LearnLessonCard";
+import { ProductCard } from "@/components/ProductCard";
+import { BlogCommentList } from "@/components/BlogCommentList";
+import { LearnCommentForm } from "@/components/learn/LearnCommentForm";
 
-const TYPES = ["grammar", "vocabulary", "kanji", "reading", "writing"] as const;
-const TYPE_LABELS: Record<string, string> = {
-  grammar: "Grammar",
-  vocabulary: "Vocabulary",
-  kanji: "Kanji",
-  reading: "Reading",
-  writing: "Writing",
-};
+type Meta = Record<string, unknown> | null;
 
 export default async function LearnDetailPage({
   params,
@@ -19,7 +23,7 @@ export default async function LearnDetailPage({
   const { type, slug } = await params;
   const normalized = type.toLowerCase();
 
-  if (!TYPES.includes(normalized as (typeof TYPES)[number])) notFound();
+  if (!LEARN_CONTENT_TYPES.includes(normalized as LearnContentType)) notFound();
 
   if (!sql) notFound();
   const rows = await sql`
@@ -27,46 +31,173 @@ export default async function LearnDetailPage({
     WHERE content_type = ${normalized} AND slug = ${slug} AND status = 'published'
     LIMIT 1
   `;
-  const item = rows[0] as { title: string; jlpt_level?: string; content?: string } | undefined;
+  const item = rows[0] as {
+    id: string;
+    title: string;
+    slug: string;
+    content_type: string;
+    jlpt_level?: string | null;
+    content?: string | null;
+    meta?: Meta;
+    tags?: string[] | null;
+    sort_order?: number;
+    created_at?: string | null;
+    updated_at?: string | null;
+  } | undefined;
   if (!item) notFound();
 
-  return (
-    <div className="py-12 sm:py-16 px-4 sm:px-6 japanese-wave-bg">
-      <div className="max-w-[800px] mx-auto">
-        <nav className="text-sm text-secondary mb-8 flex items-center gap-2">
-          <Link href="/" className="hover:text-primary">Home</Link>
-          <span className="opacity-50">／</span>
-          <Link href="/learn" className="hover:text-primary">Learn</Link>
-          <span className="opacity-50">／</span>
-          <Link href={`/learn/${normalized}`} className="hover:text-primary">
-            {TYPE_LABELS[normalized]}
-          </Link>
-          <span className="opacity-50">／</span>
-          <span className="text-charcoal truncate max-w-[200px]">{item.title}</span>
-        </nav>
+  const meta = (item.meta ?? {}) as Record<string, unknown>;
+  const featureImageUrl = typeof meta.feature_image_url === "string" ? meta.feature_image_url : null;
+  const primaryLevel = (item.jlpt_level || "").toUpperCase();
 
-        <article className="card-content japanese-shoji-border">
-          <div className="flex items-center gap-2 mb-4">
-            <span className="japanese-kanji-accent text-lg">{TYPE_LABELS[normalized]}</span>
+  let related: LearnItemForFilter[] = [];
+  let comments: { id: string; author_name: string; author_email: string; content: string; created_at: string }[] = [];
+  let allProducts: { id: string; slug: string; name: string; price_paise: number; compare_price_paise?: number; badge?: string; jlpt_level?: string; image_url?: string; is_mega?: boolean }[] = [];
+
+  const [relatedRows, productRows] = await Promise.all([
+    sql`
+      SELECT id, slug, title, content, content_type, jlpt_level, tags, meta, status, sort_order, created_at, updated_at
+      FROM learning_content
+      WHERE content_type = ${normalized} AND status = 'published' AND slug != ${slug}
+      ORDER BY sort_order ASC, created_at DESC
+      LIMIT 6
+    `,
+    sql`SELECT id, slug, name, price_paise, compare_price_paise, badge, jlpt_level, image_url, is_mega FROM products ORDER BY sort_order ASC`,
+  ]);
+
+  related = (Array.isArray(relatedRows) ? relatedRows : []) as LearnItemForFilter[];
+  allProducts = (Array.isArray(productRows) ? productRows : []) as typeof allProducts;
+
+  try {
+    const commentsRows = await sql`
+      SELECT id, author_name, author_email, content, created_at
+      FROM learning_content_comments
+      WHERE learning_content_id = ${item.id} AND status = 'approved'
+      ORDER BY created_at ASC
+    `;
+    comments = (Array.isArray(commentsRows) ? commentsRows : []) as typeof comments;
+  } catch {
+    comments = [];
+  }
+  const relevantProducts = allProducts.filter(
+    (p) =>
+      p.jlpt_level === primaryLevel ||
+      p.jlpt_level === "N4" ||
+      p.is_mega ||
+      (primaryLevel === "N5" && ["N5", "N4"].includes(p.jlpt_level || ""))
+  );
+  const bundlesToShow = relevantProducts.length > 0 ? relevantProducts.slice(0, 4) : allProducts.slice(0, 4);
+
+  return (
+    <div className="py-12 sm:py-16 px-6 sm:px-8 lg:px-12 pb-24 lg:pb-16 bg-base">
+      <div className="max-w-[1400px] mx-auto">
+        <div>
+          <nav className="text-sm text-secondary mb-6">
+            <Link href="/" className="hover:text-primary">Home</Link>
+            <span className="mx-2">／</span>
+            <Link href="/learn" className="hover:text-primary">Learn</Link>
+            <span className="mx-2">／</span>
+            <Link href={`/learn/${normalized}`} className="hover:text-primary">
+              {LEARN_TYPE_LABELS[normalized as LearnContentType]}
+            </Link>
+            <span className="mx-2">／</span>
+            <span className="text-charcoal truncate max-w-[200px]">{item.title}</span>
+          </nav>
+
+          <div className="flex flex-wrap gap-4 text-secondary text-sm mb-6">
             {item.jlpt_level && (
-              <span className="text-xs text-secondary">{item.jlpt_level}</span>
+              <span className="px-2 py-0.5 rounded bg-base border border-[var(--divider)]">
+                {item.jlpt_level}
+              </span>
             )}
           </div>
-          <h1 className="font-heading text-2xl sm:text-3xl font-bold text-charcoal mb-6">
-            {item.title}
-          </h1>
-          {item.content && (
-            <div
-              className="prose prose-charcoal max-w-none text-secondary"
-              dangerouslySetInnerHTML={{ __html: item.content.replace(/\n/g, "<br />") }}
-            />
-          )}
-        </article>
 
-        <div className="mt-8">
-          <Link href={`/learn/${normalized}`} className="btn-secondary">
-            ← Back to {TYPE_LABELS[normalized]}
-          </Link>
+          <article className="card-content japanese-shoji-border">
+            <h1 className="font-heading text-3xl sm:text-4xl md:text-5xl font-bold text-charcoal mb-4">
+              {item.title}
+            </h1>
+
+            {featureImageUrl ? (
+              <div className="rounded-bento overflow-hidden border border-[var(--divider)] mb-6 aspect-video max-w-full bg-[var(--divider)]/20">
+                <img src={featureImageUrl} alt="" className="w-full h-full object-cover" />
+              </div>
+            ) : null}
+
+            <LessonMetaContent contentType={normalized} meta={meta} />
+
+            {item.content && (
+              <div
+                className="prose prose-charcoal prose-lg max-w-none text-secondary mt-6 text-[1.5rem] [&_h1]:text-4xl [&_h1]:font-heading [&_h1]:font-bold [&_h2]:text-3xl [&_h2]:font-heading [&_h2]:font-bold [&_h2]:mt-8 [&_h2]:mb-3 [&_h3]:text-2xl [&_h3]:font-heading [&_h3]:font-bold [&_h3]:mt-6 [&_h3]:mb-2 [&_p]:text-[1.5rem] [&_p]:leading-[1.7] [&_p]:mb-4 [&_ul]:mb-4 [&_ol]:mb-4 [&_li]:text-[1.5rem]"
+                dangerouslySetInnerHTML={{ __html: item.content.replace(/\n/g, "<br />") }}
+              />
+            )}
+          </article>
+
+          <div className="mt-8 mb-12">
+            <Link href={`/learn/${normalized}`} className="btn-secondary">
+              ← Back to {LEARN_TYPE_LABELS[normalized as LearnContentType]}
+            </Link>
+          </div>
+
+          {related.length > 0 && (
+            <section className="mt-12 pt-10 border-t border-[var(--divider)]">
+              <h2 className="font-heading text-2xl font-bold text-charcoal mb-6">
+                Recommended next lessons
+              </h2>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {related.map((r) => (
+                  <LearnLessonCard key={r.id} item={r} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          <section className="mt-12 pt-10 border-t border-[var(--divider)]">
+            <h2 className="font-heading text-2xl font-bold text-charcoal mb-4">Comments</h2>
+            <BlogCommentList comments={comments} />
+            <div className="mt-6">
+              <h3 className="font-heading text-lg font-semibold text-charcoal mb-3">Add a comment</h3>
+              <LearnCommentForm contentType={normalized} slug={slug} />
+            </div>
+          </section>
+
+          {bundlesToShow.length > 0 && (
+            <section className="mt-12 pt-10 border-t border-[var(--divider)]">
+              <h2 className="font-heading text-2xl sm:text-3xl font-bold text-charcoal mb-2 text-center">
+                Recommended bundles for you
+              </h2>
+              <p className="text-secondary text-center mb-8 max-w-xl mx-auto">
+                Structured study materials to accelerate your JLPT journey.
+              </p>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {bundlesToShow.map((product, i) => (
+                  <ProductCard
+                    key={product.id}
+                    slug={product.slug}
+                    name={product.name}
+                    price={product.price_paise}
+                    comparePrice={product.compare_price_paise ?? undefined}
+                    badge={
+                      product.badge === "premium"
+                        ? "premium"
+                        : product.badge === "offer"
+                          ? "offer"
+                          : undefined
+                    }
+                    jlptLevel={product.jlpt_level ?? undefined}
+                    size="medium"
+                    imageUrl={product.image_url}
+                    index={i}
+                  />
+                ))}
+              </div>
+              <div className="mt-6 text-center">
+                <Link href="/store" className="btn-primary inline-block">
+                  Browse all bundles
+                </Link>
+              </div>
+            </section>
+          )}
         </div>
       </div>
     </div>

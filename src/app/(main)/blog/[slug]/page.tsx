@@ -103,7 +103,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
 
   const postUrl = `${BASE}/blog/${slug}`;
   return (
-    <div className="py-12 sm:py-16 px-4 sm:px-6 pb-24 lg:pb-16">
+    <div className="py-12 sm:py-16 px-6 sm:px-8 lg:px-12 pb-24 lg:pb-16">
       <ArticleSchema
         title={post.title}
         description={post.seo_description || post.summary || undefined}
@@ -112,7 +112,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
         datePublished={post.published_at || undefined}
       />
       <ContentAnalytics content_type="blog" content_id={post.id as string} trackDuration />
-      <div className="max-w-[1200px] mx-auto">
+      <div className="max-w-[1400px] mx-auto">
         <div className="grid lg:grid-cols-[1fr_280px] gap-8">
           <div>
             {/* Breadcrumb */}
@@ -169,11 +169,6 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
             <h1 className="font-heading text-3xl sm:text-4xl md:text-5xl font-bold text-charcoal mb-4">
               {post.title}
             </h1>
-            {(post.summary || post.seo_description) && (
-              <p className="text-lg text-secondary mb-6">
-                {post.summary || post.seo_description}
-              </p>
-            )}
 
             {/* Featured image */}
             {post.og_image_url && (
@@ -194,13 +189,25 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
                 </aside>
               )}
               <div className="flex-1 min-w-0">
-                <div className="prose prose-charcoal max-w-none [&_h1]:text-4xl [&_h1]:font-heading [&_h1]:font-bold [&_h2]:text-2xl [&_h2]:font-heading [&_h2]:font-bold [&_h2]:mt-8 [&_h2]:mb-3 [&_h3]:text-xl [&_h3]:font-heading [&_h3]:font-bold [&_h3]:mt-6 [&_h3]:mb-2 [&_p]:mb-4 [&_ul]:mb-4 [&_ol]:mb-4">
+                <div className="prose prose-charcoal prose-lg max-w-none text-[1.5rem] [&_h1]:text-4xl [&_h1]:font-heading [&_h1]:font-bold [&_h2]:text-3xl [&_h2]:font-heading [&_h2]:font-bold [&_h2]:mt-8 [&_h2]:mb-3 [&_h3]:text-2xl [&_h3]:font-heading [&_h3]:font-bold [&_h3]:mt-6 [&_h3]:mb-2 [&_p]:text-[1.5rem] [&_p]:leading-[1.7] [&_p]:mb-4 [&_ul]:mb-4 [&_ol]:mb-4 [&_li]:text-[1.5rem]">
                   {contentStr ? (
                     <BlogArticleContent content={contentStr} />
                   ) : null}
                 </div>
               </div>
             </div>
+
+            {/* Summary card (same style as Next Step CTA) — before "What should you do next?" */}
+            {(post.summary || post.seo_description) && (
+              <div className="card p-6 mt-12 text-center">
+                <h3 className="font-heading font-bold text-charcoal text-xl mb-4">
+                  Summary
+                </h3>
+                <p className="text-secondary leading-relaxed text-lg">
+                  {post.summary || post.seo_description}
+                </p>
+              </div>
+            )}
 
             {/* Next Step CTA */}
             <BlogNextStepCta />
@@ -273,7 +280,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
             )}
           </div>
 
-          {/* Sticky CTA sidebar + mobile bar */}
+          {/* Right sidebar: sticky CTA only */}
           <aside>
             <BlogStickyCta primaryLevel={primaryLevel} tags={tags} />
           </aside>

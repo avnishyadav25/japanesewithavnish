@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth/admin";
 import { sql } from "@/lib/db";
-
-const TYPES = ["grammar", "vocabulary", "kanji", "reading", "writing"];
+import { LEARN_CONTENT_TYPES, type LearnContentType } from "@/lib/learn-filters";
 
 export async function POST(
   req: Request,
@@ -13,12 +12,12 @@ export async function POST(
     if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const { type } = await params;
-    if (!TYPES.includes(type)) {
+    if (!LEARN_CONTENT_TYPES.includes(type as LearnContentType)) {
       return NextResponse.json({ error: "Invalid type" }, { status: 400 });
     }
 
     const body = await req.json();
-    const { slug, title, content, jlpt_level, tags, status, sort_order } = body;
+    const { slug, title, content, jlpt_level, tags, status, sort_order, meta } = body;
 
     if (!slug || !title) {
       return NextResponse.json({ error: "slug and title required" }, { status: 400 });
@@ -28,11 +27,15 @@ export async function POST(
 
     const statusVal = status === "published" ? "published" : "draft";
     const sortOrderVal = typeof sort_order === "number" ? sort_order : 0;
+    const metaVal =
+      meta != null && typeof meta === "object" && !Array.isArray(meta)
+        ? JSON.stringify(meta)
+        : "{}";
 
     try {
       const rows = await sql`
-        INSERT INTO learning_content (content_type, slug, title, content, jlpt_level, tags, status, sort_order)
-        VALUES (${type}, ${String(slug).trim()}, ${String(title).trim()}, ${content ?? null}, ${jlpt_level || null}, ${Array.isArray(tags) ? tags : []}, ${statusVal}, ${sortOrderVal})
+        INSERT INTO learning_content (content_type, slug, title, content, jlpt_level, tags, meta, status, sort_order)
+        VALUES (${type}, ${String(slug).trim()}, ${String(title).trim()}, ${content ?? null}, ${jlpt_level || null}, ${Array.isArray(tags) ? tags : []}, ${metaVal}::jsonb, ${statusVal}, ${sortOrderVal})
         RETURNING id
       `;
       const id = (rows[0] as { id: string })?.id;

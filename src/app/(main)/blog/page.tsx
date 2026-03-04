@@ -2,9 +2,12 @@ import Link from "next/link";
 import { sql } from "@/lib/db";
 import { filterPosts, type PostForFilter } from "@/lib/blog-filters";
 import { BlogFilterBar } from "@/components/blog/BlogFilterBar";
+import { BlogHeroWithSearch } from "@/components/blog/BlogHeroWithSearch";
 import { BlogPostCard } from "@/components/blog/BlogPostCard";
 
 const POSTS_PER_PAGE = 12;
+
+export const dynamic = "force-dynamic";
 
 export default async function BlogPage({
   searchParams,
@@ -21,13 +24,17 @@ export default async function BlogPage({
   let featuredSlugs: string[] = [];
 
   if (sql) {
-    const [postsRows, settingsRows] = await Promise.all([
-      sql`SELECT id, slug, title, summary, seo_description, published_at, og_image_url, jlpt_level, tags FROM posts WHERE status = 'published' ORDER BY published_at DESC LIMIT 100`,
-      sql`SELECT value FROM site_settings WHERE key = 'blog_featured_posts' LIMIT 1`,
-    ]);
-    allPosts = (postsRows || []) as PostForFilter[];
-    const settingsRow = settingsRows[0] as { value: string[] } | undefined;
-    featuredSlugs = (settingsRow?.value || []) as string[];
+    try {
+      const [postsRows, settingsRows] = await Promise.all([
+        sql`SELECT id, slug, title, summary, seo_description, published_at, og_image_url, jlpt_level, tags FROM posts WHERE status = 'published' ORDER BY published_at DESC LIMIT 100`,
+        sql`SELECT value FROM site_settings WHERE key = 'blog_featured_posts' LIMIT 1`,
+      ]);
+      allPosts = (Array.isArray(postsRows) ? postsRows : []) as PostForFilter[];
+      const settingsRow = (Array.isArray(settingsRows) ? settingsRows[0] : settingsRows) as { value?: string[] } | undefined;
+      featuredSlugs = (settingsRow?.value && Array.isArray(settingsRow.value) ? settingsRow.value : []) as string[];
+    } catch (err) {
+      console.error("[Blog] Failed to fetch posts:", err);
+    }
   }
   const filtered = filterPosts(allPosts, level, type, search);
 
@@ -59,8 +66,8 @@ export default async function BlogPage({
   return (
     <div className="py-12 sm:py-16 px-4 sm:px-6">
       <div className="max-w-[1200px] mx-auto">
-        {/* Hero */}
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-10">
+        {/* Hero: title left, search + links top right */}
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6 mb-8">
           <div>
             <h1 className="font-heading text-3xl sm:text-4xl font-bold text-charcoal mb-2">
               Blog
@@ -69,17 +76,13 @@ export default async function BlogPage({
               Lessons, tips, and resources for your JLPT journey.
             </p>
           </div>
-          <div className="flex gap-4 text-sm">
-            <Link href="/quiz" className="text-primary font-medium hover:underline">
-              Take the Quiz →
-            </Link>
-            <Link href="/store" className="text-primary font-medium hover:underline">
-              Browse Bundles →
-            </Link>
-          </div>
+          <BlogHeroWithSearch initialSearch={search} />
         </div>
 
-        <BlogFilterBar />
+        {/* Level + topic pills in one row (like Learn) */}
+        <div className="card p-5 mb-8">
+          <BlogFilterBar />
+        </div>
 
         {filtered.length > 0 ? (
           <>

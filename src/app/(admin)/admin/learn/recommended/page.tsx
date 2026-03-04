@@ -1,43 +1,51 @@
 import { sql } from "@/lib/db";
-import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
-import { LearnRecommendedForm } from "./LearnRecommendedForm";
+import { LearnRecommendedPageClient } from "./LearnRecommendedPageClient";
 
 const LEVELS = ["all", "n5", "n4", "n3", "n2", "n1"] as const;
-const LEVEL_LABELS: Record<string, string> = {
-  all: "All (default)",
-  n5: "N5",
-  n4: "N4",
-  n3: "N3",
-  n2: "N2",
-  n1: "N1",
-};
+
+const PER_LEVEL = 6;
+
+/** Build default recommended slugs from published learning_content (by level). */
+function buildDefaultsFromDb(
+  items: { slug: string; jlpt_level: string | null }[]
+): Record<string, string[]> {
+  const defaults: Record<string, string[]> = { all: [], n5: [], n4: [], n3: [], n2: [], n1: [] };
+  for (const item of items) {
+    const levelKey = (item.jlpt_level?.toUpperCase() || "").toLowerCase();
+    if (defaults.all.length < PER_LEVEL) {
+      defaults.all.push(item.slug);
+    }
+    if (levelKey && levelKey in defaults && defaults[levelKey].length < PER_LEVEL) {
+      defaults[levelKey].push(item.slug);
+    }
+  }
+  return defaults;
+}
 
 export default async function AdminLearnRecommendedPage() {
   let value: Record<string, string[]> = {};
+  let defaultsFromDb: Record<string, string[]> = {
+    all: [], n5: [], n4: [], n3: [], n2: [], n1: [],
+  };
+
   if (sql) {
-    const rows = await sql`SELECT value FROM site_settings WHERE key = 'learn_recommended' LIMIT 1`;
-    const setting = rows[0] as { value: Record<string, string[]> } | undefined;
-    value = (setting?.value as Record<string, string[]>) || {};
-  }
-  const initial: Record<string, string[]> = {};
-  for (const level of LEVELS) {
-    initial[level] = Array.isArray(value[level]) ? value[level] : [];
+    const [settingsRows, contentRows] = await Promise.all([
+      sql`SELECT value FROM site_settings WHERE key = 'learn_recommended' LIMIT 1`,
+      sql`SELECT slug, jlpt_level FROM learning_content WHERE status = 'published' ORDER BY sort_order ASC, created_at DESC LIMIT 300`,
+    ]);
+    const setting = (Array.isArray(settingsRows) ? settingsRows[0] : settingsRows) as { value?: Record<string, string[]> } | undefined;
+    const raw = setting?.value;
+    value = (raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {}) as Record<string, string[]>;
+    const items = (Array.isArray(contentRows) ? contentRows : []) as { slug: string; jlpt_level: string | null }[];
+    defaultsFromDb = buildDefaultsFromDb(items);
   }
 
-  return (
-    <div>
-      <AdminPageHeader
-        title="Recommended lessons (Learn)"
-        breadcrumb={[
-          { label: "Admin", href: "/admin" },
-          { label: "Learning" },
-          { label: "Recommended" },
-        ]}
-      />
-      <p className="text-secondary text-sm mb-6 max-w-[600px]">
-        Curate up to 6 lesson slugs per JLPT level. These appear in the &quot;Recommended lessons&quot; section on the Learn page. Use learning content slugs (e.g. from Grammar, Vocabulary, etc.).
-      </p>
-      <LearnRecommendedForm initial={initial} levelLabels={LEVEL_LABELS} />
-    </div>
-  );
+  const initial: Record<string, string[]> = {};
+  for (const level of LEVELS) {
+    const saved = Array.isArray(value[level]) ? value[level] : [];
+    const defaults = Array.isArray(defaultsFromDb[level]) ? defaultsFromDb[level] : [];
+    initial[level] = saved.length > 0 ? saved : defaults;
+  }
+
+  return <LearnRecommendedPageClient initial={initial} />;
 }

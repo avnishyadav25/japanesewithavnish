@@ -8,6 +8,8 @@ import { LearnContent } from "@/components/learn/LearnContent";
 
 const PER_PAGE = 12;
 
+export const dynamic = "force-dynamic";
+
 export default async function LearnHubPage({
   searchParams,
 }: {
@@ -30,13 +32,17 @@ export default async function LearnHubPage({
   let recommendedByLevel: Record<string, string[]> = {};
 
   if (sql) {
-    const [contentRows, settingsRows] = await Promise.all([
-      sql`SELECT id, slug, title, content, content_type, jlpt_level, tags, meta, status, sort_order, created_at, updated_at FROM learning_content WHERE status = 'published' ORDER BY sort_order ASC, created_at DESC LIMIT 200`,
-      sql`SELECT value FROM site_settings WHERE key = 'learn_recommended' LIMIT 1`,
-    ]);
-    allItems = (contentRows || []) as LearnItemForFilter[];
-    const settingsRow = settingsRows[0] as { value: Record<string, string[]> } | undefined;
-    recommendedByLevel = settingsRow?.value || {};
+    try {
+      const [contentRows, settingsRows] = await Promise.all([
+        sql`SELECT id, slug, title, content, content_type, jlpt_level, tags, meta, status, sort_order, created_at, updated_at FROM learning_content WHERE status = 'published' ORDER BY sort_order ASC, created_at DESC LIMIT 200`,
+        sql`SELECT value FROM site_settings WHERE key = 'learn_recommended' LIMIT 1`,
+      ]);
+      allItems = (Array.isArray(contentRows) ? contentRows : []) as LearnItemForFilter[];
+      const settingsRow = (Array.isArray(settingsRows) ? settingsRows[0] : settingsRows) as { value: Record<string, string[]> } | undefined;
+      recommendedByLevel = (settingsRow?.value && typeof settingsRow.value === "object") ? settingsRow.value : {};
+    } catch (err) {
+      console.error("[Learn] Failed to fetch learning_content:", err);
+    }
   }
   const curatedSlugs = recommendedByLevel[level] ?? recommendedByLevel.all ?? [];
 
@@ -75,10 +81,13 @@ export default async function LearnHubPage({
           (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
         );
 
-  const totalCount = sorted.length;
+  const recommendedIds = new Set(recommendedItems.map((i) => i.id));
+  const listItems = sorted.filter((i) => !recommendedIds.has(i.id));
+
+  const totalCount = listItems.length;
   const totalPages = Math.ceil(totalCount / PER_PAGE) || 1;
   const currentPage = Math.min(page, totalPages);
-  const paginated = sorted.slice(
+  const paginated = listItems.slice(
     (currentPage - 1) * PER_PAGE,
     currentPage * PER_PAGE
   );

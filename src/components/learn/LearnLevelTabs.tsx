@@ -17,9 +17,10 @@ const TABS: { id: LearnLevel; label: string }[] = [
 interface LearnLevelTabsProps {
   active: LearnLevel;
   basePath?: string;
+  showHelpText?: boolean;
 }
 
-export function LearnLevelTabs({ active, basePath = "/learn" }: LearnLevelTabsProps) {
+export function LearnLevelTabs({ active, basePath = "/learn", showHelpText = true }: LearnLevelTabsProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -45,8 +46,10 @@ export function LearnLevelTabs({ active, basePath = "/learn" }: LearnLevelTabsPr
 
   useEffect(() => {
     const fromUrl = searchParams.get("level")?.toLowerCase();
-    const stored = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
-    const resolved = (fromUrl as LearnLevel) || (stored as LearnLevel) || "all";
+    if (fromUrl === undefined || fromUrl === null || fromUrl === "") {
+      return;
+    }
+    const resolved = (fromUrl as LearnLevel) || "all";
     if (resolved !== active && TABS.some((t) => t.id === resolved)) {
       setLevel(resolved);
     }
@@ -73,12 +76,14 @@ export function LearnLevelTabs({ active, basePath = "/learn" }: LearnLevelTabsPr
           );
         })}
       </div>
-      <p className="text-[#555555] text-sm mt-2">
-        Not sure your level?{" "}
-        <a href="/quiz" className="text-primary font-medium hover:underline">
-          Take the quiz →
-        </a>
-      </p>
+      {showHelpText && (
+        <p className="text-[#555555] text-sm mt-2">
+          Not sure your level?{" "}
+          <a href="/quiz" className="text-primary font-medium hover:underline">
+            Take the quiz →
+          </a>
+        </p>
+      )}
     </div>
   );
 }

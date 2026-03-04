@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth/admin";
-import { getPrompt, type ContentType } from "@/lib/ai/prompts";
+import { getPrompt, getListPrompt, type ContentType } from "@/lib/ai/prompts";
 import { insertAiLog } from "@/lib/ai-logs";
 
 const DEEPSEEK_API = "https://api.deepseek.com/v1/chat/completions";
@@ -24,6 +24,9 @@ export async function POST(req: Request) {
       "reading",
       "listening",
       "writing",
+      "sounds",
+      "study_guide",
+      "practice_test",
       "product",
     ];
     if (!contentType || !validTypes.includes(contentType)) {
@@ -32,18 +35,27 @@ export async function POST(req: Request) {
 
     const context = (body.context as Record<string, string>) || {};
     const customPrompt = typeof body.customPrompt === "string" ? body.customPrompt.trim() : "";
-    const systemPrompt = customPrompt || getPrompt(contentType, context);
+    const generateList = body.generateList === true || body.mode === "list";
+
+    const systemPrompt = generateList
+      ? customPrompt || getListPrompt(contentType, context as Parameters<typeof getListPrompt>[1])
+      : customPrompt || getPrompt(contentType, context as Parameters<typeof getPrompt>[1]);
     const isBlog = contentType === "blog";
     const isProduct = contentType === "product";
     const isJsonResponse = isBlog || isProduct;
-    const userMessage = isBlog
-      ? "Generate the blog post. Return ONLY a valid JSON object with keys: content, title, slug, tags, jlpt_level, seo_title, seo_description, image_prompt, section_image_prompts. No markdown code blocks, no extra text."
-      : isProduct
-        ? "Generate the product copy. Return ONLY a valid JSON object with keys: description, who_its_for, outcome, whats_included, faq, no_refunds_note, image_prompt. No markdown code blocks, no extra text."
-        : "Generate the content as described.";
+    const userMessage = generateList
+      ? "Generate the list. Return ONLY a valid JSON array. No markdown code blocks, no text before or after the array."
+      : isBlog
+        ? "Generate the blog post. Return ONLY a valid JSON object with keys: content, title, slug, tags, jlpt_level, seo_title, seo_description, image_prompt, section_image_prompts. No markdown code blocks, no extra text."
+        : isProduct
+          ? "Generate the product copy. Return ONLY a valid JSON object with keys: description, who_its_for, outcome, whats_included, faq, no_refunds_note, image_prompt. No markdown code blocks, no extra text."
+          : "Generate the content as described.";
 
     const contentLLM = ((body.content_llm as string) || process.env.CONTENT_LLM || "deepseek").toLowerCase();
     const model = contentLLM === "gemini" ? "gemini" : "deepseek";
+    const maxTokensRequested = generateList ? 16000 : isBlog ? 8000 : isProduct ? 3000 : 4000;
+    /** DeepSeek allows max 8192; Gemini can use higher. */
+    const maxTokens = model === "deepseek" ? Math.min(maxTokensRequested, 8192) : maxTokensRequested;
     let raw: string;
 
     if (model === "gemini") {
@@ -59,7 +71,7 @@ export async function POST(req: Request) {
             contents: [{ role: "user", parts: [{ text: userMessage }] }],
             generationConfig: {
               temperature: 0.7,
-              maxOutputTokens: isBlog ? 8000 : isProduct ? 3000 : 4000,
+              maxOutputTokens: maxTokens,
             },
           }),
         }
@@ -87,7 +99,7 @@ export async function POST(req: Request) {
             { role: "user", content: userMessage },
           ],
           temperature: 0.7,
-          max_tokens: isBlog ? 8000 : isProduct ? 3000 : 4000,
+          max_tokens: maxTokens,
         }),
       });
       if (!res.ok) {
@@ -97,6 +109,27 @@ export async function POST(req: Request) {
       }
       const data = await res.json();
       raw = data.choices?.[0]?.message?.content ?? "";
+    }
+
+    if (generateList) {
+      try {
+        const extracted = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+        const parsed = JSON.parse(extracted);
+        const list = Array.isArray(parsed) ? parsed : [];
+        await insertAiLog({
+          log_type: "content_generate",
+          content_type: contentType,
+          entity_type: "list",
+          model_used: model,
+          prompt_sent: systemPrompt,
+          result_preview: `Generated ${list.length} items`,
+          admin_email: admin?.email,
+        });
+        return NextResponse.json({ list });
+      } catch {
+        // Fallback: return raw so user can copy
+        return NextResponse.json({ list: [], raw });
+      }
     }
 
     if (isJsonResponse) {

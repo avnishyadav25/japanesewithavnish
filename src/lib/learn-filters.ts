@@ -45,6 +45,33 @@ export type LearnItemForFilter = {
   updated_at: string | null;
 };
 
+/** All valid learning_content content_type values. Single source of truth for routes and API. */
+export const LEARN_CONTENT_TYPES = [
+  "grammar",
+  "vocabulary",
+  "kanji",
+  "reading",
+  "writing",
+  "listening",
+  "sounds",
+  "study_guide",
+  "practice_test",
+] as const;
+
+export type LearnContentType = (typeof LEARN_CONTENT_TYPES)[number];
+
+export const LEARN_TYPE_LABELS: Record<LearnContentType, string> = {
+  grammar: "Grammar",
+  vocabulary: "Vocabulary",
+  kanji: "Kanji",
+  reading: "Reading",
+  writing: "Writing",
+  listening: "Listening",
+  sounds: "Sounds",
+  study_guide: "Study guide",
+  practice_test: "Practice test",
+};
+
 export const LEARN_CATEGORIES = [
   { id: "all", label: "All" },
   { id: "grammar", label: "Grammar" },
@@ -52,6 +79,10 @@ export const LEARN_CATEGORIES = [
   { id: "kanji", label: "Kanji" },
   { id: "reading", label: "Reading" },
   { id: "writing", label: "Writing" },
+  { id: "listening", label: "Listening" },
+  { id: "sounds", label: "Sounds" },
+  { id: "study_guide", label: "Study guide" },
+  { id: "practice_test", label: "Practice test" },
   { id: "roadmap", label: "Roadmap" },
   { id: "tips", label: "Tips" },
 ] as const;
@@ -65,6 +96,12 @@ export function normalizeLearnLevel(level: string): LearnLevel {
   return l as LearnLevel;
 }
 
+function normalizeTags(tags: string[] | null | unknown): string[] {
+  if (Array.isArray(tags)) return tags.map((t) => String(t ?? ""));
+  if (typeof tags === "string") return tags ? tags.split(",").map((s) => s.trim()).filter(Boolean) : [];
+  return [];
+}
+
 export function filterLearnItems(
   items: LearnItemForFilter[],
   level: string,
@@ -72,7 +109,7 @@ export function filterLearnItems(
   search: string
 ): LearnItemForFilter[] {
   return items.filter((item) => {
-    const tags = (item.tags || []) as string[];
+    const tags = normalizeTags(item.tags);
     return (
       matchesLevel(item.jlpt_level, level) &&
       matchesCategory(item.content_type, category) &&

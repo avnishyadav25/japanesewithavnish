@@ -1,15 +1,7 @@
 import { notFound } from "next/navigation";
+import { LEARN_CONTENT_TYPES, LEARN_TYPE_LABELS, type LearnContentType } from "@/lib/learn-filters";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { LearningContentForm } from "../../LearningContentForm";
-
-const TYPES = ["grammar", "vocabulary", "kanji", "reading", "writing"] as const;
-const TYPE_LABELS: Record<string, string> = {
-  grammar: "Grammar",
-  vocabulary: "Vocabulary",
-  kanji: "Kanji",
-  reading: "Reading",
-  writing: "Writing",
-};
 
 export default async function AdminLearnNewPage({
   params,
@@ -18,12 +10,12 @@ export default async function AdminLearnNewPage({
 }) {
   const { type } = await params;
   const normalized = type.toLowerCase();
-  if (!TYPES.includes(normalized as (typeof TYPES)[number])) notFound();
+  if (!LEARN_CONTENT_TYPES.includes(normalized as LearnContentType)) notFound();
 
   return (
     <div>
       <AdminPageHeader
-        title={`New ${TYPE_LABELS[normalized]}`}
+        title={`New ${LEARN_TYPE_LABELS[normalized as LearnContentType]}`}
         breadcrumb={[
           { label: "Admin", href: "/admin" },
           { label: "Learning", href: `/admin/learn/${normalized}` },

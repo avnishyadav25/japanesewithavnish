@@ -7,6 +7,9 @@ export type ContentType =
   | "reading"
   | "listening"
   | "writing"
+  | "sounds"
+  | "study_guide"
+  | "practice_test"
   | "product";
 
 export type PromptContext = {
@@ -17,6 +20,14 @@ export type PromptContext = {
   word?: string;
   pattern?: string;
   character?: string;
+  /** Grammar/word meaning (pulled from form meta). */
+  meaning?: string;
+  /** Grammar structure e.g. [SUBJECT] は [NOUN] です (pulled from form meta). */
+  structure?: string;
+  /** For list generation: number of items to generate (e.g. 80 for N5 vocab). */
+  listCount?: number;
+  /** Existing slugs already in DB; AI should generate only NEW items not in this list. */
+  existingSlugs?: string[];
 };
 
 const BASE_BRAND =
@@ -32,8 +43,14 @@ export function getPrompt(contentType: ContentType, context: PromptContext): str
   const pattern = context.pattern || "N/A";
   const word = context.word || "word";
   const character = context.character || "字";
+  const meaning = context.meaning || "";
+  const structure = context.structure || "";
   const tags = context.tags ? ` Tags/focus: ${context.tags}.` : "";
   const desc = context.description ? ` Description: ${context.description}.` : "";
+  const grammarExtra =
+    meaning || structure
+      ? `\nMeaning: ${meaning || "—"}.${structure ? `\nStructure: ${structure}.` : ""}\n`
+      : "";
 
   switch (contentType) {
     case "blog": {
@@ -141,7 +158,7 @@ ${TONE_RULES}`;
 Create a comprehensive grammar lesson for JLPT ${level} learners.
 
 Grammar pattern: "${pattern}"
-${tags}${desc}
+${grammarExtra}${tags}${desc}
 
 Structure:
 1. Title (H1): Clear pattern name
@@ -158,11 +175,12 @@ ${TONE_RULES}`;
     }
 
     case "vocabulary": {
+      const vocabExtra = meaning ? `\nMeaning: ${meaning}.\n` : "";
       return `${BASE_BRAND}
 Create a vocabulary entry for JLPT ${level} learners.
 
 Word/expression: "${word}"
-${tags}${desc}
+${vocabExtra}${tags}${desc}
 
 Structure:
 1. Word (H1): Japanese + reading (hiragana/romaji)
@@ -179,11 +197,12 @@ ${TONE_RULES}`;
     }
 
     case "kanji": {
+      const kanjiExtra = meaning ? `\nMeaning: ${meaning}.\n` : "";
       return `${BASE_BRAND}
 Create a kanji entry for JLPT ${level} learners.
 
 Character: "${character}"
-${tags}${desc}
+${kanjiExtra}${tags}${desc}
 
 Structure:
 1. Kanji (H1): Character + readings (on-yomi, kun-yomi)
@@ -257,6 +276,64 @@ Output: Clean Markdown.
 ${TONE_RULES}`;
     }
 
+    case "sounds": {
+      return `${BASE_BRAND}
+Create a kana/pronunciation (sounds) lesson for JLPT ${level} learners.
+
+Topic: "${topic}"
+${tags}${desc}
+
+Structure:
+1. Title (H1): e.g. "Hiragana あ-row" or "Katakana カ-row"
+2. Introduction: Why this set matters, how to pronounce
+3. Table or list: Each character with romaji, optional mnemonic, and a short example word
+4. Pronunciation tips: Common mistakes, mouth position
+5. Practice: 2–3 words or phrases using these characters (Japanese + romaji + meaning)
+
+If describing a character set, use clear headings. You can suggest a meta structure: columns (e.g. a-i-u-e-o), characters (char, romaji, mnemonic). Tone: Calm, educational.
+Output: Clean Markdown.
+${TONE_RULES}`;
+    }
+
+    case "study_guide": {
+      return `${BASE_BRAND}
+Create a JLPT study guide section for "${topic}" (JLPT ${level}).
+
+${tags}${desc}
+
+Structure:
+1. Title (H1): e.g. "How to pass JLPT ${level}" or "JLPT ${level} study plan"
+2. Overview: Exam structure, sections, time, scoring (concise)
+3. Sections (3–5 H2s): e.g. Vocabulary strategy, Grammar strategy, Reading, Listening, Time management
+4. Study schedule: Weekly or monthly breakdown (realistic)
+5. Resources: What to use (books, mock tests, our bundles) — use relative links like /product/japanese-n5-mastery-bundle where relevant
+6. Final tips: Test-day advice, common pitfalls
+
+Tone: Calm, authoritative, actionable. No fluff.
+Output: Clean Markdown.
+${TONE_RULES}`;
+    }
+
+    case "practice_test": {
+      return `${BASE_BRAND}
+Create a practice test description and instructions for JLPT ${level} learners.
+
+Topic: "${topic}"
+${tags}${desc}
+
+Structure:
+1. Title (H1): e.g. "JLPT ${level} Mock Test 1" or "Practice test: Vocabulary & Grammar"
+2. Overview: What this test covers (sections, question types, duration)
+3. How to use: Instructions (e.g. use PDF + audio, timing, self-scoring)
+4. Sections: List each section (Language Knowledge, Reading, Listening) with time and question count
+5. Answer key: Where to find answers or how to self-check
+6. Tips: How to simulate exam conditions
+
+Tone: Calm, clear, practical. No fluff.
+Output: Clean Markdown.
+${TONE_RULES}`;
+    }
+
     case "product": {
       return `${BASE_BRAND}
 Generate complete product copy for a JLPT ${level} learning bundle.
@@ -288,5 +365,91 @@ ${TONE_RULES}`;
 
     default:
       return `${BASE_BRAND}Write content about "${topic}" for JLPT ${level} learners. Calm, structured, professional. Output: Markdown.${TONE_RULES}`;
+  }
+}
+
+/** Prompt to generate a list of learning items (for bulk creation). Output must be a JSON array. */
+export function getListPrompt(contentType: ContentType, context: PromptContext): string {
+  const level = context.jlptLevel || "N5";
+  const topic = context.topic || "";
+  const count = Math.min(Math.max(Number(context.listCount) || 20, 5), 200);
+  const scope = topic ? `Scope: ${topic}.` : "";
+  const existingSlugs = context.existingSlugs?.filter(Boolean) ?? [];
+  const existingLine =
+    existingSlugs.length > 0
+      ? `\n\nIMPORTANT: The following slugs already exist. Generate ONLY NEW items whose slug is NOT in this list (do not duplicate): [${existingSlugs.slice(0, 100).map((s) => `"${String(s).replace(/"/g, '\\"')}"`).join(", ")}]${existingSlugs.length > 100 ? ` ... and ${existingSlugs.length - 100} more` : ""}.`
+      : "";
+
+  const listInstructions = `
+OUTPUT FORMAT: Return ONLY a valid JSON array. No markdown code fences, no text before or after.
+Each element must be an object with at least: title (string), slug (URL-safe, lowercase, hyphens).
+Add type-specific meta fields where noted so we can prefill admin forms.${existingLine}`;
+
+  switch (contentType) {
+    case "grammar":
+      return `${BASE_BRAND}
+Generate a list of ${count} JLPT ${level} grammar points to create as separate lessons. ${scope}
+${listInstructions}
+Each item must use this exact structure. Include 8-12 different example sentences per grammar point in meta.examples. Include meta.image_prompt (one short sentence describing a card/list image for this lesson) and optional meta.summary.
+{ "title": "Grammar pattern name", "slug": "url-slug", "meta": { "grammar_form": "日本語", "reading": "romaji", "meaning": "brief meaning", "structure": "optional pattern e.g. [SUBJECT] は [NOUN] です", "summary": "one line for cards", "image_prompt": "e.g. Flat illustration for grammar pattern X, JLPT N5", "examples": [ { "japanese": "full sentence in Japanese", "romaji": "romaji reading", "translation": "English translation" }, ... 8 to 12 examples ] } }.`;
+
+    case "vocabulary":
+      return `${BASE_BRAND}
+Generate a list of ${count} JLPT ${level} vocabulary words/expressions to create as separate lessons. ${scope}
+${listInstructions}
+Each item must include 8-12 example sentences in meta.examples. Use japanese (kanji/hiragana/katakana), reading (romaji), meaning (English), and type. Optional: summary, image_prompt.
+{ "title": "Word or phrase", "slug": "url-slug", "meta": { "japanese": "日本語 or ひらがな", "reading": "romaji", "type": "Noun|Verb|etc", "meaning": "English meaning", "summary": "one line for cards", "image_prompt": "optional card image description", "examples": [ { "japanese": "sentence in Japanese", "romaji": "romaji", "translation": "English" }, ... 8 to 12 examples ] } }.`;
+
+    case "kanji":
+      return `${BASE_BRAND}
+Generate a list of ${count} JLPT ${level} kanji to create as separate lessons. ${scope}
+${listInstructions}
+Each item must include 8-12 example compounds or sentences in meta.examples. Use character, meaning, onyomi, kunyomi, stroke_count. Optional: summary, image_prompt.
+{ "title": "Character or meaning", "slug": "url-slug", "meta": { "character": "字", "meaning": "meaning", "onyomi": ["オン"], "kunyomi": ["くん"], "stroke_count": 5, "summary": "one line", "image_prompt": "optional", "examples": [ { "japanese": "word or sentence using this kanji", "romaji": "romaji", "translation": "English" }, ... 8 to 12 examples ] } }.`;
+
+    case "reading":
+      return `${BASE_BRAND}
+Generate a list of ${count} JLPT ${level} reading practice topics/titles to create as separate lessons. ${scope}
+${listInstructions}
+Each item should include meta.sentences (8-12) with japanese, romaji, translation for reading practice. Optional: summary, image_prompt.
+{ "title": "Reading topic or story title", "slug": "url-slug", "meta": { "summary": "brief description", "image_prompt": "optional", "sentences": [ { "japanese": "sentence (kanji/hiragana/katakana)", "romaji": "romaji", "translation": "English" }, ... 8 to 12 sentences ] } }.`;
+
+    case "listening":
+      return `${BASE_BRAND}
+Generate a list of ${count} JLPT ${level} listening practice scenarios to create as separate lessons. ${scope}
+${listInstructions}
+Each item must include 8-12 example phrases/lines in meta.examples (japanese, romaji, translation). Optional: summary, image_prompt, audio_url.
+{ "title": "Scenario (e.g. At the station)", "slug": "url-slug", "meta": { "summary": "brief description", "image_prompt": "optional", "examples": [ { "japanese": "phrase or dialogue line", "romaji": "romaji", "translation": "English" }, ... 8 to 12 examples ] } }.`;
+
+    case "writing":
+      return `${BASE_BRAND}
+Generate a list of ${count} JLPT ${level} writing prompts/topics to create as separate lessons. ${scope}
+${listInstructions}
+Each item must include 8-12 example sentences or sample responses in meta.examples (japanese, romaji, translation). Optional: summary, image_prompt.
+{ "title": "Writing prompt title", "slug": "url-slug", "meta": { "summary": "brief description", "image_prompt": "optional", "examples": [ { "japanese": "sample sentence or response", "romaji": "romaji", "translation": "English" }, ... 8 to 12 examples ] } }.`;
+
+    case "sounds":
+      return `${BASE_BRAND}
+Generate a list of ${count} kana/pronunciation (sounds) lesson topics (e.g. hiragana rows, katakana rows, minimal pairs). ${scope}
+${listInstructions}
+Each item must include meta.characters: array of objects with hiragana, katakana, romaji, meaning (English). Optional: summary, image_prompt.
+{ "title": "Topic (e.g. Hiragana あ-row)", "slug": "url-slug", "meta": { "summary": "brief description", "image_prompt": "optional", "characters": [ { "hiragana": "あ", "katakana": "ア", "romaji": "a", "meaning": "optional meaning" }, ... ] } }.`;
+
+    case "study_guide":
+      return `${BASE_BRAND}
+Generate a list of ${count} JLPT study guide chapter/section titles (e.g. per level or per skill). ${scope}
+${listInstructions}
+Each item: { "title": "Chapter title (e.g. How to pass JLPT N5)", "slug": "url-slug", "meta": { "summary": "brief description" } }.`;
+
+    case "practice_test":
+      return `${BASE_BRAND}
+Generate a list of ${count} practice test titles (e.g. Mock Test 1, 2; by section). ${scope}
+${listInstructions}
+Each item: { "title": "Test title", "slug": "url-slug", "meta": { "summary": "brief description" } }.`;
+
+    default:
+      return `${BASE_BRAND}
+Generate a list of ${count} items for "${topic || contentType}" (JLPT ${level}). ${listInstructions}
+Each item: { "title": "string", "slug": "url-slug" }.`;
   }
 }
