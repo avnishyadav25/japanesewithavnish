@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
 import { LEARN_CONTENT_TYPES, LEARN_TYPE_LABELS, type LearnContentType } from "@/lib/learn-filters";
@@ -41,6 +42,12 @@ export default async function AdminLearnPage({
         ]}
         action={{ label: "Add", href: `/admin/learn/${normalized}/new` }}
       />
+      <p className="text-sm text-secondary mb-4">
+        <Link href="/admin/analytics" className="text-primary hover:underline">
+          Content analytics
+        </Link>{" "}
+        currently tracks blog posts and products. We can enable tracking for learning content next if needed.
+      </p>
       <div className="mb-4">
         <GenerateLearnListButton
           contentType={normalized}

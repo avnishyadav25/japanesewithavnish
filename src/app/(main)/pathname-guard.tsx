@@ -10,7 +10,7 @@ export function PathnameGuard({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  if (TASK_PAGES.some((p) => pathname.startsWith(p))) {
+  if (pathname && TASK_PAGES.some((p) => pathname.startsWith(p))) {
     return null;
   }
   return <>{children}</>;

@@ -27,12 +27,12 @@ const TOPIC_PILLS = [
 export function BlogFilterBar() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const level = searchParams.get("level") || "all";
-  const type = searchParams.get("type") || "all";
+  const level = searchParams?.get("level") || "all";
+  const type = searchParams?.get("type") || "all";
 
   const updateParams = useCallback(
     (updates: { level?: string; type?: string; page?: string }) => {
-      const params = new URLSearchParams(searchParams.toString());
+      const params = new URLSearchParams(searchParams?.toString() ?? "");
       if (updates.level !== undefined) params.set("level", updates.level);
       if (updates.type !== undefined) params.set("type", updates.type);
       if (updates.page !== undefined) params.set("page", updates.page);

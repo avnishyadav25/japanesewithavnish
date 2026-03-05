@@ -31,7 +31,7 @@ export function LearnLevelTabs({ active, basePath = "/learn", showHelpText = tru
           localStorage.setItem(STORAGE_KEY, level);
         } catch {}
       }
-      const params = new URLSearchParams(searchParams.toString());
+      const params = new URLSearchParams(searchParams?.toString() ?? "");
       if (level === "all") {
         params.delete("level");
       } else {
@@ -45,7 +45,7 @@ export function LearnLevelTabs({ active, basePath = "/learn", showHelpText = tru
   );
 
   useEffect(() => {
-    const fromUrl = searchParams.get("level")?.toLowerCase();
+    const fromUrl = searchParams?.get("level")?.toLowerCase();
     if (fromUrl === undefined || fromUrl === null || fromUrl === "") {
       return;
     }

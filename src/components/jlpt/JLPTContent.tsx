@@ -31,7 +31,8 @@ export function JLPTContent({
   initialPosts,
   pinnedByLevel,
 }: JLPTContentProps) {
-  const levelParam = useSearchParams().get("level")?.toLowerCase();
+  const searchParams = useSearchParams();
+  const levelParam = searchParams?.get("level")?.toLowerCase();
   const level: JLPTLevel =
     levelParam && JLPT_LEVELS.includes(levelParam as JLPTLevel)
       ? (levelParam as JLPTLevel)

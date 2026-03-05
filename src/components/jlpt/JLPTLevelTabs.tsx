@@ -22,7 +22,7 @@ export function JLPTLevelTabs({ active, onActiveChange }: JLPTLevelTabsProps) {
           localStorage.setItem(STORAGE_KEY, level);
         } catch {}
       }
-      const params = new URLSearchParams(searchParams.toString());
+      const params = new URLSearchParams(searchParams?.toString() ?? "");
       params.set("level", level);
       router.replace(`/jlpt?${params.toString()}`, { scroll: false });
       onActiveChange?.(level);
@@ -32,7 +32,7 @@ export function JLPTLevelTabs({ active, onActiveChange }: JLPTLevelTabsProps) {
 
   useEffect(() => {
     const stored = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
-    const fromUrl = searchParams.get("level")?.toLowerCase();
+    const fromUrl = searchParams?.get("level")?.toLowerCase();
     const resolved = (fromUrl as JLPTLevel) || (stored as JLPTLevel) || "n5";
     if (JLPT_LEVELS.includes(resolved) && resolved !== active) {
       onActiveChange?.(resolved);

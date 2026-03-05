@@ -42,7 +42,7 @@ export function LearnContent({
 }: LearnContentProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const searchFromUrl = searchParams.get("search") ?? "";
+  const searchFromUrl = searchParams?.get("search") ?? "";
   const [searchInput, setSearchInput] = useState(searchFromUrl);
   useEffect(() => {
     setSearchInput(searchFromUrl);
@@ -51,7 +51,7 @@ export function LearnContent({
   const handleSearch = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault();
-      const params = new URLSearchParams(searchParams.toString());
+      const params = new URLSearchParams(searchParams?.toString() ?? "");
       const q = searchInput.trim();
       if (q) params.set("search", q);
       else params.delete("search");

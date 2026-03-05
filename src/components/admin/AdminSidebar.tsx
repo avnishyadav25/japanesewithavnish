@@ -61,7 +61,7 @@ const navGroups = [
 
 function NavLink({ href, label }: { href: string; label: string }) {
   const pathname = usePathname();
-  const isActive = pathname === href || (href !== "/admin" && pathname.startsWith(href));
+  const isActive = !!pathname && (pathname === href || (href !== "/admin" && pathname.startsWith(href)));
   return (
     <Link
       href={href}

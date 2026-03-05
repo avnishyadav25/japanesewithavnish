@@ -16,11 +16,11 @@ interface LearnFilterBarProps {
 export function LearnFilterBar({ basePath = "/learn" }: LearnFilterBarProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const sort = searchParams.get("sort") ?? "newest";
+  const sort = searchParams?.get("sort") ?? "newest";
 
   const updateParams = useCallback(
     (updates: { sort?: string; page?: string }) => {
-      const params = new URLSearchParams(searchParams.toString());
+      const params = new URLSearchParams(searchParams?.toString() ?? "");
       if (updates.sort !== undefined) params.set("sort", updates.sort);
       if (updates.page !== undefined) params.set("page", updates.page);
       else params.delete("page");

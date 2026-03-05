@@ -38,7 +38,7 @@ function CheckoutLoadingSkeleton() {
 
 function CheckoutContent() {
   const searchParams = useSearchParams();
-  const productSlug = searchParams.get("product");
+  const productSlug = searchParams?.get("product");
   const [product, setProduct] = useState<{ id: string; name: string; slug: string; price_paise: number } | null>(null);
   const [loading, setLoading] = useState(true);
 

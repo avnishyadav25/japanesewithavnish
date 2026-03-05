@@ -14,8 +14,8 @@ const THRESHOLDS = [
 
 function ResultContent() {
   const searchParams = useSearchParams();
-  const score = parseInt(searchParams.get("score") || "0", 10);
-  const total = parseInt(searchParams.get("total") || "10", 10);
+  const score = parseInt(searchParams?.get("score") || "0", 10);
+  const total = parseInt(searchParams?.get("total") || "10", 10);
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"gate" | "loading" | "shown" | "error">("gate");
   const [newsletterOptIn, setNewsletterOptIn] = useState(true);

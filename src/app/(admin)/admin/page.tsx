@@ -20,6 +20,7 @@ export default async function AdminDashboardPage() {
   let quizQuestions: number;
   let recentOrders: { id: string; user_email: string; status: string; total_amount_paise: number; created_at: string }[];
   let last7Days: { created_at: string; total_amount_paise: number; status: string }[];
+  let contentAnalyticsRows: { content_type: string; views: number; avg_seconds: number | null }[] = [];
 
   if (sql) {
     const [
@@ -32,6 +33,7 @@ export default async function AdminDashboardPage() {
       questionsCountRows,
       recentRows,
       weekPaidRows,
+      contentAnalyticsRaw,
     ] = await Promise.all([
       sql`SELECT COUNT(*)::int AS c FROM orders`,
       sql`SELECT total_amount_paise FROM orders WHERE status = 'paid' AND created_at >= ${monthStart}`,
@@ -42,6 +44,14 @@ export default async function AdminDashboardPage() {
       sql`SELECT COUNT(*)::int AS c FROM quiz_questions`,
       sql`SELECT id, user_email, status, total_amount_paise, created_at FROM orders ORDER BY created_at DESC LIMIT 5`,
       sql`SELECT created_at, total_amount_paise, status FROM orders WHERE created_at >= ${weekAgo} AND status = 'paid'`,
+      sql`
+        SELECT
+          content_type,
+          COUNT(*) FILTER (WHERE event_type = 'view') AS views,
+          ROUND(AVG(duration_seconds) FILTER (WHERE event_type = 'duration'))::int AS avg_seconds
+        FROM content_events
+        GROUP BY content_type
+      `,
     ]);
     totalOrders = (ordersCountRows[0] as { c: number })?.c ?? 0;
     revenueThisMonth = (revenueRows as { total_amount_paise: number }[]).reduce((sum, o) => sum + Number(o.total_amount_paise || 0), 0);
@@ -52,6 +62,7 @@ export default async function AdminDashboardPage() {
     quizQuestions = (questionsCountRows[0] as { c: number })?.c ?? 0;
     recentOrders = (recentRows as { id: string; user_email: string; status: string; total_amount_paise: number; created_at: string }[]) ?? [];
     last7Days = (weekPaidRows as { created_at: string; total_amount_paise: number; status: string }[]) ?? [];
+    contentAnalyticsRows = (contentAnalyticsRaw as typeof contentAnalyticsRows) ?? [];
   } else {
     totalOrders = 0;
     revenueThisMonth = 0;
@@ -62,6 +73,7 @@ export default async function AdminDashboardPage() {
     quizQuestions = 0;
     recentOrders = [];
     last7Days = [];
+    contentAnalyticsRows = [];
   }
 
   // Build last 7 days bar chart data
@@ -79,6 +91,17 @@ export default async function AdminDashboardPage() {
   });
 
   const maxRevenue = Math.max(...dayBars.map((d) => d.revenue), 1);
+
+  const analyticsMap = new Map<string, { views: number; avg_seconds: number | null }>();
+  contentAnalyticsRows.forEach((row) => {
+    analyticsMap.set(row.content_type, {
+      views: Number(row.views || 0),
+      avg_seconds: row.avg_seconds,
+    });
+  });
+  const blogViews = analyticsMap.get("blog")?.views ?? 0;
+  const productViews = analyticsMap.get("product")?.views ?? 0;
+  const pageViews = analyticsMap.get("page")?.views ?? 0;
 
   const quickLinks = [
     { href: "/admin/products", label: "Products", desc: "Manage bundles & prices", emoji: "🛍️" },
@@ -168,6 +191,32 @@ export default async function AdminDashboardPage() {
           <h2 className="font-heading font-bold text-charcoal text-sm">SEO</h2>
           <p className="text-secondary text-xs">Notify Google &amp; Bing that the sitemap was updated.</p>
           <SitemapPingButton />
+        </div>
+
+        {/* Content analytics summary */}
+        <div className="bento-span-2 card flex flex-col gap-4">
+          <h2 className="font-heading font-bold text-charcoal text-sm">Content analytics</h2>
+          <p className="text-secondary text-xs">
+            High-level views from in-house analytics. For full table, see{" "}
+            <Link href="/admin/analytics" className="text-primary hover:underline">
+              Content analytics
+            </Link>
+            .
+          </p>
+          <div className="space-y-2 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-secondary">Blog views (all time)</span>
+              <span className="font-heading font-semibold text-charcoal">{blogViews}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-secondary">Product views (all time)</span>
+              <span className="font-heading font-semibold text-charcoal">{productViews}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-secondary">Other pages (all time)</span>
+              <span className="font-heading font-semibold text-charcoal">{pageViews}</span>
+            </div>
+          </div>
         </div>
       </div>
 

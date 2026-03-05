@@ -79,8 +79,8 @@ export function SocialPrepareForm() {
   }, [base]);
 
   useEffect(() => {
-    const type = searchParams.get("type");
-    const slugParam = searchParams.get("slug");
+    const type = searchParams?.get("type");
+    const slugParam = searchParams?.get("slug");
     if (type === "blog" || type === "product" || type === "newsletter") setContentType(type);
     if (slugParam) {
       setSlug(slugParam);

@@ -18,7 +18,7 @@ type Log = {
 
 export function AiLogsClient() {
   const searchParams = useSearchParams();
-  const entityType = searchParams.get("entityType") ?? "";
+  const entityType = searchParams?.get("entityType") ?? "";
   const [logs, setLogs] = useState<Log[]>([]);
   const [loading, setLoading] = useState(true);
 

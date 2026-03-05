@@ -7,6 +7,27 @@ import { HomepageSettingsForm } from "./HomepageSettingsForm";
 
 type Settings = Record<string, string | unknown>;
 
+function SettingsSection({
+  title,
+  children,
+  defaultOpen = false,
+}: {
+  title: string;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  return (
+    <AdminCard>
+      <details open={defaultOpen}>
+        <summary className="cursor-pointer font-heading font-bold text-charcoal mb-2">
+          {title}
+        </summary>
+        <div className="mt-2 space-y-4">{children}</div>
+      </details>
+    </AdminCard>
+  );
+}
+
 export function CompanySettingsForm({
   initial,
   homepageInitial = {},
@@ -39,163 +60,172 @@ export function CompanySettingsForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
-      <AdminCard>
-        <h2 className="font-heading font-bold text-charcoal mb-4">Company</h2>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-charcoal mb-1">Company name</label>
-            <input
-              type="text"
-              value={String(settings.company_name ?? "")}
-              onChange={(e) => update("company_name", e.target.value)}
-              className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-charcoal mb-1">Tagline</label>
-            <input
-              type="text"
-              value={String(settings.company_tagline ?? "")}
-              onChange={(e) => update("company_tagline", e.target.value)}
-              className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-charcoal mb-1">Logo URL</label>
+      <SettingsSection title="Company" defaultOpen>
+        <div>
+          <label className="block text-sm font-medium text-charcoal mb-1">Company name</label>
+          <input
+            type="text"
+            value={String(settings.company_name ?? "")}
+            onChange={(e) => update("company_name", e.target.value)}
+            className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-charcoal mb-1">Tagline</label>
+          <input
+            type="text"
+            value={String(settings.company_tagline ?? "")}
+            onChange={(e) => update("company_tagline", e.target.value)}
+            className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-charcoal mb-1">Logo URL</label>
+          <input
+            type="url"
+            value={String(settings.logo_url ?? "")}
+            onChange={(e) => update("logo_url", e.target.value)}
+            className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-charcoal mb-1">Favicon URL</label>
+          <input
+            type="url"
+            value={String(settings.favicon_url ?? "")}
+            onChange={(e) => update("favicon_url", e.target.value)}
+            className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
+          />
+        </div>
+      </SettingsSection>
+
+      <SettingsSection title="Contact">
+        <div>
+          <label className="block text-sm font-medium text-charcoal mb-1">Support email</label>
+          <input
+            type="email"
+            value={String(settings.support_email ?? "")}
+            onChange={(e) => update("support_email", e.target.value)}
+            className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-charcoal mb-1">Contact email</label>
+          <input
+            type="email"
+            value={String(settings.contact_email ?? "")}
+            onChange={(e) => update("contact_email", e.target.value)}
+            className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-charcoal mb-1">Phone</label>
+          <input
+            type="tel"
+            value={String(settings.phone ?? "")}
+            onChange={(e) => update("phone", e.target.value)}
+            className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
+          />
+        </div>
+      </SettingsSection>
+
+      <SettingsSection title="Social">
+        {["twitter_url", "instagram_url", "youtube_url", "discord_url", "facebook_url", "threads_url", "pinterest_url"].map((key) => (
+          <div key={key}>
+            <label className="block text-sm font-medium text-charcoal mb-1">
+              {key.replace("_url", "").replace(/_/g, " ")}
+              {key === "instagram_url" && " (@japanesewithavnish)"}
+            </label>
             <input
               type="url"
-              value={String(settings.logo_url ?? "")}
-              onChange={(e) => update("logo_url", e.target.value)}
+              value={String(settings[key] ?? "")}
+              onChange={(e) => update(key, e.target.value)}
+              placeholder={key === "instagram_url" ? "https://www.instagram.com/japanesewithavnish" : undefined}
               className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-charcoal mb-1">Favicon URL</label>
-            <input
-              type="url"
-              value={String(settings.favicon_url ?? "")}
-              onChange={(e) => update("favicon_url", e.target.value)}
-              className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
-            />
-          </div>
-        </div>
-      </AdminCard>
+        ))}
+      </SettingsSection>
 
-      <AdminCard>
-        <h2 className="font-heading font-bold text-charcoal mb-4">Contact</h2>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-charcoal mb-1">Support email</label>
-            <input
-              type="email"
-              value={String(settings.support_email ?? "")}
-              onChange={(e) => update("support_email", e.target.value)}
-              className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-charcoal mb-1">Contact email</label>
-            <input
-              type="email"
-              value={String(settings.contact_email ?? "")}
-              onChange={(e) => update("contact_email", e.target.value)}
-              className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-charcoal mb-1">Phone</label>
-            <input
-              type="tel"
-              value={String(settings.phone ?? "")}
-              onChange={(e) => update("phone", e.target.value)}
-              className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
-            />
-          </div>
+      <SettingsSection title="SEO defaults">
+        <div>
+          <label className="block text-sm font-medium text-charcoal mb-1">Default meta title</label>
+          <input
+            type="text"
+            value={String(settings.seo_default_title ?? "")}
+            onChange={(e) => update("seo_default_title", e.target.value)}
+            className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
+          />
         </div>
-      </AdminCard>
-
-      <AdminCard>
-        <h2 className="font-heading font-bold text-charcoal mb-4">Social</h2>
-        <div className="space-y-4">
-          {["twitter_url", "instagram_url", "youtube_url", "discord_url", "facebook_url", "threads_url", "pinterest_url"].map((key) => (
-            <div key={key}>
-              <label className="block text-sm font-medium text-charcoal mb-1">
-                {key.replace("_url", "").replace(/_/g, " ")}
-                {key === "instagram_url" && " (@japanesewithavnish)"}
-              </label>
-              <input
-                type="url"
-                value={String(settings[key] ?? "")}
-                onChange={(e) => update(key, e.target.value)}
-                placeholder={key === "instagram_url" ? "https://www.instagram.com/japanesewithavnish" : undefined}
-                className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
-              />
-            </div>
-          ))}
+        <div>
+          <label className="block text-sm font-medium text-charcoal mb-1">Default meta description</label>
+          <textarea
+            value={String(settings.seo_default_description ?? "")}
+            onChange={(e) => update("seo_default_description", e.target.value)}
+            rows={2}
+            className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
+          />
         </div>
-      </AdminCard>
-
-      <AdminCard>
-        <h2 className="font-heading font-bold text-charcoal mb-4">SEO defaults</h2>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-charcoal mb-1">Default meta title</label>
-            <input
-              type="text"
-              value={String(settings.seo_default_title ?? "")}
-              onChange={(e) => update("seo_default_title", e.target.value)}
-              className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-charcoal mb-1">Default meta description</label>
-            <textarea
-              value={String(settings.seo_default_description ?? "")}
-              onChange={(e) => update("seo_default_description", e.target.value)}
-              rows={2}
-              className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-charcoal mb-1">Default OG image URL</label>
-            <input
-              type="url"
-              value={String(settings.seo_default_og_image ?? "")}
-              onChange={(e) => update("seo_default_og_image", e.target.value)}
-              className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
-            />
-          </div>
+        <div>
+          <label className="block text-sm font-medium text-charcoal mb-1">Default OG image URL</label>
+          <input
+            type="url"
+            value={String(settings.seo_default_og_image ?? "")}
+            onChange={(e) => update("seo_default_og_image", e.target.value)}
+            className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
+          />
         </div>
-      </AdminCard>
+      </SettingsSection>
 
-      <AdminCard>
-        <h2 className="font-heading font-bold text-charcoal mb-4">Footer</h2>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-charcoal mb-1">Copyright text</label>
-            <input
-              type="text"
-              value={String(settings.footer_copyright ?? "")}
-              onChange={(e) => update("footer_copyright", e.target.value)}
-              className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
-              placeholder="© 2025 Japanese with Avnish"
-            />
-          </div>
+      <SettingsSection title="Footer">
+        <div>
+          <label className="block text-sm font-medium text-charcoal mb-1">Copyright text</label>
+          <input
+            type="text"
+            value={String(settings.footer_copyright ?? "")}
+            onChange={(e) => update("footer_copyright", e.target.value)}
+            className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
+            placeholder="© 2025 Japanese with Avnish"
+          />
         </div>
-      </AdminCard>
+      </SettingsSection>
 
-      <AdminCard>
-        <h2 className="font-heading font-bold text-charcoal mb-4">Integrations</h2>
+      <SettingsSection title="Integrations">
         <p className="text-secondary text-sm">
           SMTP (email), Razorpay, Supabase, DeepSeek, Gemini, AdSense, Monetag/Propeller — configured via .env.
           See GUIDE.md and MARKETING_ANALYTICS_GUIDE.md. Resend API is in backlog for future.
         </p>
-      </AdminCard>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <label className="block text-sm font-medium text-charcoal mb-1">
+              Monetag in-page push zone ID
+            </label>
+            <input
+              type="text"
+              value={String(settings.monetag_inpage_zone_id ?? "")}
+              onChange={(e) => update("monetag_inpage_zone_id", e.target.value)}
+              className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
+              placeholder="e.g. 10684866"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-charcoal mb-1">
+              Monetag vignette zone ID
+            </label>
+            <input
+              type="text"
+              value={String(settings.monetag_vignette_zone_id ?? "")}
+              onChange={(e) => update("monetag_vignette_zone_id", e.target.value)}
+              className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
+              placeholder="e.g. 10684873"
+            />
+          </div>
+        </div>
+      </SettingsSection>
 
-      <AdminCard>
-        <h2 className="font-heading font-bold text-charcoal mb-4">Homepage</h2>
+      <SettingsSection title="Homepage">
         <HomepageSettingsForm initial={homepageInitial} onChange={update} />
-      </AdminCard>
+      </SettingsSection>
 
       <ChatbotContextCard />
 
