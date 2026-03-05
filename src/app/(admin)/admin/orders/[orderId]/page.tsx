@@ -5,6 +5,7 @@ import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminCard } from "@/components/admin/AdminCard";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { ResendOrderEmailButton } from "@/components/admin/ResendOrderEmailButton";
+import { MarkAsPaidButton } from "@/components/admin/MarkAsPaidButton";
 
 type OrderRow = {
   id: string;
@@ -19,6 +20,8 @@ type OrderRow = {
   created_at: string;
   updated_at: string;
   last_confirmation_email_at: string | null;
+  payment_reference: string | null;
+  payment_note: string | null;
 };
 
 type OrderItemRow = {
@@ -46,7 +49,7 @@ export default async function AdminOrderDetailPage({
   if (!sql) notFound();
 
   const orderRows = await sql`
-    SELECT id, user_email, user_name, user_phone, status, provider, total_amount_paise, coupon_code, discount_paise, created_at, updated_at, last_confirmation_email_at
+    SELECT id, user_email, user_name, user_phone, status, provider, total_amount_paise, coupon_code, discount_paise, created_at, updated_at, last_confirmation_email_at, payment_reference, payment_note
     FROM orders WHERE id = ${orderId} LIMIT 1
   ` as OrderRow[];
   const order = orderRows[0];
@@ -120,6 +123,26 @@ export default async function AdminOrderDetailPage({
                 lastConfirmationEmailAt={order.last_confirmation_email_at}
               />
             </dd>
+            {order.status === "pending_payment" && order.provider === "manual" && (
+              <>
+                <dt className="text-secondary">Mark as paid (manual UPI)</dt>
+                <dd>
+                  <MarkAsPaidButton orderId={order.id} />
+                </dd>
+              </>
+            )}
+            {order.payment_reference && (
+              <>
+                <dt className="text-secondary">Payment reference (UTR)</dt>
+                <dd className="font-mono text-xs">{order.payment_reference}</dd>
+              </>
+            )}
+            {order.payment_note && (
+              <>
+                <dt className="text-secondary">Payment note</dt>
+                <dd className="text-xs">{order.payment_note}</dd>
+              </>
+            )}
           </dl>
         </AdminCard>
 

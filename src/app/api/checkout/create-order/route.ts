@@ -60,9 +60,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Amount too low for payment (min ₹1)" }, { status: 400 });
     }
 
+    const keyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
+    const keySecret = process.env.RAZORPAY_KEY_SECRET;
+    const useRazorpay = Boolean(keyId && keySecret);
+
     const orderRows = await sql`
       INSERT INTO orders (user_email, user_name, user_phone, status, provider, total_amount_paise, coupon_code, discount_paise)
-      VALUES (${email}, ${name}, ${phone}, 'pending_payment', 'razorpay', ${amountPaise}, ${appliedCoupon}, ${discountPaise})
+      VALUES (${email}, ${name}, ${phone}, 'pending_payment', ${useRazorpay ? "razorpay" : "manual"}, ${amountPaise}, ${appliedCoupon}, ${discountPaise})
       RETURNING id
     `;
     const order = orderRows[0];
@@ -81,14 +85,23 @@ export async function POST(req: Request) {
       await sql`UPDATE coupons SET used_count = COALESCE(used_count, 0) + 1 WHERE code = ${appliedCoupon}`;
     }
 
-    const keyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
-    const keySecret = process.env.RAZORPAY_KEY_SECRET;
-    if (!keyId || !keySecret) {
-      return NextResponse.json({ error: "Razorpay not configured" }, { status: 500 });
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+
+    if (!useRazorpay) {
+      await sql`
+        INSERT INTO payments (order_id, provider_payment_id, status)
+        VALUES (${orderId}, ${orderId}, 'created')
+      `;
+      return NextResponse.json({
+        orderId,
+        paymentMethod: "manual",
+        amountPaise,
+        name: "Japanese with Avnish",
+        description: String(product.name),
+      });
     }
 
-    const razorpay = new Razorpay({ key_id: keyId, key_secret: keySecret });
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+    const razorpay = new Razorpay({ key_id: keyId!, key_secret: keySecret! });
     const rzOrder = await razorpay.orders.create({
       amount: amountPaise,
       currency: "INR",

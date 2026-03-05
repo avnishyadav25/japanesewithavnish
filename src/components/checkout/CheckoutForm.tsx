@@ -84,6 +84,11 @@ export function CheckoutForm({ product, compact = false }: CheckoutFormProps) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
 
+      if (data.paymentMethod === "manual" || !data.razorpayOrderId) {
+        window.location.href = `/order/${data.orderId}/pay`;
+        return;
+      }
+
       const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || (typeof window !== "undefined" ? window.location.origin : "");
       const options = {
         key: data.key,
@@ -191,10 +196,10 @@ export function CheckoutForm({ product, compact = false }: CheckoutFormProps) {
             required
             className="w-full px-4 py-3 border-2 border-[var(--divider)] rounded-bento focus:border-primary focus:outline-none transition"
           />
-          <p className="text-xs text-secondary mt-1">Required for Razorpay payment.</p>
+          <p className="text-xs text-secondary mt-1">Required for payment.</p>
         </div>
         <button type="submit" className="btn-primary w-full" disabled={submitting}>
-          {submitting ? "Opening..." : "Pay with Razorpay"}
+          {submitting ? "..." : "Continue to payment"}
         </button>
         <p className="text-xs text-secondary mt-2">
           By paying, you agree to our Terms &amp; Refund Policy (no refunds for digital products).

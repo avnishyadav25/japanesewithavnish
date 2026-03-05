@@ -176,6 +176,24 @@ export async function sendCommunityGuidelinesEmail(
   return sendMail(email, "Community guidelines — Japanese with Avnish", emailWrapper(content, productList));
 }
 
+/** Sends contact form submission to site contact email. */
+export async function sendContactFormNotification(
+  to: string,
+  name: string,
+  fromEmail: string,
+  message: string
+): Promise<{ id?: string } | null> {
+  const escapedName = name.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const escapedEmail = fromEmail.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const escapedMessage = message.replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
+  const html = `
+    <p><strong>From:</strong> ${escapedName} &lt;${escapedEmail}&gt;</p>
+    <p><strong>Message:</strong></p>
+    <p>${escapedMessage}</p>
+  `;
+  return sendMail(to, `Contact form: ${name} — Japanese with Avnish`, html);
+}
+
 /** Sent when a payment fails (e.g. Razorpay payment.failed). Includes product link to retry. */
 export async function sendPaymentFailedRetryEmail(
   email: string,

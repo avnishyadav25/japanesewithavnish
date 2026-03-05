@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Source_Serif_4 } from "next/font/google";
 import "./globals.css";
 import { OrganizationSchema } from "@/components/JsonLd";
+import { ThirdPartyScripts } from "@/components/ThirdPartyScripts";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -29,6 +30,7 @@ export default function RootLayout({
       <body className="font-sans antialiased">
         <OrganizationSchema />
         {children}
+        <ThirdPartyScripts />
       </body>
     </html>
   );

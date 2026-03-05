@@ -45,6 +45,7 @@ const navGroups = [
       { href: "/admin/newsletter/subscribers", label: "Subscribers" },
       { href: "/admin/newsletter/settings", label: "Newsletter Settings" },
       { href: "/admin/emailtemplate", label: "Email Templates" },
+      { href: "/admin/contact", label: "Contact" },
     ],
   },
   {
