@@ -21,6 +21,7 @@ export const metadata: Metadata = {
 };
 
 const ADSENSE_CLIENT = process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID;
+const MONETAG_TAG = process.env.NEXT_PUBLIC_MONETAG_TAG;
 
 export default function RootLayout({
   children,
@@ -36,6 +37,7 @@ export default function RootLayout({
             content={ADSENSE_CLIENT}
           />
         ) : null}
+        {MONETAG_TAG ? <meta name="monetag" content={MONETAG_TAG} /> : null}
       </head>
       <body className="font-sans antialiased">
         <OrganizationSchema />

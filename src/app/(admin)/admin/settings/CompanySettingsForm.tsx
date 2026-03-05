@@ -187,7 +187,8 @@ export function CompanySettingsForm({
       <AdminCard>
         <h2 className="font-heading font-bold text-charcoal mb-4">Integrations</h2>
         <p className="text-secondary text-sm">
-          SMTP (email), Razorpay, Supabase, DeepSeek, Gemini — configured via .env. See GUIDE.md. Resend API is in backlog for future.
+          SMTP (email), Razorpay, Supabase, DeepSeek, Gemini, AdSense, Monetag/Propeller — configured via .env.
+          See GUIDE.md and MARKETING_ANALYTICS_GUIDE.md. Resend API is in backlog for future.
         </p>
       </AdminCard>
 
