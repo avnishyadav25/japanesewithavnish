@@ -20,6 +20,8 @@ export const metadata: Metadata = {
   icons: { icon: "/favicon.ico" },
 };
 
+const ADSENSE_CLIENT = process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID;
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -27,6 +29,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${inter.variable} ${sourceSerif.variable}`}>
+      <head>
+        {ADSENSE_CLIENT ? (
+          <meta
+            name="google-adsense-account"
+            content={ADSENSE_CLIENT}
+          />
+        ) : null}
+      </head>
       <body className="font-sans antialiased">
         <OrganizationSchema />
         {children}
