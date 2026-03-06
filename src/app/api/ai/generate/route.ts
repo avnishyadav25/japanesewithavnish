@@ -18,6 +18,7 @@ export async function POST(req: Request) {
     const validTypes: ContentType[] = [
       "blog",
       "newsletter",
+      "carousel",
       "grammar",
       "vocabulary",
       "kanji",
@@ -42,13 +43,17 @@ export async function POST(req: Request) {
       : customPrompt || getPrompt(contentType, context as Parameters<typeof getPrompt>[1]);
     const isBlog = contentType === "blog";
     const isProduct = contentType === "product";
-    const isJsonResponse = isBlog || isProduct;
+    const isLearn =
+      contentType === "grammar" || contentType === "vocabulary" || contentType === "kanji";
+    const isJsonResponse = isBlog || isProduct || isLearn;
     const userMessage = generateList
       ? "Generate the list. Return ONLY a valid JSON array. No markdown code blocks, no text before or after the array."
       : isBlog
         ? "Generate the blog post. Return ONLY a valid JSON object with keys: content, title, slug, tags, jlpt_level, seo_title, seo_description, image_prompt, section_image_prompts. No markdown code blocks, no extra text."
         : isProduct
           ? "Generate the product copy. Return ONLY a valid JSON object with keys: description, who_its_for, outcome, whats_included, faq, no_refunds_note, image_prompt. No markdown code blocks, no extra text."
+          : isLearn
+            ? "Generate the lesson. Return ONLY a valid JSON object with keys: content, feature_image_prompt, image_prompt_items. content must be Markdown. image_prompt_items must be an array of objects: { placeholder, role, aspect_ratio, prompt }. No markdown code blocks, no extra text."
           : "Generate the content as described.";
 
     const contentLLM = ((body.content_llm as string) || process.env.CONTENT_LLM || "deepseek").toLowerCase();
@@ -183,6 +188,36 @@ export async function POST(req: Request) {
               model_used: model,
               prompt_sent: systemPrompt,
               result_preview: JSON.stringify(out).slice(0, 500),
+              admin_email: admin?.email,
+            });
+            return NextResponse.json(out);
+          }
+        }
+
+        if (isLearn) {
+          for (const k of ["content", "feature_image_prompt"]) {
+            const v = parsed[k];
+            if (typeof v === "string") out[k] = v;
+          }
+          const items = parsed.image_prompt_items;
+          if (Array.isArray(items) && items.length > 0) {
+            out.image_prompt_items = items.filter(
+              (p: unknown) =>
+                p &&
+                typeof p === "object" &&
+                "placeholder" in p &&
+                "role" in p &&
+                "prompt" in p
+            );
+          }
+          if (typeof out.content === "string") {
+            await insertAiLog({
+              log_type: "content_generate",
+              content_type: contentType,
+              entity_type: "learning_content",
+              model_used: model,
+              prompt_sent: systemPrompt,
+              result_preview: out.content.slice(0, 500),
               admin_email: admin?.email,
             });
             return NextResponse.json(out);

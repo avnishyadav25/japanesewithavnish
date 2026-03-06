@@ -21,12 +21,25 @@ export type BlogGeneratedFields = {
   section_image_prompts?: SectionImagePrompt[];
 };
 
+export type LearningImagePromptItem = {
+  placeholder: string;
+  role: string;
+  aspect_ratio?: string;
+  prompt: string;
+};
+
+export type LearningGeneratedFields = {
+  content: string;
+  feature_image_prompt?: string;
+  image_prompt_items?: LearningImagePromptItem[];
+};
+
 type GenerateContentModalProps = {
   open: boolean;
   onClose: () => void;
   contentType: ContentType;
   initialContext: PromptContext;
-  onGenerated: (content: string | BlogGeneratedFields) => void;
+  onGenerated: (content: string | BlogGeneratedFields | LearningGeneratedFields) => void;
 };
 
 export function GenerateContentModal({
@@ -75,6 +88,13 @@ export function GenerateContentModal({
       if (contentType === "blog" && typeof data.content === "string" && typeof data.title === "string") {
         // Blog: structured JSON with content, title, slug, etc.
         onGenerated(data as BlogGeneratedFields);
+        onClose();
+      } else if (
+        ["grammar", "vocabulary", "kanji"].includes(contentType) &&
+        typeof data.content === "string" &&
+        Array.isArray(data.image_prompt_items)
+      ) {
+        onGenerated(data as LearningGeneratedFields);
         onClose();
       } else if (contentType === "product") {
         // Product: structured JSON without a 'content' key

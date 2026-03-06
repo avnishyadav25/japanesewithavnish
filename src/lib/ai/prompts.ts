@@ -1,6 +1,7 @@
 export type ContentType =
   | "blog"
   | "newsletter"
+  | "carousel"
   | "grammar"
   | "vocabulary"
   | "kanji"
@@ -36,6 +37,26 @@ const BASE_BRAND =
 const TONE_RULES = `
 Tone & Brand Alignment: Calm, structured, minimal, Japanese-inspired, professional. Not casual, not slang-heavy, not anime-focused.
 Avoid: Over-motivation, clickbait tone, overuse of emojis, salesy language.`;
+
+const TERM_LESSON_STYLE_RULES = `
+Global rules:
+- You are teaching beginners preparing for JLPT N5–N1 (use the provided JLPT level).
+- Keep explanations simple and practical. Avoid heavy linguistics jargon.
+- Use calm academic tone (no hype).
+- Prefer short paragraphs and clean formatting.
+- Do NOT use emojis except for the two dialogue character markers (Sakura 🌸, Kenji 🐼).
+
+Japanese formatting rules:
+- For each Japanese line, provide romaji and English on the next lines.
+- Use natural Japanese appropriate for the JLPT level.
+
+Image prompt style rules (for Nano Banana / Midjourney / DALL·E):
+- Style: friendly educational flat-vector (NOT anime), minimal Japanese classroom aesthetic.
+- Background: off-white (#FAF8F5). Accent: red (#D0021B). Text: dark charcoal (#1A1A1A).
+- Clean composition, lots of white space, readable typography.
+- Negative prompt (apply to all): no clutter, no neon, no photorealism, no anime exaggeration, no scary faces.
+- Default aspect ratio: 1:1 unless specified.
+- If the prompt includes on-image text, ensure it is short and highly legible.`;
 
 export function getPrompt(contentType: ContentType, context: PromptContext): string {
   const level = context.jlptLevel || "N5";
@@ -153,68 +174,317 @@ Output: Clean Markdown.
 ${TONE_RULES}`;
     }
 
-    case "grammar": {
+    case "carousel": {
+      const input =
+        pattern !== "N/A"
+          ? pattern
+          : word !== "word"
+            ? word
+            : character !== "字"
+              ? character
+              : topic;
       return `${BASE_BRAND}
-Create a comprehensive grammar lesson for JLPT ${level} learners.
+🎌 INSTAGRAM CAROUSEL GENERATOR (10 SLIDES)
 
-Grammar pattern: "${pattern}"
+You are a Japanese language teacher and content creator. Generate a complete Instagram carousel teaching ONE Japanese concept.
+
+INPUT_TERM: "${input}"
+JLPT_LEVEL: ${level}
 ${grammarExtra}${tags}${desc}
 
-Structure:
-1. Title (H1): Clear pattern name
-2. Structure & Form: How to form it (formula, conjugation)
-3. Meaning & Usage: When and why to use it
-4. Example sentences (3–5): Japanese + romaji + English translation
-5. Common mistakes: What to avoid
-6. Practice tip: One actionable study suggestion
+Audience:
+- Beginners and JLPT ${level} learners
+- Self-learners
 
-Include kana/kanji as appropriate for ${level}.
-Tone: Calm, academic, clear. No fluff.
-Output: Clean Markdown.
-${TONE_RULES}`;
+Tone:
+- calm, clear, educational
+- simple English
+- not anime-focused, not hype
+
+Brand visual style (for ALL image prompts):
+- Off-white background (#FAF8F5)
+- Red accents (#D0021B)
+- Flat vector educational illustration
+- Minimal Japanese classroom aesthetic
+- Clean readable typography (dark charcoal #1A1A1A)
+- Aspect ratio: 1:1
+- At the bottom of the image, display the text "japanesewithavnish.com" in subtle, readable typography.
+
+Slide structure (exactly 10 slides):
+1) Hook & term (hero)
+2) Meaning (JP + romaji + EN)
+3) Simple structure / how to use
+4) Mnemonic / memory trick
+5) Example 1 (JP + romaji + EN)
+6) Example 2 (JP + romaji + EN)
+7) Example 3 (JP + romaji + EN)
+8) Example 4 (JP + romaji + EN)
+9) Quick quiz (with options A/B/C + answer)
+10) Study tip + CTA (follow / save / practice)
+
+OUTPUT FORMAT (no extra text before/after):
+Slide 1
+Title:
+Text:
+Image Prompt:
+
+Slide 2
+Title:
+Text:
+Image Prompt:
+
+... continue through Slide 10.
+
+Rules:
+- Keep each slide Text short (2–3 lines, max ~180 characters).
+- Include Japanese + romaji + English for meaning and examples (as space allows).
+- Each Image Prompt must be 2–3 sentences describing the exact scene and the on-image text to include (term + key line). Include the brand visual style. End with the site text rule.
+${TONE_RULES}`.trim();
+    }
+
+    case "grammar": {
+      return `${BASE_BRAND}
+🎌 UNIVERSAL TERM LESSON (Grammar) — JLPT ${level}
+
+You are a Japanese language teacher helping beginners preparing for JLPT N5–N3.
+Create structured learning content for this grammar pattern:
+
+INPUT_TERM: "${pattern}"
+${grammarExtra}${tags}${desc}
+
+OUTPUT FORMAT (CRITICAL):
+Return ONLY valid JSON. No markdown fences, no commentary, no trailing commas.
+{
+  "content": "Markdown lesson content (string)",
+  "feature_image_prompt": "string (best hero image prompt for this lesson)",
+  "image_prompt_items": [
+    { "placeholder": "[IMG_MEANING_CARD]", "role": "Meaning card", "aspect_ratio": "1:1", "prompt": "..." }
+  ]
+}
+
+In the content, include these placeholders on their own line where the images should be inserted:
+[IMG_MEANING_CARD]
+[IMG_MNEMONIC]
+[IMG_EX_1] [IMG_EX_2] [IMG_EX_3] [IMG_EX_4] (and optionally [IMG_EX_5], [IMG_EX_6])
+[IMG_CONVO]
+[IMG_QUIZ]
+[IMG_STUDY_TIP]
+
+Your lesson content MUST include these sections (use the exact headings):
+
+## Meaning
+- Japanese: (the pattern)
+- Romaji:
+- Meaning (simple English):
+- When you use it (1 sentence):
+
+## Simple Explanation
+- Explain how it works in very simple terms.
+- Give 1–2 core structures using slots like: [Person] は [Thing] を …
+- If conjugation is needed, show the ONE most important rule (keep it short).
+
+## Mnemonic / Memory Trick
+- Create a visual or story-based memory trick.
+
+## Example Sentences (4–6)
+- Each example MUST be exactly 3 lines:
+Japanese:
+Romaji:
+English:
+- Keep sentences beginner-friendly and realistic.
+
+## Mini Conversation (Cartoon Style)
+- Two characters only:
+Sakura 🌸
+Kenji 🐼
+- 4–6 turns total.
+- For each turn: Japanese line, then romaji, then English.
+
+## Common Beginner Mistake
+- Show one common mistake with:
+❌ Incorrect (Japanese)
+✔ Correct (Japanese)
+- Explain the mistake in 1–2 simple sentences.
+
+## Practice Exercise
+- Provide 2–3 short questions.
+- Include at least ONE multiple-choice fill-in-the-blank with:
+Question, Options (A/B/C), Correct answer, Explanation.
+
+## Study Tip
+- One daily practice tip (1–2 sentences).
+
+Image prompt requirements (for feature_image_prompt and every image_prompt_items.prompt):
+- Include the exact on-image text to show (term + 1 key line).
+- Follow these style rules:
+${TERM_LESSON_STYLE_RULES}
+${TONE_RULES}`.trim();
     }
 
     case "vocabulary": {
-      const vocabExtra = meaning ? `\nMeaning: ${meaning}.\n` : "";
       return `${BASE_BRAND}
-Create a vocabulary entry for JLPT ${level} learners.
+🎌 UNIVERSAL TERM LESSON (Vocabulary) — JLPT ${level}
 
-Word/expression: "${word}"
-${vocabExtra}${tags}${desc}
+You are a Japanese language teacher helping beginners preparing for JLPT N5–N3.
+Create structured learning content for this vocabulary word/expression:
 
-Structure:
-1. Word (H1): Japanese + reading (hiragana/romaji)
-2. Part of speech
-3. Meaning(s): Primary and secondary if applicable
-4. Example sentences (2–3): Japanese + reading + English
-5. Related words or compounds
-6. Usage note: When to use, nuance, formality
+INPUT_TERM: "${word}"
+${meaning ? `Known meaning (from meta): ${meaning}.\n` : ""}${tags}${desc}
 
-Include kanji if appropriate for ${level}.
-Tone: Calm, academic, precise.
-Output: Clean Markdown.
-${TONE_RULES}`;
+OUTPUT FORMAT (CRITICAL):
+Return ONLY valid JSON. No markdown fences, no commentary, no trailing commas.
+{
+  "content": "Markdown lesson content (string)",
+  "feature_image_prompt": "string (best hero image prompt for this lesson)",
+  "image_prompt_items": [
+    { "placeholder": "[IMG_MEANING_CARD]", "role": "Meaning card", "aspect_ratio": "1:1", "prompt": "..." }
+  ]
+}
+
+In the content, include these placeholders on their own line where the images should be inserted:
+[IMG_MEANING_CARD]
+[IMG_MNEMONIC]
+[IMG_EX_1] [IMG_EX_2] [IMG_EX_3] [IMG_EX_4] (and optionally [IMG_EX_5], [IMG_EX_6])
+[IMG_CONVO]
+[IMG_QUIZ]
+[IMG_STUDY_TIP]
+
+Your lesson content MUST include these sections (use the exact headings):
+
+## Meaning
+Japanese:
+Romaji:
+Meaning:
+Part of speech:
+Nuance / when to use (1 sentence):
+
+## Simple Explanation
+- Explain how the word is used.
+- Give 1 simple pattern (slot form) showing common particles.
+- Mention politeness if relevant (ます-form vs dictionary form) in 1 sentence.
+
+## Mnemonic / Memory Trick
+- Visual or story-based.
+- If the word has kanji, optionally reference the kanji shape/components (keep it simple).
+
+## Example Sentences (4–6)
+- Each example MUST be exactly 3 lines:
+Japanese:
+Romaji:
+English:
+- Make the examples varied (time words, objects, places) but still beginner level.
+
+## Mini Conversation (Cartoon Style)
+- Two characters only:
+Sakura 🌸
+Kenji 🐼
+- 4–6 turns total.
+- For each turn: Japanese line, then romaji, then English.
+
+## Common Beginner Mistake
+- One common mistake (particle, missing を/が, wrong formality, wrong tense).
+- Show:
+❌ Incorrect (Japanese)
+✔ Correct (Japanese)
+- Explain in 1–2 sentences.
+
+## Practice Exercise
+- 2–3 tasks.
+- Include at least ONE multiple-choice fill-in-the-blank (A/B/C) + correct answer + explanation.
+
+## Study Tip
+- One daily practice tip (1–2 sentences).
+
+Image prompt requirements (for feature_image_prompt and every image_prompt_items.prompt):
+- Include the exact on-image text to show (term + 1 key line).
+- Follow these style rules:
+${TERM_LESSON_STYLE_RULES}
+${TONE_RULES}`.trim();
     }
 
     case "kanji": {
-      const kanjiExtra = meaning ? `\nMeaning: ${meaning}.\n` : "";
       return `${BASE_BRAND}
-Create a kanji entry for JLPT ${level} learners.
+🎌 UNIVERSAL TERM LESSON (Kanji) — JLPT ${level}
 
-Character: "${character}"
-${kanjiExtra}${tags}${desc}
+You are a Japanese language teacher helping beginners preparing for JLPT N5–N3.
+Create structured learning content for this kanji:
 
-Structure:
-1. Kanji (H1): Character + readings (on-yomi, kun-yomi)
-2. Meaning(s)
-3. Stroke count
-4. Common compounds (2–3): Word + reading + meaning
-5. Example sentence: Japanese + translation
-6. Mnemonic or study tip (optional)
+INPUT_TERM: "${character}"
+${meaning ? `Known meaning (from meta): ${meaning}.\n` : ""}${tags}${desc}
 
-Tone: Calm, academic, clear.
-Output: Clean Markdown.
-${TONE_RULES}`;
+OUTPUT FORMAT (CRITICAL):
+Return ONLY valid JSON. No markdown fences, no commentary, no trailing commas.
+{
+  "content": "Markdown lesson content (string)",
+  "feature_image_prompt": "string (best hero image prompt for this lesson)",
+  "image_prompt_items": [
+    { "placeholder": "[IMG_MEANING_CARD]", "role": "Meaning card", "aspect_ratio": "1:1", "prompt": "..." }
+  ]
+}
+
+In the content, include these placeholders on their own line where the images should be inserted:
+[IMG_MEANING_CARD]
+[IMG_MNEMONIC]
+[IMG_COMPOUNDS_GRID]
+[IMG_EX_1] [IMG_EX_2] [IMG_EX_3] [IMG_EX_4] (and optionally [IMG_EX_5], [IMG_EX_6])
+[IMG_CONVO]
+[IMG_QUIZ]
+[IMG_STUDY_TIP]
+
+Your lesson content MUST include these sections (use the exact headings):
+
+## Meaning
+Kanji:
+Romaji (main reading):
+Meaning:
+On-yomi (if common for this level):
+Kun-yomi (if common for this level):
+Stroke count (best estimate):
+
+## Simple Explanation
+- Explain what the kanji means and where you commonly see it.
+- Give 2–4 very common compounds/words using this kanji (word + reading + meaning).
+
+## Mnemonic / Memory Trick
+- A visual story based on the kanji shape/components.
+
+## Example Sentences (4–6)
+- Use words that contain this kanji when possible.
+- Each example MUST be exactly 3 lines:
+Japanese:
+Romaji:
+English:
+
+## Mini Conversation (Cartoon Style)
+- Two characters only:
+Sakura 🌸
+Kenji 🐼
+- 4–6 turns total.
+- Use at least one word containing the kanji.
+- For each turn: Japanese line, then romaji, then English.
+
+## Common Beginner Mistake
+- One mistake: wrong reading, confusing with a similar kanji, or using the wrong compound.
+- Show:
+❌ Incorrect (Japanese)
+✔ Correct (Japanese)
+- Explain in 1–2 sentences.
+
+## Practice Exercise
+- 2–3 tasks. Include at least ONE task like:
+  - choose the correct reading
+  - pick the correct compound meaning
+  - fill-in-the-blank with the right kanji word
+- Include at least ONE multiple-choice question (A/B/C) + correct answer + explanation.
+
+## Study Tip
+- One daily practice tip (1–2 sentences).
+
+Image prompt requirements (for feature_image_prompt and every image_prompt_items.prompt):
+- Include the exact on-image text to show (kanji + 1 key line).
+- Follow these style rules:
+${TERM_LESSON_STYLE_RULES}
+${TONE_RULES}`.trim();
     }
 
     case "reading": {

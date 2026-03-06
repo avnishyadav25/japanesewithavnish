@@ -3,6 +3,34 @@ import { getAdminSession } from "@/lib/auth/admin";
 import { sql } from "@/lib/db";
 import { LEARN_CONTENT_TYPES, type LearnContentType } from "@/lib/learn-filters";
 
+export async function GET(
+  _req: Request,
+  { params }: { params: Promise<{ type: string; slug: string }> }
+) {
+  try {
+    const admin = await getAdminSession();
+    if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const { type, slug } = await params;
+    if (!LEARN_CONTENT_TYPES.includes(type as LearnContentType)) {
+      return NextResponse.json({ error: "Invalid type" }, { status: 400 });
+    }
+    if (!sql) return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
+
+    const rows = await sql`
+      SELECT id, slug, title, content, jlpt_level, tags, meta, status, sort_order, updated_at
+      FROM learning_content
+      WHERE content_type = ${type} AND slug = ${slug} LIMIT 1
+    `;
+    const row = rows[0] as Record<string, unknown> | undefined;
+    if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return NextResponse.json(row);
+  } catch (e) {
+    console.error("Learning content get:", e);
+    return NextResponse.json({ error: "Failed to fetch" }, { status: 500 });
+  }
+}
+
 export async function PUT(
   req: Request,
   { params }: { params: Promise<{ type: string; slug: string }> }

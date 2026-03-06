@@ -4,6 +4,8 @@ import { sql } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth/admin";
 import { LEARN_CONTENT_TYPES, LEARN_TYPE_LABELS, type LearnContentType } from "@/lib/learn-filters";
 import { LessonMetaContent } from "@/components/learn/LessonMetaContent";
+import { LearnMarkdown } from "@/components/learn/LearnMarkdown";
+import { reorderContentExamplesLast, boldContentLabels } from "@/lib/learn-content";
 
 type Meta = Record<string, unknown> | null;
 
@@ -79,10 +81,9 @@ export default async function AdminLearnPreviewPage({
           <LessonMetaContent contentType={normalized} meta={meta} />
 
           {contentStr ? (
-            <div
-              className="prose prose-charcoal max-w-none text-secondary mt-6"
-              dangerouslySetInnerHTML={{ __html: contentStr.replace(/\n/g, "<br />") }}
-            />
+            <div className="prose prose-charcoal max-w-none text-secondary mt-6">
+              <LearnMarkdown content={boldContentLabels(reorderContentExamplesLast(contentStr))} meta={meta} contentType={normalized} />
+            </div>
           ) : (
             <p className="text-secondary mt-6 italic">No main content yet.</p>
           )}

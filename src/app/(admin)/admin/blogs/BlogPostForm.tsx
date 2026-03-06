@@ -8,6 +8,19 @@ import { GenerateImageModal } from "@/components/admin/GenerateImageModal";
 import { BlogPreviewModal } from "@/components/admin/BlogPreviewModal";
 import { SectionImageGenerator } from "@/components/admin/SectionImageGenerator";
 
+/** Extract markdown images ![alt](url) from content for display. */
+function extractMarkdownImages(content: string): { alt: string; url: string }[] {
+  const re = /!\[([^\]]*)\]\(\s*([^)\s]+)\s*\)/g;
+  const out: { alt: string; url: string }[] = [];
+  let m;
+  while ((m = re.exec(content)) !== null) {
+    const url = (m[2] || "").trim();
+    if (url && (url.startsWith("http://") || url.startsWith("https://")))
+      out.push({ alt: (m[1] || "").trim() || "Image", url });
+  }
+  return out;
+}
+
 type Post = {
   id?: string;
   slug: string;
@@ -27,6 +40,7 @@ type Post = {
 export function BlogPostForm({ post }: { post?: Post }) {
   const router = useRouter();
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [imageModalOpen, setImageModalOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -55,6 +69,7 @@ export function BlogPostForm({ post }: { post?: Post }) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setStatus("loading");
+    setErrorMessage(null);
     try {
       const res = await fetch(
         post ? `/api/admin/posts/${post.slug}` : "/api/admin/posts",
@@ -79,7 +94,17 @@ export function BlogPostForm({ post }: { post?: Post }) {
           }),
         }
       );
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) {
+        let msg = "Failed to save blog post";
+        try {
+          const data = (await res.json()) as { error?: string };
+          if (data?.error) msg = data.error;
+        } catch {
+          // ignore parse error
+        }
+        setErrorMessage(msg);
+        throw new Error(msg);
+      }
       router.push("/admin/blogs");
       router.refresh();
     } catch {
@@ -200,6 +225,31 @@ export function BlogPostForm({ post }: { post?: Post }) {
               content={form.content}
               onContentUpdate={(c) => update("content", c)}
             />
+
+            {/* All images in this post (featured + inline from content) */}
+            {(form.og_image_url || extractMarkdownImages(form.content).length > 0) && (
+              <div className="mt-4 p-4 border border-[var(--divider)] rounded-bento bg-[var(--base)]">
+                <h3 className="text-sm font-semibold text-charcoal mb-3">All images in this post</h3>
+                <div className="flex flex-wrap gap-3">
+                  {form.og_image_url && (
+                    <div className="flex flex-col items-start">
+                      <span className="text-xs text-secondary mb-1">Feature image</span>
+                      <div className="rounded overflow-hidden border border-[var(--divider)] w-32 aspect-video bg-[var(--divider)]/20">
+                        <img src={form.og_image_url} alt="Feature" className="w-full h-full object-cover object-top" />
+                      </div>
+                    </div>
+                  )}
+                  {extractMarkdownImages(form.content).map((img, i) => (
+                    <div key={`${img.url}-${i}`} className="flex flex-col items-start">
+                      <span className="text-xs text-secondary mb-1">{img.alt || `Image ${i + 1}`}</span>
+                      <div className="rounded overflow-hidden border border-[var(--divider)] w-32 aspect-video bg-[var(--divider)]/20">
+                        <img src={img.url} alt={img.alt || ""} className="w-full h-full object-cover object-top" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -332,6 +382,9 @@ export function BlogPostForm({ post }: { post?: Post }) {
         <button type="submit" className="btn-primary" disabled={status === "loading"}>
           {status === "loading" ? "Saving..." : "Save"}
         </button>
+        {status === "error" && errorMessage && (
+          <span className="text-sm text-red-600">{errorMessage}</span>
+        )}
         <button
           type="button"
           onClick={() => setPreviewOpen(true)}
@@ -339,9 +392,6 @@ export function BlogPostForm({ post }: { post?: Post }) {
         >
           Preview
         </button>
-        {status === "error" && (
-          <span className="text-red-600 text-sm">Failed to save.</span>
-        )}
       </div>
 
       <BlogPreviewModal

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AdminCard } from "@/components/admin/AdminCard";
 import { GenerateContentButton } from "@/components/admin/GenerateContentButton";
 import { GenerateImageModal } from "@/components/admin/GenerateImageModal";
+import { LearnInlineImageGenerator } from "@/components/admin/LearnInlineImageGenerator";
 
 type Item = {
   id: string;
@@ -27,6 +28,7 @@ export function LearningContentForm({
 }) {
   const router = useRouter();
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [errorMessage, setErrorMessage] = useState<string>("");
   const initialMeta = item?.meta ?? {};
   const [form, setForm] = useState({
     slug: item?.slug ?? "",
@@ -80,39 +82,109 @@ export function LearningContentForm({
     updateMeta({ ...form.meta, examples: next.length ? next : undefined });
   }
 
+  type ImagePromptItem = { placeholder: string; role: string; prompt: string; aspect_ratio?: string };
+  function getImagePromptItems(): ImagePromptItem[] {
+    const v = form.meta.image_prompt_items;
+    if (!Array.isArray(v)) return [];
+    return v
+      .map((x) => (typeof x === "object" && x !== null ? (x as Record<string, unknown>) : null))
+      .filter(Boolean)
+      .map((x) => ({
+        placeholder: typeof x?.placeholder === "string" ? (x.placeholder as string) : "",
+        role: typeof x?.role === "string" ? (x.role as string) : "",
+        prompt: typeof x?.prompt === "string" ? (x.prompt as string) : "",
+        aspect_ratio: typeof x?.aspect_ratio === "string" ? (x.aspect_ratio as string) : undefined,
+      }))
+      .filter((x) => x.placeholder && x.role && x.prompt);
+  }
+
+  function getGeneratedImages(): Record<string, string> {
+    const v = form.meta.generated_images;
+    if (!v || typeof v !== "object" || Array.isArray(v)) return {};
+    const out: Record<string, string> = {};
+    for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+      if (typeof val === "string") out[k] = val;
+    }
+    return out;
+  }
+
+  function buildMetaFromEditor(): Record<string, unknown> {
+    try {
+      const p = metaJson.trim() ? JSON.parse(metaJson) : {};
+      return typeof p === "object" && p !== null && !Array.isArray(p) ? (p as Record<string, unknown>) : form.meta;
+    } catch {
+      return form.meta;
+    }
+  }
+
+  async function persistToDb(opts?: {
+    content?: string;
+    meta?: Record<string, unknown>;
+    preferReplaceUrl?: boolean;
+  }) {
+    const metaPayload = opts?.meta ?? buildMetaFromEditor();
+    const contentPayload = opts?.content ?? (form.content ?? "");
+
+    if (!form.slug || !form.title) {
+      setStatus("error");
+      setErrorMessage("slug and title required");
+      return { ok: false as const };
+    }
+
+    const url = item
+      ? `/api/admin/learning-content/${contentType}/${item.slug}`
+      : `/api/admin/learning-content/${contentType}`;
+    const res = await fetch(url, {
+      method: item ? "PUT" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        slug: form.slug,
+        title: form.title,
+        content: contentPayload,
+        jlpt_level: form.jlpt_level || null,
+        tags: form.tags ? form.tags.split(",").map((s) => s.trim()).filter(Boolean) : [],
+        status: form.status,
+        sort_order: form.sort_order,
+        meta: metaPayload,
+      }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setStatus("error");
+      setErrorMessage((data as { error?: string })?.error ?? "Failed to save");
+      return { ok: false as const };
+    }
+
+    setErrorMessage("");
+    const data = (await res.json().catch(() => ({}))) as { slug?: string };
+
+    if (opts?.preferReplaceUrl !== false) {
+      if (item) {
+        const newSlug = String(form.slug).trim();
+        if (newSlug && newSlug !== item.slug) {
+          router.replace(`/admin/learn/${contentType}/${newSlug}/edit`);
+        }
+      } else {
+        const slug = data.slug ?? form.slug;
+        if (slug) router.replace(`/admin/learn/${contentType}/${String(slug).trim()}/edit`);
+      }
+    }
+
+    router.refresh();
+    return { ok: true as const, slug: data.slug };
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setStatus("loading");
     try {
-      const url = item
-        ? `/api/admin/learning-content/${contentType}/${item.slug}`
-        : `/api/admin/learning-content/${contentType}`;
-      const res = await fetch(url, {
-        method: item ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          slug: form.slug,
-          title: form.title,
-          content: form.content ?? "",
-          jlpt_level: form.jlpt_level || null,
-          tags: form.tags ? form.tags.split(",").map((s) => s.trim()).filter(Boolean) : [],
-          status: form.status,
-          sort_order: form.sort_order,
-          meta: (() => {
-            try {
-              const p = metaJson.trim() ? JSON.parse(metaJson) : {};
-              return typeof p === "object" && p !== null && !Array.isArray(p) ? p : form.meta;
-            } catch {
-              return form.meta;
-            }
-          })(),
-        }),
-      });
-      if (!res.ok) throw new Error("Failed");
-      router.push(`/admin/learn/${contentType}`);
-      router.refresh();
+      const result = await persistToDb({ preferReplaceUrl: true });
+      if (!result.ok) return;
+      setStatus("idle");
     } catch {
       setStatus("error");
+      setErrorMessage("Failed to save");
     }
   }
 
@@ -157,7 +229,28 @@ export function LearningContentForm({
                   meaning: metaStr("meaning") || undefined,
                   structure: contentType === "grammar" ? (metaStr("structure") || undefined) : undefined,
                 }}
-                onGenerated={(data) => update("content", typeof data === "string" ? data : data.content ?? "")}
+                onGenerated={(data) => {
+                  if (typeof data === "string") {
+                    update("content", data);
+                    return;
+                  }
+                  const obj = data as {
+                    content?: string;
+                    feature_image_prompt?: string;
+                    image_prompt_items?: ImagePromptItem[];
+                  };
+                  if (typeof obj.content === "string") update("content", obj.content);
+                  if (typeof obj.feature_image_prompt === "string") {
+                    updateMeta({ ...form.meta, image_prompt: obj.feature_image_prompt });
+                  }
+                  if (Array.isArray(obj.image_prompt_items) && obj.image_prompt_items.length > 0) {
+                    updateMeta({
+                      ...form.meta,
+                      image_prompt_items: obj.image_prompt_items,
+                      generated_images: form.meta.generated_images ?? {},
+                    });
+                  }
+                }}
               />
             </div>
             <textarea
@@ -166,6 +259,55 @@ export function LearningContentForm({
               rows={10}
               className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal font-mono text-sm"
               placeholder="Main lesson content: explanations, examples, practice. Use Generate with AI above for a draft."
+            />
+
+            {/* All images in this content (below content): feature + every inline slot, with thumbnail or placeholder */}
+            {(metaStr("feature_image_url") || getImagePromptItems().length > 0) && (
+              <div className="mt-4 p-4 border border-[var(--divider)] rounded-bento bg-[var(--base)]">
+                <h3 className="text-sm font-semibold text-charcoal mb-3">All images in this content</h3>
+                <div className="flex flex-wrap gap-3">
+                  {metaStr("feature_image_url") && (
+                    <div className="flex flex-col items-start">
+                      <span className="text-xs text-secondary mb-1">Feature image</span>
+                      <div className="rounded overflow-hidden border border-[var(--divider)] w-24 h-24 bg-[var(--divider)]/20 shrink-0">
+                        <img src={metaStr("feature_image_url")} alt="" className="w-full h-full object-cover" />
+                      </div>
+                    </div>
+                  )}
+                  {getImagePromptItems().map((it) => {
+                    const url = getGeneratedImages()[it.placeholder];
+                    return (
+                      <div key={it.placeholder} className="flex flex-col items-start">
+                        <span className="text-xs text-secondary mb-1">{it.role}</span>
+                        <div className="rounded overflow-hidden border border-[var(--divider)] w-24 h-24 bg-[var(--divider)]/20 shrink-0 flex items-center justify-center">
+                          {url ? (
+                            <img src={url} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <span className="text-xs text-secondary">No image</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <LearnInlineImageGenerator
+              items={getImagePromptItems()}
+              content={form.content ?? ""}
+              generated={getGeneratedImages()}
+              onContentUpdate={(c) => update("content", c)}
+              onItemsUpdate={(items) => updateMeta({ ...form.meta, image_prompt_items: items })}
+              onGeneratedUpdate={(generated) => updateMeta({ ...form.meta, generated_images: generated })}
+              onAutoSave={async ({ content, items, generated }) => {
+                const nextMeta = {
+                  ...buildMetaFromEditor(),
+                  image_prompt_items: items,
+                  generated_images: generated,
+                };
+                await persistToDb({ content, meta: nextMeta, preferReplaceUrl: true });
+              }}
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -577,6 +719,9 @@ export function LearningContentForm({
 
           <div>
             <label className="block text-sm font-medium text-charcoal mb-1">Meta (JSON, optional)</label>
+              <p className="text-xs text-secondary mb-1">
+                Per-section audio: <code className="bg-[var(--divider)] px-1 rounded">section_audio</code> with keys matching content headings (e.g. &quot;Meaning&quot;, &quot;Simple Explanation&quot;) and audio URLs.
+              </p>
             <textarea
               value={metaJson}
               onChange={(e) => {
@@ -602,8 +747,8 @@ export function LearningContentForm({
         <button type="submit" className="btn-primary" disabled={status === "loading"}>
           {status === "loading" ? "Saving..." : "Save"}
         </button>
-        {status === "error" && (
-          <span className="text-red-600 text-sm">Failed to save.</span>
+        {status === "error" && errorMessage && (
+          <span className="text-red-600 text-sm">{errorMessage}</span>
         )}
       </div>
     </form>
@@ -624,6 +769,11 @@ export function LearningContentForm({
           const nextMeta = { ...(f.meta as Record<string, unknown>), feature_image_url: url };
           setMetaJson(JSON.stringify(nextMeta, null, 2));
           return { ...f, meta: nextMeta };
+        });
+        // Persist immediately so feature image isn't lost on refresh/navigation
+        void persistToDb({
+          meta: { ...buildMetaFromEditor(), feature_image_url: url },
+          preferReplaceUrl: true,
         });
         setImageModalOpen(false);
       }}
