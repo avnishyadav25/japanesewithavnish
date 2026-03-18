@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   if (!sql) return {};
   const rows = await sql`
     SELECT title, seo_title, seo_description, og_image_url
-    FROM posts WHERE slug = ${slug} AND status = 'published' LIMIT 1
+    FROM posts WHERE slug = ${slug} AND status = 'published' AND (content_type IS NULL OR content_type = 'blog') LIMIT 1
   ` as { title: string; seo_title: string | null; seo_description: string | null; og_image_url: string | null }[];
   const p = rows[0];
   if (!p) return {};
@@ -49,7 +49,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
   const { slug } = await params;
   if (!sql) notFound();
 
-  const postRows = await sql`SELECT * FROM posts WHERE slug = ${slug} AND status = 'published' LIMIT 1`;
+  const postRows = await sql`SELECT * FROM posts WHERE slug = ${slug} AND status = 'published' AND (content_type IS NULL OR content_type = 'blog') LIMIT 1`;
   const postRaw = postRows[0] as Record<string, unknown> | undefined;
   if (!postRaw) notFound();
   const post = postRaw as {
@@ -80,7 +80,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
 
   const allPostsRows = await sql`
     SELECT id, slug, title, summary, seo_description, published_at, og_image_url, jlpt_level, tags
-    FROM posts WHERE status = 'published' AND id != ${post.id as string}
+    FROM posts WHERE status = 'published' AND (content_type IS NULL OR content_type = 'blog') AND id != ${post.id as string}
     ORDER BY published_at DESC LIMIT 50
   `;
   const related = filterPosts(
@@ -92,7 +92,9 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
 
   const commentsRows = await sql`
     SELECT id, author_name, author_email, content, created_at
-    FROM post_comments WHERE post_id = ${post.id as string} AND status = 'approved'
+    FROM post_comments
+    WHERE post_id = ${post.id as string}
+      AND status IN ('approved', 'approve')
     ORDER BY created_at ASC
   `;
   const comments = (commentsRows || []) as { id: string; author_name: string; author_email: string; content: string; created_at: string }[];
@@ -189,7 +191,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
                 </aside>
               )}
               <div className="flex-1 min-w-0">
-                <div className="prose prose-charcoal prose-lg max-w-none text-[1.5rem] [&_h1]:text-4xl [&_h1]:font-heading [&_h1]:font-bold [&_h2]:text-3xl [&_h2]:font-heading [&_h2]:font-bold [&_h2]:mt-8 [&_h2]:mb-3 [&_h3]:text-2xl [&_h3]:font-heading [&_h3]:font-bold [&_h3]:mt-6 [&_h3]:mb-2 [&_p]:text-[1.5rem] [&_p]:leading-[1.7] [&_p]:mb-4 [&_ul]:mb-4 [&_ol]:mb-4 [&_li]:text-[1.5rem]">
+                <div className="prose prose-charcoal prose-lg max-w-none text-[1rem] [&_h1]:text-4xl [&_h1]:font-heading [&_h1]:font-bold [&_h2]:text-3xl [&_h2]:font-heading [&_h2]:font-bold [&_h2]:mt-8 [&_h2]:mb-3 [&_h3]:text-2xl [&_h3]:font-heading [&_h3]:font-bold [&_h3]:mt-6 [&_h3]:mb-2 [&_p]:text-[1rem] [&_p]:leading-[1.7] [&_p]:mb-4 [&_ul]:mb-4 [&_ol]:mb-4 [&_li]:text-[1rem]">
                   {contentStr ? (
                     <BlogArticleContent content={contentStr} />
                   ) : null}

@@ -12,12 +12,14 @@ export async function GET(
   try {
     const { slug } = await params;
     if (!sql) return NextResponse.json({ error: "Failed to fetch comments" }, { status: 503 });
-    const postRows = await sql`SELECT id FROM posts WHERE slug = ${slug} AND status = 'published' LIMIT 1`;
+    const postRows = await sql`SELECT id FROM posts WHERE slug = ${slug} AND status = 'published' AND (content_type IS NULL OR content_type = 'blog') LIMIT 1`;
     const post = postRows[0] as { id: string } | undefined;
     if (!post) return NextResponse.json({ error: "Post not found" }, { status: 404 });
     const commentsRows = await sql`
       SELECT id, author_name, author_email, content, created_at
-      FROM post_comments WHERE post_id = ${post.id} AND status = 'approved'
+      FROM post_comments
+      WHERE post_id = ${post.id}
+        AND status IN ('approved', 'approve')
       ORDER BY created_at ASC
     `;
     return NextResponse.json({ comments: commentsRows || [] });
@@ -52,7 +54,7 @@ export async function POST(
 
     if (!sql) return NextResponse.json({ error: "Failed to post comment" }, { status: 503 });
 
-    const postRows = await sql`SELECT id, title FROM posts WHERE slug = ${slug} AND status = 'published' LIMIT 1`;
+    const postRows = await sql`SELECT id, title FROM posts WHERE slug = ${slug} AND status = 'published' AND (content_type IS NULL OR content_type = 'blog') LIMIT 1`;
     const post = postRows[0] as { id: string; title: string } | undefined;
     if (!post) return NextResponse.json({ error: "Post not found" }, { status: 404 });
 
@@ -83,7 +85,9 @@ export async function POST(
 
     const previousCommenters = await sql`
       SELECT author_email, author_name FROM post_comments
-      WHERE post_id = ${post.id} AND status = 'approved' AND author_email != ${trimmedEmail}
+      WHERE post_id = ${post.id}
+        AND status IN ('approved', 'approve')
+        AND author_email != ${trimmedEmail}
     ` as { author_email: string; author_name: string }[];
 
     const uniqueEmails = new Map<string, string>();

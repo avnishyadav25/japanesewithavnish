@@ -7,9 +7,16 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "e2e": "node test/e2e-full-flow.js",
     "migrate:data": "tsx scripts/migrate-supabase-to-neon-data.ts",
     "migrate:storage": "tsx scripts/migrate-storage-supabase-to-r2.ts",
-    "migrate:urls-to-r2": "tsx scripts/rewrite-db-urls-to-r2.ts"
+    "migrate:urls-to-r2": "tsx scripts/rewrite-db-urls-to-r2.ts",
+    "sync:type-tables": "tsx scripts/sync-type-tables-from-posts.ts",
+    "gen:n5-lessons": "tsx scripts/generate-n5-lesson-payload.ts",
+    "gen:level-lessons": "tsx scripts/generate-level-lesson-payload.ts",
+    "seed:n5-practice": "tsx scripts/seed-n5-starter-practice.ts",
+    "seed:curriculum": "tsx scripts/seed-curriculum.ts",
+    "seed:curriculum-from-docs": "tsx scripts/seed-curriculum-from-docs.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1000.0",
@@ -28,6 +35,7 @@
     "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
+    "playwright": "^1.49.0",
     "@types/node": "^20",
     "@types/nodemailer": "^6",
     "@types/pg": "^8",

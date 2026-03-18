@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getAdminSession } from "@/lib/auth/admin";
 import { getImagePrompt, type ImageType } from "@/lib/ai/image-prompts";
+import { getPromptContent } from "@/lib/ai/load-prompts";
 import { insertAiLog } from "@/lib/ai-logs";
 
-const validImageTypes: ImageType[] = ["product", "blog", "newsletter", "page", "learning"];
+const validImageTypes: ImageType[] = ["product", "blog", "newsletter", "page", "learning", "curriculum"];
 
 function getR2Client(): S3Client | null {
   const endpoint = process.env.R2_ENDPOINT;
@@ -47,8 +48,23 @@ export async function POST(req: Request) {
     }
 
     const context = (body.context as Record<string, string>) || {};
-    let userPrompt: string =
-      promptOverride?.trim() || getImagePrompt(imageType, context);
+    let userPrompt: string;
+    if (promptOverride?.trim()) {
+      userPrompt = promptOverride.trim();
+    } else if (imageType === "curriculum") {
+      const dbPrompt = await getPromptContent("curriculum_feature_image");
+      const title = context.title || context.topic || "Japanese with Avnish";
+      const entityType = context.entityType || "lesson";
+      if (dbPrompt?.trim()) {
+        userPrompt = dbPrompt
+          .replace(/\{\{title\}\}/g, title)
+          .replace(/\{\{entityType\}\}/g, entityType);
+      } else {
+        userPrompt = getImagePrompt(imageType, context);
+      }
+    } else {
+      userPrompt = getImagePrompt(imageType, context);
+    }
     if (aspectRatio?.trim()) {
       userPrompt = `${userPrompt}\nAspect ratio ${aspectRatio.trim()}.`;
     }

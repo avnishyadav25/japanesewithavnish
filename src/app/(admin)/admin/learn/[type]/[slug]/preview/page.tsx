@@ -23,8 +23,8 @@ export default async function AdminLearnPreviewPage({
 
   if (!sql) notFound();
   const rows = await sql`
-    SELECT id, title, content, jlpt_level, meta, status
-    FROM learning_content
+    SELECT id, title, content, (jlpt_level)[1] AS jlpt_level, meta, status, og_image_url
+    FROM posts
     WHERE content_type = ${normalized} AND slug = ${slug}
     LIMIT 1
   `;
@@ -34,11 +34,12 @@ export default async function AdminLearnPreviewPage({
     content?: string | null;
     meta?: Meta;
     status?: string;
+    og_image_url?: string | null;
   } | undefined;
   if (!item) notFound();
 
   const meta = (item.meta ?? {}) as Record<string, unknown>;
-  const featureImageUrl = typeof meta.feature_image_url === "string" ? meta.feature_image_url : null;
+  const featureImageUrl = item.og_image_url ?? (typeof meta.feature_image_url === "string" ? meta.feature_image_url : null);
   const contentStr = item.content != null ? String(item.content) : "";
 
   return (

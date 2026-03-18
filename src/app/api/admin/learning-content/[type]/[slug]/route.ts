@@ -18,8 +18,8 @@ export async function GET(
     if (!sql) return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
 
     const rows = await sql`
-      SELECT id, slug, title, content, jlpt_level, tags, meta, status, sort_order, updated_at
-      FROM learning_content
+      SELECT id, slug, title, content, (jlpt_level)[1] AS jlpt_level, tags, meta, status, sort_order, updated_at
+      FROM posts
       WHERE content_type = ${type} AND slug = ${slug} LIMIT 1
     `;
     const row = rows[0] as Record<string, unknown> | undefined;
@@ -60,18 +60,21 @@ export async function PUT(
         ? JSON.stringify(meta)
         : "{}";
     const contentVal = content !== undefined && content !== null ? String(content) : null;
+    const jlptArr = jlpt_level != null && String(jlpt_level).trim() ? [String(jlpt_level).trim()] : [];
+    const publishedAtVal = statusVal === "published" ? new Date().toISOString() : null;
 
     try {
       await sql`
-        UPDATE learning_content SET
+        UPDATE posts SET
           slug = ${String(slug).trim()},
           title = ${String(title).trim()},
           content = ${contentVal},
-          jlpt_level = ${jlpt_level || null},
+          jlpt_level = ${jlptArr},
           tags = ${Array.isArray(tags) ? tags : []},
           meta = ${metaVal}::jsonb,
           status = ${statusVal},
           sort_order = ${sortOrderVal},
+          published_at = ${publishedAtVal},
           updated_at = ${new Date().toISOString()}
         WHERE content_type = ${type} AND slug = ${oldSlug}
       `;
@@ -103,7 +106,7 @@ export async function DELETE(
     if (!sql) return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
 
     const result = await sql`
-      DELETE FROM learning_content
+      DELETE FROM posts
       WHERE content_type = ${type} AND slug = ${slug}
       RETURNING id
     `;

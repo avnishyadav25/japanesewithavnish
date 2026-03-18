@@ -26,12 +26,26 @@ export async function POST(
       return NextResponse.json({ error: "Invalid type" }, { status: 400 });
     }
 
-    const body = await req.json();
+    let body: { items: BulkItem[]; override?: boolean; jlpt_level?: string | null };
+    const contentType = req.headers.get("content-type") ?? "";
+    if (contentType.includes("multipart/form-data")) {
+      const formData = await req.formData();
+      const file = formData.get("file") as File | null;
+      if (!file) return NextResponse.json({ error: "file required (JSON)" }, { status: 400 });
+      const text = await file.text();
+      try {
+        body = JSON.parse(text) as { items: BulkItem[]; override?: boolean; jlpt_level?: string | null };
+      } catch {
+        return NextResponse.json({ error: "file must be valid JSON" }, { status: 400 });
+      }
+    } else {
+      body = await req.json();
+    }
     const {
       items,
       override = false,
       jlpt_level: defaultJlpt,
-    }: { items: BulkItem[]; override?: boolean; jlpt_level?: string | null } = body;
+    } = body;
 
     if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: "items array required" }, { status: 400 });
@@ -40,7 +54,7 @@ export async function POST(
     if (!sql) return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
 
     const existingRows = (await sql`
-      SELECT slug FROM learning_content WHERE content_type = ${type}
+      SELECT slug FROM posts WHERE content_type = ${type}
     `) as { slug: string }[];
     const existingSlugs = new Set((existingRows ?? []).map((r) => r.slug));
 
@@ -64,22 +78,25 @@ export async function POST(
           ? JSON.stringify(it.meta)
           : "{}";
       const jlpt = it.jlpt_level ?? defaultJlpt ?? null;
+      const jlptArr = jlpt != null && String(jlpt).trim() ? [String(jlpt).trim()] : [];
       const tags = Array.isArray(it.tags) ? it.tags : [];
       const statusVal = it.status === "published" ? "published" : "draft";
       const sortOrderVal = typeof it.sort_order === "number" ? it.sort_order : i;
+      const publishedAtVal = statusVal === "published" ? new Date().toISOString() : null;
 
       if (existingSlugs.has(slug)) {
         if (override) {
           try {
             await sql`
-              UPDATE learning_content SET
+              UPDATE posts SET
                 title = ${title},
                 content = COALESCE(content, ''),
-                jlpt_level = ${jlpt},
+                jlpt_level = ${jlptArr},
                 tags = ${tags},
                 meta = ${metaVal}::jsonb,
                 status = ${statusVal},
                 sort_order = ${sortOrderVal},
+                published_at = ${publishedAtVal},
                 updated_at = ${new Date().toISOString()}
               WHERE content_type = ${type} AND slug = ${slug}
             `;
@@ -95,8 +112,8 @@ export async function POST(
 
       try {
         await sql`
-          INSERT INTO learning_content (content_type, slug, title, content, jlpt_level, tags, meta, status, sort_order)
-          VALUES (${type}, ${slug}, ${title}, '', ${jlpt}, ${tags}, ${metaVal}::jsonb, ${statusVal}, ${sortOrderVal})
+          INSERT INTO posts (content_type, slug, title, content, jlpt_level, tags, meta, status, published_at, sort_order)
+          VALUES (${type}, ${slug}, ${title}, '', ${jlptArr}, ${tags}, ${metaVal}::jsonb, ${statusVal}, ${publishedAtVal}, ${sortOrderVal})
         `;
         existingSlugs.add(slug);
         created++;

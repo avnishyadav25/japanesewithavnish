@@ -31,11 +31,22 @@ export async function POST(
       meta != null && typeof meta === "object" && !Array.isArray(meta)
         ? JSON.stringify(meta)
         : "{}";
+    const summaryVal = meta != null && typeof meta === "object" && !Array.isArray(meta) && typeof (meta as Record<string, unknown>).summary === "string"
+      ? (meta as Record<string, unknown>).summary as string
+      : null;
+    const ogImageVal = meta != null && typeof meta === "object" && !Array.isArray(meta) && typeof (meta as Record<string, unknown>).feature_image_url === "string"
+      ? (meta as Record<string, unknown>).feature_image_url as string
+      : null;
+    const imagePromptVal = meta != null && typeof meta === "object" && !Array.isArray(meta) && typeof (meta as Record<string, unknown>).image_prompt === "string"
+      ? (meta as Record<string, unknown>).image_prompt as string
+      : null;
+    const jlptArr = jlpt_level != null && String(jlpt_level).trim() ? [String(jlpt_level).trim()] : [];
+    const publishedAtVal = statusVal === "published" ? new Date().toISOString() : null;
 
     try {
       const rows = await sql`
-        INSERT INTO learning_content (content_type, slug, title, content, jlpt_level, tags, meta, status, sort_order)
-        VALUES (${type}, ${String(slug).trim()}, ${String(title).trim()}, ${content ?? null}, ${jlpt_level || null}, ${Array.isArray(tags) ? tags : []}, ${metaVal}::jsonb, ${statusVal}, ${sortOrderVal})
+        INSERT INTO posts (content_type, slug, title, content, summary, jlpt_level, tags, og_image_url, image_prompt, status, published_at, sort_order, meta)
+        VALUES (${type}, ${String(slug).trim()}, ${String(title).trim()}, ${content ?? null}, ${summaryVal}, ${jlptArr}, ${Array.isArray(tags) ? tags : []}, ${ogImageVal}, ${imagePromptVal}, ${statusVal}, ${publishedAtVal}, ${sortOrderVal}, ${metaVal}::jsonb)
         RETURNING id
       `;
       const id = (rows[0] as { id: string })?.id;

@@ -82,9 +82,9 @@ export function ChatbotContextCard() {
 
   return (
     <AdminCard>
-      <h2 className="font-heading font-bold text-charcoal mb-4">Chatbot (japani-bhai)</h2>
+      <h2 className="font-heading font-bold text-charcoal mb-4">Chatbot (japani-bhai) & Nihongo Navi</h2>
       <p className="text-secondary text-sm mb-4">
-        Pull the latest blogs, products, and support info into the chatbot context so japani-bhai can answer visitors accurately.
+        Context includes <strong>blogs, products, and published learning content</strong>. Rebuilding updates both the site chat (japani-bhai) and Nihongo Navi (/tutor). Pull to refresh.
       </p>
 
       {/* Current context */}

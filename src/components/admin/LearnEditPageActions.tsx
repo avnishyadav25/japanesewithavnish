@@ -8,10 +8,13 @@ export function LearnEditPageActions({
   contentType,
   slug,
   status,
+  redirectAfterDelete,
 }: {
   contentType: string;
   slug: string;
   status: string;
+  /** After delete, go here (e.g. "/admin/blogs" when editing from unified blog edit). */
+  redirectAfterDelete?: string;
 }) {
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
@@ -26,7 +29,7 @@ export function LearnEditPageActions({
         alert(data.error || "Failed to delete");
         return;
       }
-      router.push(`/admin/learn/${contentType}`);
+      router.push(redirectAfterDelete ?? `/admin/learn/${contentType}`);
       router.refresh();
     } finally {
       setDeleting(false);
@@ -45,7 +48,7 @@ export function LearnEditPageActions({
       </Link>
       {status === "published" && (
         <Link
-          href={`/learn/${contentType}/${slug}`}
+          href={`/blog/${contentType}/${slug}`}
           target="_blank"
           rel="noopener noreferrer"
           className="btn-secondary"

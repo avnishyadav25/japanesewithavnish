@@ -4,7 +4,6 @@ import { ProductCard } from "@/components/ProductCard";
 import { StoreFilters } from "./StoreFilters";
 import { BundleComparisonTable } from "@/components/BundleComparisonTable";
 import { HomeFaq } from "@/components/HomeFaq";
-import { NewsletterSection } from "@/components/NewsletterSection";
 
 interface StoreProduct {
   id: string;
@@ -187,8 +186,6 @@ export default async function StorePage({
           <HomeFaq items={faqItems ? faqItems.slice(0, 3) : null} />
         </section>
 
-        {/* Newsletter */}
-        <NewsletterSection source="store" />
       </div>
     </div>
   );

@@ -26,8 +26,9 @@ export async function GET() {
     if (!sql) return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
 
     const rows = await sql`
-      SELECT slug, jlpt_level FROM learning_content
+      SELECT slug, (jlpt_level)[1] AS jlpt_level FROM posts
       WHERE status = 'published'
+        AND content_type IN ('grammar','vocabulary','kanji','reading','writing','listening','sounds','study_guide','practice_test')
       ORDER BY sort_order ASC, created_at DESC
       LIMIT 300
     `;

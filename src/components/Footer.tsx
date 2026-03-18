@@ -23,7 +23,9 @@ async function getFooterSettings() {
 }
 
 const quickLinks = [
-  { href: "/start-here", label: "Start Here" },
+  { href: "/", label: "Home" },
+  { href: "/learn", label: "Learn" },
+  { href: "/tutor", label: "Nihongo Navi" },
   { href: "/quiz", label: "Quiz" },
   { href: "/store", label: "Store" },
   { href: "/blog", label: "Blog" },

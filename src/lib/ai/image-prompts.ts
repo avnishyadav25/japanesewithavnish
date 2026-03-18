@@ -5,9 +5,11 @@ export type ImageContext = {
   tags?: string;
   description?: string;
   contentType?: string;
+  /** For curriculum: "level" | "module" | "submodule" | "lesson" */
+  entityType?: string;
 };
 
-export type ImageType = "product" | "blog" | "newsletter" | "page" | "learning";
+export type ImageType = "product" | "blog" | "newsletter" | "page" | "learning" | "curriculum";
 
 const BASE_STYLE = `
 Style: flat vector illustration, minimal Japanese aesthetic.
@@ -60,6 +62,15 @@ ${BASE_STYLE}`;
 Display the lesson title "${learningTitle}" prominently at the top center in a clean h2/h3 heading style: bold, readable typography, dark charcoal color (#1A1A1A).
 Show a minimal study desk with an open notebook, hiragana chart (あ い う え お), katakana chart (カ キ ク ケ コ), simple kanji cards (日, 学, 語), pencil, and headphones neatly arranged below. Clear and simple.
 ${BASE_STYLE}`;
+    }
+    case "curriculum": {
+      const entityType = context.entityType || "lesson";
+      const heading = context.title || context.topic || "Japanese with Avnish";
+      return `A clean flat-vector educational curriculum feature image for ${entityType}: "${heading}". JLPT ${level}.${tags}${desc}
+Display the heading "${heading}" prominently at the top center in a clean h2/h3 heading style: bold, readable typography, dark charcoal color (#1A1A1A).
+Show a minimal study desk with an open notebook, hiragana chart (あ い う え お), katakana chart (カ キ ク ケ コ), simple kanji cards (日, 学, 語), pencil, and headphones neatly arranged below. Calm academic atmosphere.
+${BASE_STYLE}
+At the bottom of the image, display the text japanesewithavnish.com in clean, readable typography (subtle but legible).`;
     }
     default:
       return `A clean flat-vector educational image about "${topic}" for Japanese learners. Minimal study desk with hiragana, katakana, kanji elements.${BASE_STYLE}`;

@@ -14,7 +14,7 @@ export async function GET(
     }
     if (!sql) return NextResponse.json({ error: "Failed to fetch comments" }, { status: 503 });
     const contentRows = await sql`
-      SELECT id FROM learning_content
+      SELECT id FROM posts
       WHERE content_type = ${normalized} AND slug = ${slug} AND status = 'published'
       LIMIT 1
     `;
@@ -22,8 +22,8 @@ export async function GET(
     if (!content) return NextResponse.json({ error: "Lesson not found" }, { status: 404 });
     const commentsRows = await sql`
       SELECT id, author_name, author_email, content, created_at
-      FROM learning_content_comments
-      WHERE learning_content_id = ${content.id} AND status = 'approved'
+      FROM post_comments
+      WHERE post_id = ${content.id} AND status IN ('approved', 'approve')
       ORDER BY created_at ASC
     `;
     return NextResponse.json({ comments: commentsRows || [] });
@@ -60,14 +60,14 @@ export async function POST(
     }
     if (!sql) return NextResponse.json({ error: "Failed to post comment" }, { status: 503 });
     const contentRows = await sql`
-      SELECT id FROM learning_content
+      SELECT id FROM posts
       WHERE content_type = ${normalized} AND slug = ${slug} AND status = 'published'
       LIMIT 1
     `;
     const lesson = contentRows[0] as { id: string } | undefined;
     if (!lesson) return NextResponse.json({ error: "Lesson not found" }, { status: 404 });
     const insertRows = await sql`
-      INSERT INTO learning_content_comments (learning_content_id, author_name, author_email, content, status)
+      INSERT INTO post_comments (post_id, author_name, author_email, content, status)
       VALUES (${lesson.id}, ${name.trim()}, ${trimmedEmail}, ${content.trim()}, 'approved')
       RETURNING id
     `;

@@ -34,7 +34,15 @@ export default async function LearnHubPage({
   if (sql) {
     try {
       const [contentRows, settingsRows] = await Promise.all([
-        sql`SELECT id, slug, title, content, content_type, jlpt_level, tags, meta, status, sort_order, created_at, updated_at FROM learning_content WHERE status = 'published' ORDER BY sort_order ASC, created_at DESC LIMIT 200`,
+        sql`
+          SELECT id, slug, title, content, content_type,
+                 (jlpt_level)[1] AS jlpt_level, tags, meta, status, sort_order, created_at, updated_at
+          FROM posts
+          WHERE content_type IN ('grammar','vocabulary','kanji','reading','writing','listening','sounds','study_guide','practice_test')
+            AND status = 'published'
+          ORDER BY sort_order ASC, created_at DESC
+          LIMIT 200
+        `,
         sql`SELECT value FROM site_settings WHERE key = 'learn_recommended' LIMIT 1`,
       ]);
       allItems = (Array.isArray(contentRows) ? contentRows : []) as LearnItemForFilter[];

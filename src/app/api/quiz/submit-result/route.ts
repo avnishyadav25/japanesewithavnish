@@ -25,6 +25,15 @@ export async function POST(req: Request) {
         await sql`INSERT INTO subscribers (email, source) VALUES (${email}, 'quiz') ON CONFLICT (email) DO UPDATE SET source = 'quiz'`;
       }
       await sql`INSERT INTO quiz_attempts (email, score, total_questions, recommended_level) VALUES (${email}, ${score || 0}, ${total || 10}, ${rec.level})`;
+      try {
+        await sql`
+          INSERT INTO profiles (email, recommended_level, updated_at)
+          VALUES (${email}, ${rec.level}, NOW())
+          ON CONFLICT (email) DO UPDATE SET recommended_level = ${rec.level}, updated_at = NOW()
+        `;
+      } catch (profileErr) {
+        console.warn("Profiles upsert (table may not exist yet):", profileErr);
+      }
     }
 
     try {

@@ -34,7 +34,7 @@ export default async function StartHerePage() {
     const [productRows, settingsRows, postsRows] = await Promise.all([
       sql`SELECT * FROM products ORDER BY sort_order ASC`,
       sql`SELECT key, value FROM site_settings WHERE key = ANY(ARRAY['start_here_announcement', 'start_here_curated_posts', 'start_here_faq'])`,
-      sql`SELECT id, slug, title, summary, jlpt_level FROM posts WHERE status = 'published'`,
+      sql`SELECT id, slug, title, summary, jlpt_level FROM posts WHERE status = 'published' AND (content_type IS NULL OR content_type = 'blog')`,
     ]);
     products = (productRows as Record<string, unknown>[])?.length ? (productRows as typeof FALLBACK_PRODUCTS) : FALLBACK_PRODUCTS;
     (settingsRows as { key: string; value: unknown }[]).forEach((r) => { settings[r.key] = r.value; });

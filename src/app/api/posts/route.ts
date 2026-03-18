@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
   if (sql) {
     const rows = await sql`
       SELECT id, slug, title, summary, jlpt_level, tags, published_at
-      FROM posts WHERE status = 'published'
+      FROM posts WHERE status = 'published' AND (content_type IS NULL OR content_type = 'blog')
       ORDER BY published_at DESC LIMIT 100
     `;
     posts = (rows ?? []) as typeof posts;

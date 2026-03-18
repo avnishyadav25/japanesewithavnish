@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { isLearnContent } from "@/lib/blog-filters";
 
 type Post = {
   id: string;
@@ -10,6 +11,7 @@ type Post = {
   tags?: string[] | null;
   published_at?: string | null;
   og_image_url?: string | null;
+  content_type?: string | null;
 };
 
 interface BlogPostCardProps {
@@ -25,13 +27,16 @@ export function BlogPostCard({ post, size = "small" }: BlogPostCardProps) {
   const topicTags = (post.tags || []).slice(0, 2);
   const primaryLevel = jlptTags[0];
   const displayTags = primaryLevel ? [primaryLevel, ...topicTags.filter((t) => t !== primaryLevel)] : topicTags;
+  const href = isLearnContent(post.content_type)
+    ? `/blog/${post.content_type}/${post.slug}`
+    : `/blog/${post.slug}`;
 
   const isFeatured = size === "featured";
   const isMedium = size === "medium";
 
   return (
     <Link
-      href={`/blog/${post.slug}`}
+      href={href}
       className={`card block h-full hover:no-underline group overflow-hidden ${
         isFeatured ? "bento-span-4 bento-row-2" : isMedium ? "bento-span-2 bento-row-2" : ""
       }`}

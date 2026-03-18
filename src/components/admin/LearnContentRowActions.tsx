@@ -34,7 +34,7 @@ export function LearnContentRowActions({
 
   return (
     <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-      <Link href={`/admin/learn/${contentType}/${slug}/edit`} className="text-primary text-sm hover:underline">
+      <Link href={`/admin/blogs/${slug}/edit`} className="text-primary text-sm hover:underline">
         Edit
       </Link>
       <Link
@@ -47,7 +47,7 @@ export function LearnContentRowActions({
       </Link>
       {status === "published" && (
         <Link
-          href={`/learn/${contentType}/${slug}`}
+          href={`/blog/${contentType}/${slug}`}
           className="text-primary text-sm hover:underline"
           target="_blank"
           rel="noopener noreferrer"

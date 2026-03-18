@@ -19,18 +19,18 @@ export default async function AdminLearnPage({
   const normalized = type.toLowerCase();
   if (!LEARN_CONTENT_TYPES.includes(normalized as LearnContentType)) notFound();
 
-  type Row = { id: string; slug: string; title: string; jlpt_level: string | null; status: string; sort_order: number; meta: Record<string, unknown> | null };
+  type Row = { id: string; slug: string; title: string; jlpt_level: string | null; status: string; sort_order: number; meta: Record<string, unknown> | null; og_image_url?: string | null };
   let items: Row[] = [];
   if (sql) {
     const rows = await sql`
-      SELECT id, slug, title, jlpt_level, status, sort_order, meta
-      FROM learning_content WHERE content_type = ${normalized}
+      SELECT id, slug, title, (jlpt_level)[1] AS jlpt_level, status, sort_order, meta, og_image_url
+      FROM posts WHERE content_type = ${normalized}
       ORDER BY sort_order, created_at DESC
     `;
     items = (rows ?? []) as Row[];
   }
-  const featureImageUrl = (meta: Record<string, unknown> | null) =>
-    meta && typeof meta.feature_image_url === "string" ? meta.feature_image_url : null;
+  const featureImageUrl = (item: Row) =>
+    (item.og_image_url ?? (item.meta && typeof item.meta.feature_image_url === "string" ? item.meta.feature_image_url : null));
 
   return (
     <div>
@@ -60,9 +60,9 @@ export default async function AdminLearnPage({
             {items.map((item) => (
               <tr key={item.id} className="border-b border-[var(--divider)]">
                 <td className="py-2 px-2">
-                  {featureImageUrl(item.meta) ? (
+                  {featureImageUrl(item) ? (
                     <div className="w-10 h-10 rounded overflow-hidden border border-[var(--divider)] bg-[var(--divider)]/20 flex-shrink-0">
-                      <img src={featureImageUrl(item.meta)!} alt="" className="w-full h-full object-cover" />
+                      <img src={featureImageUrl(item)!} alt="" className="w-full h-full object-cover" />
                     </div>
                   ) : (
                     <span className="text-secondary text-xs">—</span>

@@ -8,6 +8,7 @@ import { TestimonialsAbout } from "@/components/TestimonialsAbout";
 import { HomeFaq } from "@/components/HomeFaq";
 import { LeadMagnetForm } from "@/components/LeadMagnetForm";
 import { RecentBlogSection } from "@/components/RecentBlogSection";
+import { NewsletterSection } from "@/components/NewsletterSection";
 
 const isComingSoon = process.env.COMING_SOON === "true" || process.env.COMING_SOON === "1";
 
@@ -58,7 +59,7 @@ async function FullHomeView() {
       const [productRows, settingsRows, lessonRows] = await Promise.all([
         sql`SELECT * FROM products ORDER BY sort_order ASC`,
         sql`SELECT key, value FROM site_settings WHERE key = ANY(${settingsKeys})`,
-        sql`SELECT id, slug, title, content_type, jlpt_level FROM learning_content WHERE status = 'published' AND content_type IN ('grammar', 'vocabulary', 'kanji') ORDER BY created_at DESC LIMIT 6`,
+        sql`SELECT id, slug, title, content_type, (jlpt_level)[1] AS jlpt_level FROM posts WHERE status = 'published' AND content_type IN ('grammar', 'vocabulary', 'kanji') ORDER BY created_at DESC LIMIT 6`,
       ]);
       products = ((productRows as Record<string, unknown>[])?.length ? (productRows as Record<string, unknown>[]) : FALLBACK_PRODUCTS) as typeof FALLBACK_PRODUCTS;
       (settingsRows as { key: string; value: unknown }[]).forEach((r) => { settings[r.key] = r.value; });
@@ -91,7 +92,7 @@ async function FullHomeView() {
                   Learn Japanese the Right Way
                 </h1>
                 <p className="text-white/90 text-base max-w-xl">
-                  Premium JLPT resources from N5 to N1. Structured bundles, placement quiz, and lessons.
+                  Premium JLPT resources from N5 to N1. Structured bundles, placement quiz, AI tutor (Nihongo Navi), and lessons.
                 </p>
               </div>
               <div className="flex flex-wrap gap-3 mt-6">
@@ -100,6 +101,9 @@ async function FullHomeView() {
                 </Link>
                 <Link href="/store" className="border-2 border-white/80 text-white px-5 py-3 rounded-md font-semibold hover:bg-white/10 transition h-11 flex items-center">
                   Browse Bundles
+                </Link>
+                <Link href="/tutor" className="border-2 border-white/60 text-white px-5 py-3 rounded-md font-semibold hover:bg-white/10 transition h-11 flex items-center">
+                  Nihongo Navi
                 </Link>
               </div>
               <p className="text-white/85 text-[13px] mt-4">
@@ -125,6 +129,12 @@ async function FullHomeView() {
               <h3 className="font-heading font-bold text-charcoal mb-1 text-base">Library</h3>
               <p className="text-secondary text-[14px] mb-4">Access anytime. Study offline.</p>
               <Link href="/login" className="text-primary text-sm font-medium hover:underline">Login →</Link>
+            </div>
+            <div className="bento-span-2 card flex flex-col justify-center items-center text-center bg-white border-[#EEEEEE] rounded-[14px] p-6">
+              <span className="text-[40px] font-bold text-primary mb-2">4</span>
+              <h3 className="font-heading font-bold text-charcoal mb-1 text-base">Nihongo Navi</h3>
+              <p className="text-secondary text-[14px] mb-4">AI tutor — grammar, vocab, sentence correction.</p>
+              <Link href="/tutor" className="text-primary text-sm font-medium hover:underline">Try it →</Link>
             </div>
           </div>
         </div>
@@ -261,7 +271,7 @@ async function FullHomeView() {
             {lessons.map((item: { id: string; slug: string; title: string; content_type: string; jlpt_level?: string | null }) => (
               <Link
                 key={item.id}
-                href={`/learn/${item.content_type}/${item.slug}`}
+                href={`/blog/${item.content_type}/${item.slug}`}
                 className="bento-span-2 card block hover:no-underline group"
               >
                 <h3 className="font-heading font-bold text-charcoal group-hover:text-primary transition">
@@ -294,6 +304,9 @@ async function FullHomeView() {
           <HomeFaq items={settings.homepage_faq as Parameters<typeof HomeFaq>[0]["items"]} />
         </div>
       </section>
+
+      {/* Get JLPT tips and updates — only on home */}
+      <NewsletterSection source="site" />
 
     </div>
   );

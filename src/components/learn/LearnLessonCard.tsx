@@ -29,7 +29,7 @@ export function LearnLessonCard({ item, variant = "card" }: LearnLessonCardProps
   if (variant === "list") {
     return (
       <Link
-        href={`/learn/${item.content_type}/${item.slug}`}
+        href={`/blog/${item.content_type}/${item.slug}`}
         className="flex items-center gap-4 p-4 hover:no-underline group border-b border-[var(--divider)] last:border-b-0 hover:bg-[var(--divider)]/10 transition"
       >
         {featureImageUrl ? (
@@ -68,7 +68,7 @@ export function LearnLessonCard({ item, variant = "card" }: LearnLessonCardProps
 
   return (
     <Link
-      href={`/learn/${item.content_type}/${item.slug}`}
+      href={`/blog/${item.content_type}/${item.slug}`}
       className="card block overflow-hidden p-0 hover:no-underline group"
     >
       {featureImageUrl && (

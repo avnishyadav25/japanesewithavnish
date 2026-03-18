@@ -31,7 +31,7 @@ export default async function AdminLearnRecommendedPage() {
   if (sql) {
     const [settingsRows, contentRows] = await Promise.all([
       sql`SELECT value FROM site_settings WHERE key = 'learn_recommended' LIMIT 1`,
-      sql`SELECT slug, jlpt_level FROM learning_content WHERE status = 'published' ORDER BY sort_order ASC, created_at DESC LIMIT 300`,
+      sql`SELECT slug, (jlpt_level)[1] AS jlpt_level FROM posts WHERE status = 'published' AND content_type IN ('grammar','vocabulary','kanji','reading','writing','listening','sounds','study_guide','practice_test') ORDER BY sort_order ASC, created_at DESC LIMIT 300`,
     ]);
     const setting = (Array.isArray(settingsRows) ? settingsRows[0] : settingsRows) as { value?: Record<string, string[]> } | undefined;
     const raw = setting?.value;

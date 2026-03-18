@@ -1,17 +1,10 @@
-import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
-import { BlogPostForm } from "../BlogPostForm";
+import { Suspense } from "react";
+import { NewBlogPageClient } from "./NewBlogPageClient";
 
 export default function AdminBlogsNewPage() {
   return (
-    <div>
-      <AdminPageHeader
-        title="New post"
-        breadcrumb={[
-          { label: "Admin", href: "/admin" },
-          { label: "Blogs", href: "/admin/blogs" },
-        ]}
-      />
-      <BlogPostForm />
-    </div>
+    <Suspense fallback={<div className="p-6">Loading…</div>}>
+      <NewBlogPageClient />
+    </Suspense>
   );
 }

@@ -155,6 +155,12 @@ function ResultContent() {
                     >
                       Start learning now →
                     </Link>
+                    <Link
+                      href="/tutor"
+                      className="text-sm text-primary font-medium hover:underline"
+                    >
+                      Try Nihongo Navi (AI Tutor) →
+                    </Link>
                   </div>
                 </div>
                 <div className="bento-span-2 card flex flex-col justify-center bg-base border-[var(--divider)]">

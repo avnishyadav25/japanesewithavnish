@@ -129,8 +129,24 @@ export default function QuizPage() {
   }
 
   function handleNotSure() {
-    // Use -1 to represent \"I'm not sure\" (always counted as incorrect)
-    setAnswers({ ...answers, [currentIndex]: -1 });
+    // -1 = "I'm not sure" → 0 points, then move to next (or finish)
+    const newAnswers = { ...answers, [currentIndex]: -1 };
+    setAnswers(newAnswers);
+    if (currentIndex < questions.length - 1) {
+      setCurrentIndex(currentIndex + 1);
+    } else {
+      try {
+        window.localStorage.removeItem("jlpt_quiz_state_v1");
+      } catch {
+        // ignore
+      }
+      const score = questions.reduce(
+        (acc, question, index) =>
+          acc + (newAnswers[index] === question.correct_index ? 1 : 0),
+        0
+      );
+      router.push(`/quiz/result?score=${score}&total=${questions.length}`);
+    }
   }
 
   function handleNext() {

@@ -17,7 +17,7 @@ export async function RecentBlogSection() {
   if (sql) {
     const rows = await sql`
       SELECT id, slug, title, summary, seo_description, published_at, og_image_url
-      FROM posts WHERE status = 'published'
+      FROM posts WHERE status = 'published' AND (content_type IS NULL OR content_type = 'blog')
       ORDER BY published_at DESC LIMIT 6
     `;
     items = (rows ?? []) as Post[];

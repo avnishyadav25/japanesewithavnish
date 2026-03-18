@@ -5,56 +5,74 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { AdminLogout } from "@/app/(admin)/AdminLogout";
 
+const manageAIPrompts = { href: "/admin/prompts", label: "Manage AI Prompts" };
+
 const navGroups = [
   {
-    label: "Main",
+    label: "Dashboard",
     items: [
-      { href: "/admin", label: "Dashboard" },
+      { href: "/admin", label: "All" },
+      { href: "/admin/students", label: "User" },
       { href: "/admin/chatbot", label: "Chatbot" },
-      { href: "/admin/products", label: "Products" },
-      { href: "/admin/orders", label: "Orders" },
+      { href: "/admin/products", label: "Product" },
+      { href: "/admin/orders", label: "Order" },
       { href: "/admin/quiz", label: "Quiz" },
+      manageAIPrompts,
     ],
   },
   {
-    label: "Content",
+    label: "Student",
     items: [
-      { href: "/admin/blogs", label: "Blogs" },
-      { href: "/admin/comments", label: "Comments" },
+      { href: "/admin/students", label: "All" },
+      { href: "/admin/students", label: "Students" },
+      { href: "/admin/students/progress", label: "Progress" },
+      manageAIPrompts,
     ],
   },
   {
-    label: "Learning",
+    label: "Learning Content",
     items: [
-      { href: "/admin/learn/recommended", label: "Recommended" },
-      { href: "/admin/learn/grammar", label: "Grammar" },
+      { href: "/admin/learn/curriculum", label: "Curriculum" },
       { href: "/admin/learn/vocabulary", label: "Vocabulary" },
+      { href: "/admin/learn/grammar", label: "Grammar" },
       { href: "/admin/learn/kanji", label: "Kanji" },
-      { href: "/admin/learn/reading", label: "Reading" },
-      { href: "/admin/learn/listening", label: "Listening" },
-      { href: "/admin/learn/writing", label: "Writing" },
-      { href: "/admin/learn/sounds", label: "Sounds" },
-      { href: "/admin/learn/study_guide", label: "Study guide" },
-      { href: "/admin/learn/practice_test", label: "Practice test" },
+      { href: "/admin/grammar-drills", label: "Grammar drills" },
+      { href: "/admin/listening-generator", label: "Listening generator" },
+      { href: "/admin/reading-glossary", label: "Reading glossary" },
+      { href: "/admin/blogs", label: "Blog" },
+      { href: "/admin/comments", label: "Comment" },
+      { href: "/admin/blogs/recommended", label: "Recommend" },
+      manageAIPrompts,
     ],
   },
   {
-    label: "Audience",
+    label: "Product",
     items: [
-      { href: "/admin/newsletters", label: "Newsletters" },
-      { href: "/admin/newsletter/subscribers", label: "Subscribers" },
-      { href: "/admin/newsletter/settings", label: "Newsletter Settings" },
-      { href: "/admin/emailtemplate", label: "Email Templates" },
-      { href: "/admin/contact", label: "Contact" },
+      { href: "/admin/products", label: "All Products" },
+      { href: "/admin/orders", label: "All Order" },
+      { href: "/admin/orders", label: "Manage Orders" },
+      manageAIPrompts,
     ],
   },
   {
-    label: "Settings",
+    label: "Newsletter",
     items: [
-      { href: "/admin/settings", label: "Company Settings" },
-      { href: "/admin/social/prepare", label: "Prepare for social" },
+      { href: "/admin/newsletter/subscribers", label: "Subscriber" },
+      { href: "/admin/newsletters", label: "Newsletter" },
+      { href: "/admin/emailtemplate", label: "Email template" },
+      { href: "/admin/newsletter/settings", label: "Newsletter Setting" },
+      manageAIPrompts,
+    ],
+  },
+  {
+    label: "Setting",
+    items: [
+      { href: "/admin/settings", label: "Company Setting" },
+      { href: "/admin/progression", label: "Progression" },
+      { href: "/admin/social/prepare", label: "Prepare for Social" },
       { href: "/admin/analytics", label: "Analytics" },
-      { href: "/admin/ai-logs", label: "AI history" },
+      { href: "/admin/ai-logs", label: "AI History" },
+      manageAIPrompts,
     ],
   },
 ];
@@ -125,7 +143,7 @@ export function AdminSidebar() {
               </p>
               <ul className="space-y-1">
                 {group.items.map((item) => (
-                  <li key={item.href}>
+                  <li key={`${item.href}-${item.label}`}>
                     <NavLink href={item.href} label={item.label} />
                   </li>
                 ))}

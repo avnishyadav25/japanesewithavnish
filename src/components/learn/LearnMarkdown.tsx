@@ -2,7 +2,7 @@ import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import { slugify } from "@/lib/slugify";
-import { TTSPlayButton } from "@/components/learn/LessonMetaContent";
+import { TTSPlayButton, SoundsTableCellWithTTS } from "@/components/learn/LessonMetaContent";
 
 type SectionAudio = Record<string, string>;
 type Meta = Record<string, unknown> | null | undefined;
@@ -99,7 +99,7 @@ export function LearnMarkdown({
           </div>
           {metaStr(meta, "meaning") && <p className="text-charcoal mb-2">{metaStr(meta, "meaning")}</p>}
           {metaStr(meta, "structure") && (
-            <p className="text-[1.5rem] text-secondary font-mono mb-3">{metaStr(meta, "structure")}</p>
+            <p className="text-[1rem] text-secondary font-mono mb-3">{metaStr(meta, "structure")}</p>
           )}
         </div>
       )}
@@ -119,7 +119,7 @@ export function LearnMarkdown({
               <span className="text-xs text-secondary">{Number(meta.stroke_count)} strokes</span>
             )}
           </div>
-          <div className="flex flex-wrap justify-center gap-4 text-[1.5rem]">
+          <div className="flex flex-wrap justify-center gap-4 text-[1rem]">
             {Array.isArray(m.onyomi) && (m.onyomi as string[]).length > 0 && (
               <span>
                 <span className="text-secondary">On: </span>
@@ -159,6 +159,75 @@ export function LearnMarkdown({
             {children}
           </SectionWithAudio>
         ),
+        table: ({ children, ...props }) => (
+          <div className="my-6 overflow-x-auto">
+            <table className="w-full border-collapse border border-[var(--divider)]" {...props}>
+              {children}
+            </table>
+          </div>
+        ),
+        thead: ({ children, ...props }) => (
+          <thead className="bg-[var(--divider)]/20" {...props}>
+            {children}
+          </thead>
+        ),
+        tbody: ({ children, ...props }) => (
+          <tbody {...props}>{children}</tbody>
+        ),
+        tr: ({ children, ...props }) => (
+          <tr className="border-b border-[var(--divider)] last:border-b-0" {...props}>
+            {children}
+          </tr>
+        ),
+        th: ({ children, ...props }) => (
+          <th className="border border-[var(--divider)] px-3 py-2 text-left font-bold text-charcoal" {...props}>
+            {children}
+          </th>
+        ),
+        td: ({ children, ...props }) =>
+          contentType === "sounds" ? (
+            <SoundsTableCellWithTTS className="border border-[var(--divider)] px-3 py-2 align-top" {...props}>
+              {children}
+            </SoundsTableCellWithTTS>
+          ) : (
+            <td className="border border-[var(--divider)] px-3 py-2 align-top" {...props}>
+              {children}
+            </td>
+          ),
+        ul: ({ children, ...props }) =>
+          contentType === "sounds" ? (
+            <ol className="list-decimal list-inside mb-4 space-y-2 [&_p]:inline [&_p]:my-0">
+              {children}
+            </ol>
+          ) as React.ReactElement : (
+            <ul {...props}>{children}</ul>
+          ),
+        ol: ({ children, ...props }) =>
+          contentType === "sounds" ? (
+            <ol className="list-decimal list-inside mb-4 space-y-2 [&_p]:inline [&_p]:my-0" {...props}>
+              {children}
+            </ol>
+          ) : (
+            <ol {...props}>{children}</ol>
+          ),
+        li: ({ children, ...props }) => {
+          if (contentType !== "sounds") return <li {...props}>{children}</li>;
+          const nodes = Array.isArray(children) ? children : [children];
+          const first = nodes[0];
+          const rest = nodes.slice(1);
+          const japanese = first != null ? extractJapaneseFromNode(first) : null;
+          return (
+            <li className="leading-[1.7] text-[1rem]" {...props}>
+              {first != null && (
+                <span className="inline-flex items-center gap-2 flex-wrap">
+                  <>{first}</>
+                  {japanese && <TTSPlayButton text={japanese} />}
+                </span>
+              )}
+              {rest.length > 0 && rest}
+            </li>
+          );
+        },
       }}
     >
         {content}
@@ -172,5 +241,12 @@ function flattenText(node: React.ReactNode): string {
   if (Array.isArray(node)) return node.map(flattenText).join("");
   if (node && typeof node === "object" && "props" in node) return flattenText((node as { props: { children?: React.ReactNode } }).props?.children);
   return "";
+}
+
+const JAPANESE_CHAR = /[\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf\u3000-\u303f\uff00-\uffef]/;
+function extractJapaneseFromNode(node: React.ReactNode): string | null {
+  const s = flattenText(node).replace(/\*\*/g, "").trim();
+  const match = s.match(new RegExp(`[${JAPANESE_CHAR.source}]+`));
+  return match ? match[0] : null;
 }
 

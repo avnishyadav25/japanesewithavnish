@@ -3,7 +3,7 @@ import { ReactNode } from "react";
 
 interface AdminEmptyStateProps {
   message: string;
-  action?: { label: string; href: string };
+  action?: { label: string; href?: string; onClick?: () => void };
   children?: ReactNode;
 }
 
@@ -11,11 +11,15 @@ export function AdminEmptyState({ message, action, children }: AdminEmptyStatePr
   return (
     <div className="card-content p-12 text-center">
       <p className="text-secondary mb-4">{message}</p>
-      {action && (
-        <Link href={action.href} className="btn-primary inline-block">
+      {action && (action.onClick ? (
+        <button type="button" onClick={action.onClick} className="btn-primary inline-block">
+          {action.label}
+        </button>
+      ) : (
+        <Link href={action.href ?? "#"} className="btn-primary inline-block">
           {action.label}
         </Link>
-      )}
+      ))}
       {children}
     </div>
   );

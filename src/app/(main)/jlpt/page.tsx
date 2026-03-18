@@ -41,7 +41,7 @@ export default async function JLPTPage({
 
   if (sql) {
     const [postsRows, settingsRows] = await Promise.all([
-      sql`SELECT id, slug, title, summary, jlpt_level, tags, published_at FROM posts WHERE status = 'published' ORDER BY published_at DESC LIMIT 100`,
+      sql`SELECT id, slug, title, summary, jlpt_level, tags, published_at FROM posts WHERE status = 'published' AND (content_type IS NULL OR content_type = 'blog') ORDER BY published_at DESC LIMIT 100`,
       sql`SELECT value FROM site_settings WHERE key = 'jlpt_pinned_posts' LIMIT 1`,
     ]);
     allPosts = (postsRows ?? []) as Post[];

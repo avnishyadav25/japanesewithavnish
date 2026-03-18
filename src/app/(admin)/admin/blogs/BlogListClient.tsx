@@ -3,6 +3,8 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useState, useMemo } from "react";
+import { isLearnContent } from "@/lib/blog-filters";
+import { LEARN_CONTENT_TYPES, LEARN_TYPE_LABELS, type LearnContentType } from "@/lib/learn-filters";
 
 type Post = {
     id: string;
@@ -13,7 +15,18 @@ type Post = {
     jlpt_level: string[] | string | null;
     og_image_url?: string | null;
     summary?: string | null;
+    content_type?: string | null;
+    created_at?: string;
+    updated_at?: string;
 };
+
+type SortBy = "title" | "content_type" | "updated_at" | "created_at" | "published_at" | "status";
+type SortDir = "asc" | "desc";
+
+function formatDate(s: string | null | undefined) {
+    if (!s) return "—";
+    return new Date(s).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
 
 type View = "table" | "grid" | "gallery";
 
@@ -54,8 +67,11 @@ export function BlogListClient({
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState<"all" | "published" | "draft">("all");
     const [levelFilter, setLevelFilter] = useState("all");
+    const [contentTypeFilter, setContentTypeFilter] = useState<string>("all");
     const [selected, setSelected] = useState<Set<string>>(new Set());
     const [bulkLoading, setBulkLoading] = useState(false);
+    const [sortBy, setSortBy] = useState<SortBy>("created_at");
+    const [sortDir, setSortDir] = useState<SortDir>("desc");
 
     const filtered = useMemo(() => {
         let p = posts;
@@ -66,12 +82,56 @@ export function BlogListClient({
                 return levels.includes(levelFilter);
             });
         }
+        if (contentTypeFilter !== "all") {
+            if (contentTypeFilter === "blog") {
+                p = p.filter((x) => !x.content_type || x.content_type === "blog");
+            } else {
+                p = p.filter((x) => (x.content_type ?? "").toLowerCase() === contentTypeFilter.toLowerCase());
+            }
+        }
         if (search.trim()) {
             const q = search.toLowerCase();
             p = p.filter((x) => x.title.toLowerCase().includes(q) || x.slug.includes(q));
         }
         return p;
-    }, [posts, statusFilter, levelFilter, search]);
+    }, [posts, statusFilter, levelFilter, contentTypeFilter, search]);
+
+    const sorted = useMemo(() => {
+        const list = [...filtered];
+        const mult = sortDir === "asc" ? 1 : -1;
+        list.sort((a, b) => {
+            let va: string | number | null = null;
+            let vb: string | number | null = null;
+            if (sortBy === "title") {
+                va = a.title ?? "";
+                vb = b.title ?? "";
+            } else if (sortBy === "content_type") {
+                va = (a.content_type ?? "blog") as string;
+                vb = (b.content_type ?? "blog") as string;
+            } else if (sortBy === "updated_at") {
+                va = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+                vb = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+            } else if (sortBy === "created_at") {
+                va = a.created_at ? new Date(a.created_at).getTime() : 0;
+                vb = b.created_at ? new Date(b.created_at).getTime() : 0;
+            } else if (sortBy === "published_at") {
+                va = a.published_at ? new Date(a.published_at).getTime() : 0;
+                vb = b.published_at ? new Date(b.published_at).getTime() : 0;
+            } else if (sortBy === "status") {
+                va = a.status ?? "";
+                vb = b.status ?? "";
+            }
+            if (va === null || vb === null) return 0;
+            if (typeof va === "number" && typeof vb === "number") return mult * (va - vb);
+            return mult * String(va).localeCompare(String(vb));
+        });
+        return list;
+    }, [filtered, sortBy, sortDir]);
+
+    function toggleSort(col: SortBy) {
+        setSortBy(col);
+        setSortDir((d) => (sortBy === col ? (d === "asc" ? "desc" : "asc") : "desc"));
+    }
 
     function toggleSelect(id: string) {
         setSelected((s) => {
@@ -97,6 +157,9 @@ export function BlogListClient({
             Array.from(selected).map((id) => {
                 const post = posts.find((p) => p.id === id);
                 if (!post) return Promise.resolve();
+                if (isLearnContent(post.content_type)) {
+                    return fetch(`/api/admin/learning-content/${post.content_type}/${post.slug}`, { method: "DELETE" });
+                }
                 return fetch(`/api/admin/posts/${post.slug}`, { method: "DELETE" });
             })
         );
@@ -109,9 +172,19 @@ export function BlogListClient({
         if (selected.size === 0) return;
         setBulkLoading(true);
         await Promise.all(
-            Array.from(selected).map((id) => {
+            Array.from(selected).map(async (id) => {
                 const post = posts.find((p) => p.id === id);
-                if (!post) return Promise.resolve();
+                if (!post) return;
+                if (isLearnContent(post.content_type)) {
+                    const res = await fetch(`/api/admin/learning-content/${post.content_type}/${post.slug}`);
+                    if (!res.ok) return;
+                    const full = await res.json();
+                    return fetch(`/api/admin/learning-content/${post.content_type}/${post.slug}`, {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ ...full, status }),
+                    });
+                }
                 return fetch(`/api/admin/posts/${post.slug}`, {
                     method: "PUT",
                     headers: { "Content-Type": "application/json" },
@@ -175,6 +248,19 @@ export function BlogListClient({
                     ))}
                 </select>
 
+                {/* Content type filter */}
+                <select
+                    value={contentTypeFilter}
+                    onChange={(e) => setContentTypeFilter(e.target.value)}
+                    className="px-3 py-2 border border-[var(--divider)] rounded-bento text-sm text-charcoal bg-white"
+                >
+                    <option value="all">All content types</option>
+                    <option value="blog">Blog</option>
+                    {LEARN_CONTENT_TYPES.map((t) => (
+                        <option key={t} value={t}>{LEARN_TYPE_LABELS[t as LearnContentType]}</option>
+                    ))}
+                </select>
+
                 {/* Bulk actions */}
                 {selected.size > 0 && (
                     <div className="flex items-center gap-2 ml-2 pl-2 border-l border-[var(--divider)]">
@@ -223,7 +309,7 @@ export function BlogListClient({
             {/* Results count */}
             <p className="text-secondary text-xs mb-3">
                 {filtered.length} post{filtered.length !== 1 ? "s" : ""}
-                {search || statusFilter !== "all" || levelFilter !== "all" ? " matching filters" : ""}
+                {search || statusFilter !== "all" || levelFilter !== "all" || contentTypeFilter !== "all" ? " matching filters" : ""}
             </p>
 
             {/* Views */}
@@ -231,30 +317,47 @@ export function BlogListClient({
                 <div className="card text-center py-12">
                     <p className="text-secondary mb-4">No posts match your filters.</p>
                     <button
-                        onClick={() => { setSearch(""); setStatusFilter("all"); setLevelFilter("all"); }}
+                        onClick={() => { setSearch(""); setStatusFilter("all"); setLevelFilter("all"); setContentTypeFilter("all"); }}
                         className="text-primary hover:underline text-sm"
                     >
                         Clear filters
                     </button>
                 </div>
             ) : view === "table" ? (
-                <TableView posts={filtered} selected={selected} onToggle={toggleSelect} onToggleAll={toggleAll} />
+                <TableView posts={sorted} selected={selected} onToggle={toggleSelect} onToggleAll={toggleAll} sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
             ) : view === "grid" ? (
-                <GridView posts={filtered} selected={selected} onToggle={toggleSelect} />
+                <GridView posts={sorted} selected={selected} onToggle={toggleSelect} />
             ) : (
-                <GalleryView posts={filtered} selected={selected} onToggle={toggleSelect} />
+                <GalleryView posts={sorted} selected={selected} onToggle={toggleSelect} />
             )}
         </div>
     );
 }
 
+function SortableTh({
+    label, col, sortBy, sortDir, onSort,
+}: { label: string; col: SortBy; sortBy: SortBy; sortDir: SortDir; onSort: (c: SortBy) => void }) {
+    const active = sortBy === col;
+    return (
+        <th className="py-3 px-3 text-left font-medium text-charcoal whitespace-nowrap">
+            <button type="button" onClick={() => onSort(col)} className="hover:text-primary flex items-center gap-1">
+                {label}
+                {active && <span className="text-primary">{sortDir === "asc" ? "↑" : "↓"}</span>}
+            </button>
+        </th>
+    );
+}
+
 function TableView({
-    posts, selected, onToggle, onToggleAll,
+    posts, selected, onToggle, onToggleAll, sortBy, sortDir, onSort,
 }: {
     posts: Post[];
     selected: Set<string>;
     onToggle: (id: string) => void;
     onToggleAll: () => void;
+    sortBy: SortBy;
+    sortDir: SortDir;
+    onSort: (col: SortBy) => void;
 }) {
     return (
         <div className="card overflow-x-auto p-0">
@@ -271,9 +374,12 @@ function TableView({
                         </th>
                         <th className="py-3 px-3 text-left font-medium text-charcoal w-16">Image</th>
                         <th className="py-3 px-3 text-left font-medium text-charcoal">Title</th>
+                        <SortableTh label="Content type" col="content_type" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
                         <th className="py-3 px-3 text-left font-medium text-charcoal">Status</th>
                         <th className="py-3 px-3 text-left font-medium text-charcoal">JLPT</th>
-                        <th className="py-3 px-3 text-left font-medium text-charcoal">Published</th>
+                        <SortableTh label="Published" col="published_at" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
+                        <SortableTh label="Last modified" col="updated_at" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
+                        <SortableTh label="Created" col="created_at" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
                         <th className="py-3 px-3 text-left font-medium text-charcoal">Actions</th>
                     </tr>
                 </thead>
@@ -318,6 +424,7 @@ function TableView({
                                     <span className="line-clamp-1">{p.title}</span>
                                     <span className="text-secondary text-xs block">{p.slug}</span>
                                 </td>
+                                <td className="py-2 px-3 text-secondary text-xs capitalize">{p.content_type ?? "blog"}</td>
                                 <td className="py-2 px-3"><StatusDot status={p.status} /></td>
                                 <td className="py-2 px-3">
                                     <div className="flex flex-wrap gap-1">
@@ -326,14 +433,16 @@ function TableView({
                                     </div>
                                 </td>
                                 <td className="py-2 px-3 text-secondary text-xs">
-                                    {p.published_at ? new Date(p.published_at).toLocaleDateString() : "—"}
+                                    {p.published_at ? formatDate(p.published_at) : "—"}
                                 </td>
+                                <td className="py-2 px-3 text-secondary text-xs">{formatDate(p.updated_at)}</td>
+                                <td className="py-2 px-3 text-secondary text-xs">{formatDate(p.created_at)}</td>
                                 <td className="py-2 px-3">
                                     <div className="flex gap-3">
                                         <Link href={`/admin/blogs/${p.slug}/edit`} className="text-primary text-sm hover:underline">Edit</Link>
                                         <Link href={`/admin/blogs/${p.slug}/comments`} className="text-secondary text-sm hover:underline">Comments</Link>
                                         {p.status === "published" && (
-                                            <Link href={`/blog/${p.slug}`} target="_blank" className="text-secondary text-sm hover:underline">↗ View</Link>
+                                            <Link href={isLearnContent(p.content_type) ? `/blog/${p.content_type}/${p.slug}` : `/blog/${p.slug}`} target="_blank" className="text-secondary text-sm hover:underline">↗ View</Link>
                                         )}
                                     </div>
                                 </td>
@@ -399,9 +508,16 @@ function GridView({
                             >
                                 Edit
                             </Link>
+                            <Link
+                                href={`/admin/blogs/${p.slug}/comments`}
+                                className="text-secondary text-xs hover:underline"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                Comments
+                            </Link>
                             {p.status === "published" && (
                                 <Link
-                                    href={`/blog/${p.slug}`}
+                                    href={isLearnContent(p.content_type) ? `/blog/${p.content_type}/${p.slug}` : `/blog/${p.slug}`}
                                     target="_blank"
                                     className="text-secondary text-xs hover:underline"
                                     onClick={(e) => e.stopPropagation()}
@@ -474,9 +590,16 @@ function GalleryView({
                                 >
                                     Edit
                                 </Link>
+                                <Link
+                                    href={`/admin/blogs/${p.slug}/comments`}
+                                    className="text-secondary text-xs hover:underline"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    Comments
+                                </Link>
                                 {p.status === "published" && (
                                     <Link
-                                        href={`/blog/${p.slug}`}
+                                        href={isLearnContent(p.content_type) ? `/blog/${p.content_type}/${p.slug}` : `/blog/${p.slug}`}
                                         target="_blank"
                                         className="text-secondary text-xs hover:underline"
                                         onClick={(e) => e.stopPropagation()}

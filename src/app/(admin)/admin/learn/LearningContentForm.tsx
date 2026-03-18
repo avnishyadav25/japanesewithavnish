@@ -22,9 +22,12 @@ type Item = {
 export function LearningContentForm({
   contentType,
   item,
+  editBasePath = "learn",
 }: {
   contentType: string;
   item?: Item;
+  /** When "blogs", save/redirect uses /admin/blogs/[slug]/edit. */
+  editBasePath?: "learn" | "blogs";
 }) {
   const router = useRouter();
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
@@ -160,14 +163,16 @@ export function LearningContentForm({
     const data = (await res.json().catch(() => ({}))) as { slug?: string };
 
     if (opts?.preferReplaceUrl !== false) {
+      const base = editBasePath === "blogs" ? "/admin/blogs" : `/admin/learn/${contentType}`;
+      const editPath = editBasePath === "blogs" ? (s: string) => `${base}/${s}/edit` : (s: string) => `${base}/${s}/edit`;
       if (item) {
         const newSlug = String(form.slug).trim();
         if (newSlug && newSlug !== item.slug) {
-          router.replace(`/admin/learn/${contentType}/${newSlug}/edit`);
+          router.replace(editPath(newSlug));
         }
       } else {
         const slug = data.slug ?? form.slug;
-        if (slug) router.replace(`/admin/learn/${contentType}/${String(slug).trim()}/edit`);
+        if (slug) router.replace(editPath(String(slug).trim()));
       }
     }
 

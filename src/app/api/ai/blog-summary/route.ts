@@ -2,8 +2,11 @@ import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth/admin";
 import { sql } from "@/lib/db";
 import { insertAiLog } from "@/lib/ai-logs";
+import { getPromptContent } from "@/lib/ai/load-prompts";
 
 const DEEPSEEK_API = "https://api.deepseek.com/v1/chat/completions";
+
+const BLOG_SUMMARY_SYSTEM_PROMPT_FALLBACK = `You are an expert editor. Write a concise, engaging summary of the given blog post. Use 200-400 words. Write in clear, professional prose. Do not use bullet points unless the content is inherently a list. Output ONLY the summary text, no heading or labels.`;
 
 export async function POST(req: Request) {
   try {
@@ -18,7 +21,7 @@ export async function POST(req: Request) {
     if (!slug || !sql) return NextResponse.json({ error: "slug required" }, { status: 400 });
 
     const rows = await sql`
-      SELECT id, title, content, summary FROM posts WHERE slug = ${slug} LIMIT 1
+      SELECT id, title, content, summary FROM posts WHERE slug = ${slug} AND (content_type IS NULL OR content_type = 'blog') LIMIT 1
     ` as { id: string; title: string; content: string | null; summary: string | null }[];
     const post = rows[0];
     if (!post) return NextResponse.json({ error: "Post not found" }, { status: 404 });
@@ -27,7 +30,7 @@ export async function POST(req: Request) {
     const textForSummary = content.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 15000);
     if (!textForSummary) return NextResponse.json({ error: "Post has no content to summarize" }, { status: 400 });
 
-    const systemPrompt = `You are an expert editor. Write a concise, engaging summary of the given blog post. Use 200-400 words. Write in clear, professional prose. Do not use bullet points unless the content is inherently a list. Output ONLY the summary text, no heading or labels.`;
+    const systemPrompt = (await getPromptContent("blog_summary")) ?? BLOG_SUMMARY_SYSTEM_PROMPT_FALLBACK;
 
     const res = await fetch(DEEPSEEK_API, {
       method: "POST",

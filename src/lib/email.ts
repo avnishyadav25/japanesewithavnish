@@ -73,6 +73,20 @@ export async function sendMagicLink(email: string, magicLinkUrl: string) {
   );
 }
 
+export async function sendPasswordResetEmail(email: string, resetLink: string) {
+  return sendMail(
+    email,
+    "Reset your password — Japanese with Avnish",
+    `
+      <p>We received a request to reset your password.</p>
+      <p><a href="${resetLink}" style="color:#D0021B;font-weight:600;">Reset your password</a></p>
+      <p>This link expires in 1 hour.</p>
+      <p>If you didn't request this, you can ignore this email. Your password will not change.</p>
+      <p style="margin-top:16px;">— Japanese with Avnish</p>
+    `
+  );
+}
+
 export type OrderConfirmationOptions = {
   accessToken: string;
   productSlug?: string | null;
@@ -102,6 +116,16 @@ export async function sendOrderConfirmation(
   const products = await getProductsForEmail();
   const productList = productListHtml(products, SITE_URL);
   return sendMail(email, "Your purchase is ready — Japanese with Avnish", emailWrapper(content, productList));
+}
+
+export async function sendStreakReminder(email: string, streakDays: number) {
+  const loginUrl = `${SITE_URL}/login?redirect=/learn/dashboard`;
+  const content = `
+    <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">You're on a <strong>${streakDays}-day</strong> streak. Don't break it — log in and complete today's session.</p>
+    <p style="margin:0 0 24px;"><a href="${loginUrl}" style="background:#D0021B;color:white;padding:12px 26px;text-decoration:none;border-radius:8px;display:inline-block;font-weight:600;">Log in & continue</a></p>
+    <p style="font-size:14px;line-height:1.6;margin:0;color:#555;">— Nihongo Navi / Japanese with Avnish</p>
+  `;
+  return sendMail(email, `Don't break your ${streakDays}-day streak — Japanese with Avnish`, emailWrapper(content, ""));
 }
 
 export async function sendQuizResults(

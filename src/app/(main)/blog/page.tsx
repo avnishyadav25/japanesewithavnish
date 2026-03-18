@@ -26,7 +26,7 @@ export default async function BlogPage({
   if (sql) {
     try {
       const [postsRows, settingsRows] = await Promise.all([
-        sql`SELECT id, slug, title, summary, seo_description, published_at, og_image_url, jlpt_level, tags FROM posts WHERE status = 'published' ORDER BY published_at DESC LIMIT 100`,
+        sql`SELECT id, slug, title, summary, seo_description, published_at, og_image_url, jlpt_level, tags, content_type FROM posts WHERE status = 'published' ORDER BY published_at DESC LIMIT 200`,
         sql`SELECT value FROM site_settings WHERE key = 'blog_featured_posts' LIMIT 1`,
       ]);
       allPosts = (Array.isArray(postsRows) ? postsRows : []) as PostForFilter[];

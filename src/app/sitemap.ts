@@ -31,14 +31,35 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const blogEntries: MetadataRoute.Sitemap = [];
   const productEntries: MetadataRoute.Sitemap = [];
 
+  const learnEntries: MetadataRoute.Sitemap = [];
   if (sql) {
     try {
       const postRows = await sql`
-        SELECT slug, updated_at FROM posts WHERE status = 'published' ORDER BY updated_at DESC
+        SELECT slug, updated_at FROM posts
+        WHERE status = 'published' AND (content_type IS NULL OR content_type = 'blog')
+        ORDER BY updated_at DESC
       ` as { slug: string; updated_at: string }[];
       blogEntries.push(
         ...(postRows || []).map((row) => ({
           url: `${BASE}/blog/${row.slug}`,
+          lastModified: row.updated_at ? new Date(row.updated_at) : new Date(),
+          changeFrequency: "weekly" as const,
+          priority: 0.7 as number,
+        }))
+      );
+    } catch {
+      // ignore
+    }
+    try {
+      const learnRows = await sql`
+        SELECT slug, content_type, updated_at FROM posts
+        WHERE status = 'published'
+          AND content_type IN ('grammar','vocabulary','kanji','reading','writing','listening','sounds','study_guide','practice_test')
+        ORDER BY updated_at DESC
+      ` as { slug: string; content_type: string; updated_at: string }[];
+      learnEntries.push(
+        ...(learnRows || []).map((row) => ({
+          url: `${BASE}/blog/${row.content_type}/${row.slug}`,
           lastModified: row.updated_at ? new Date(row.updated_at) : new Date(),
           changeFrequency: "weekly" as const,
           priority: 0.7 as number,
@@ -64,5 +85,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
   }
 
-  return [...staticEntries, ...blogEntries, ...productEntries];
+  return [...staticEntries, ...blogEntries, ...learnEntries, ...productEntries];
 }
