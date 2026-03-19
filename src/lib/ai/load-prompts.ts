@@ -7,6 +7,7 @@ export const ALLOWED_PROMPT_KEYS = [
   "daily_checkpoint",
   "blog_summary",
   "curriculum_lesson_intro",
+  "curriculum_lesson_body",
   "curriculum_lesson_vocab",
   "curriculum_examples",
   "curriculum_suggest_summary",

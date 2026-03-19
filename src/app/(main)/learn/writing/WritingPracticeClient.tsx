@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { WritingCanvas, type CharacterType } from "@/components/learn/WritingCanvas";
 
 const DEFAULT_KANJI = ["日", "本", "人", "水", "火"];
@@ -9,21 +9,37 @@ const DEFAULT_KATAKANA = ["ア", "イ", "ウ", "エ", "オ"];
 
 type CharInfo = { character: string; type: CharacterType; strokeCount: number | null; reading: string | null };
 
-export function WritingPracticeClient() {
-  const [characterType, setCharacterType] = useState<CharacterType>("kanji");
-  const [characters, setCharacters] = useState<string[]>(DEFAULT_KANJI);
-  const [selectedChar, setSelectedChar] = useState<string>(DEFAULT_KANJI[0]);
+export function WritingPracticeClient({
+  initialType = "kanji",
+  initialCharacters,
+}: {
+  initialType?: CharacterType;
+  initialCharacters?: string[];
+}) {
+  const initialList = initialCharacters?.length ? initialCharacters : initialType === "kanji" ? DEFAULT_KANJI : initialType === "hiragana" ? DEFAULT_HIRAGANA : DEFAULT_KATAKANA;
+
+  const [characterType, setCharacterType] = useState<CharacterType>(initialType);
+  const [characters, setCharacters] = useState<string[]>(initialList);
+  const [selectedChar, setSelectedChar] = useState<string>(initialList[0] ?? "");
   const [charInfo, setCharInfo] = useState<CharInfo | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const skipFirstResetRef = useRef(Boolean(initialCharacters?.length));
   useEffect(() => {
+    if (skipFirstResetRef.current) {
+      skipFirstResetRef.current = false;
+      return;
+    }
     const list = characterType === "kanji" ? DEFAULT_KANJI : characterType === "hiragana" ? DEFAULT_HIRAGANA : DEFAULT_KATAKANA;
     setCharacters(list);
-    setSelectedChar(list[0]);
+    setSelectedChar(list[0] ?? "");
   }, [characterType]);
 
   useEffect(() => {
-    if (!selectedChar) return;
+    if (!selectedChar) {
+      setCharInfo(null);
+      return;
+    }
     setLoading(true);
     fetch(`/api/learn/writing/character?char=${encodeURIComponent(selectedChar)}&type=${characterType}`)
       .then((r) => r.json())

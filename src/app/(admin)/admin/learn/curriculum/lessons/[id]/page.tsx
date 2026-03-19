@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { LessonEditForm } from "./LessonEditForm";
+import { LessonBodySection } from "./LessonBodySection";
 import { LessonLinksSection } from "./LessonLinksSection";
 
 export default async function AdminCurriculumLessonPage({ params }: { params: Promise<{ id: string }> }) {
@@ -36,6 +37,7 @@ export default async function AdminCurriculumLessonPage({ params }: { params: Pr
         levelCode={row.level_code}
         initial={{ code: row.code, title: row.title, goal: row.goal ?? "", introduction: row.introduction ?? "", sort_order: row.sort_order, feature_image_url: row.feature_image_url ?? "" }}
       />
+      <LessonBodySection lessonId={row.id} lessonTitle={row.title} levelCode={row.level_code} />
       <LessonLinksSection lessonId={row.id} lessonTitle={row.title} levelCode={row.level_code} />
     </div>
   );

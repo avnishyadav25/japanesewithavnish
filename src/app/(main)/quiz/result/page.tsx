@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useMemo, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
@@ -19,11 +19,8 @@ function ResultContent() {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"gate" | "loading" | "shown" | "error">("gate");
   const [newsletterOptIn, setNewsletterOptIn] = useState(true);
-  const [recommendation, setRecommendation] = useState<typeof THRESHOLDS[0] | null>(null);
-
-  useEffect(() => {
-    const rec = [...THRESHOLDS].reverse().find((t) => score >= t.minScore) || THRESHOLDS[0];
-    setRecommendation(rec);
+  const recommendation = useMemo(() => {
+    return [...THRESHOLDS].reverse().find((t) => score >= t.minScore) || THRESHOLDS[0];
   }, [score]);
 
   async function handleEmailSubmit(e: React.FormEvent) {
@@ -42,15 +39,10 @@ function ResultContent() {
     }
   }
 
-  if (!recommendation) {
-    return <div className="py-24 text-center">Loading...</div>;
-  }
-
   return (
     <div className="bg-[#FAF8F5] py-12 sm:py-16 px-4 sm:px-6">
       <div className="max-w-[1100px] mx-auto">
-        {!recommendation ? null : (
-          <>
+        <>
             {/* Email gate */}
             {status === "gate" || status === "loading" || status === "error" ? (
               <div className="bento-grid mb-10">
@@ -183,7 +175,6 @@ function ResultContent() {
               </div>
             )}
           </>
-        )}
       </div>
     </div>
   );

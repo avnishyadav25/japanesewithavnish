@@ -156,6 +156,29 @@ export default async function LearnCurriculumLessonPage({ params }: { params: Pr
     sort_order: number;
   }[]) ?? [];
 
+  const writingHiraganaChars = kana
+    .filter((k) => k.type === "hiragana" && k.character)
+    .map((k) => k.character);
+  const writingKatakanaChars = kana
+    .filter((k) => k.type === "katakana" && k.character)
+    .map((k) => k.character);
+
+  const writingType: "hiragana" | "katakana" | null = writingHiraganaChars.length
+    ? "hiragana"
+    : writingKatakanaChars.length
+      ? "katakana"
+      : null;
+  const writingChars =
+    writingType === "hiragana"
+      ? Array.from(new Set(writingHiraganaChars))
+      : writingType === "katakana"
+        ? Array.from(new Set(writingKatakanaChars))
+        : [];
+  const writingHref =
+    writingType && writingChars.length
+      ? `/learn/writing?type=${encodeURIComponent(writingType)}&chars=${encodeURIComponent(writingChars.join(","))}`
+      : "/learn/writing";
+
   return (
     <div className="min-h-screen bg-[var(--base)]">
       <div className="max-w-[720px] mx-auto px-4 py-8">
@@ -315,7 +338,7 @@ export default async function LearnCurriculumLessonPage({ params }: { params: Pr
               <div className="font-heading font-semibold text-charcoal mb-1">Reading sandbox</div>
               <div className="text-secondary text-sm">Read with glossary support.</div>
             </Link>
-            <Link href="/learn/writing" className="bg-white border border-[var(--divider)] rounded-bento p-5 hover:border-primary transition">
+            <Link href={writingHref} className="bg-white border border-[var(--divider)] rounded-bento p-5 hover:border-primary transition">
               <div className="font-heading font-semibold text-charcoal mb-1">Writing</div>
               <div className="text-secondary text-sm">Write, get feedback, and track mistakes.</div>
             </Link>

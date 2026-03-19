@@ -7,7 +7,7 @@ import { BlogPostCard } from "@/components/blog/BlogPostCard";
 
 const POSTS_PER_PAGE = 12;
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export default async function BlogPage({
   searchParams,

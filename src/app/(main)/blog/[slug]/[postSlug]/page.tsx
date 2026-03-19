@@ -21,7 +21,49 @@ import { reorderContentExamplesLast, boldContentLabels } from "@/lib/learn-conte
 
 type Meta = Record<string, unknown> | null;
 
+const BASE = process.env.NEXT_PUBLIC_SITE_URL || "https://japanesewithavnish.com";
+
 /** Learning content at /blog/[type]/[slug] e.g. /blog/grammar/wa-desu. First segment is content type, second is post slug. */
+export const revalidate = 60;
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string; postSlug: string }>;
+}) {
+  const { slug: typeSegment, postSlug } = await params;
+  const normalized = typeSegment.toLowerCase();
+
+  if (!LEARN_CONTENT_TYPES.includes(normalized as LearnContentType)) return {};
+  if (!sql) return {};
+
+  const rows = await sql`
+    SELECT title, seo_title, seo_description, og_image_url
+    FROM posts
+    WHERE content_type = ${normalized} AND slug = ${postSlug} AND status = 'published'
+    LIMIT 1
+  ` as { title: string; seo_title: string | null; seo_description: string | null; og_image_url: string | null }[];
+
+  const p = rows[0];
+  if (!p) return {};
+
+  const title = p.seo_title?.trim() || p.title;
+  const description = p.seo_description?.trim() || undefined;
+  const url = `${BASE}/blog/${normalized}/${postSlug}`;
+
+  return {
+    title: title ? `${title} | Japanese with Avnish` : undefined,
+    description,
+    openGraph: {
+      title: title || undefined,
+      description: description || undefined,
+      images: p.og_image_url ? [{ url: p.og_image_url }] : undefined,
+      type: "article",
+      url,
+    },
+  };
+}
+
 export default async function BlogLearnDetailPage({
   params,
 }: {
@@ -62,7 +104,7 @@ export default async function BlogLearnDetailPage({
 
   let related: LearnItemForFilter[] = [];
   let comments: { id: string; author_name: string; author_email: string; content: string; created_at: string }[] = [];
-  let allProducts: { id: string; slug: string; name: string; price_paise: number; compare_price_paise?: number; badge?: string; jlpt_level?: string; image_url?: string; is_mega?: boolean }[] = [];
+  let bundlesToShow: { id: string; slug: string; name: string; price_paise: number; compare_price_paise?: number; badge?: string; jlpt_level?: string; image_url?: string; is_mega?: boolean }[] = [];
 
   const [relatedRows, productRows] = await Promise.all([
     sql`
@@ -72,11 +114,28 @@ export default async function BlogLearnDetailPage({
       ORDER BY sort_order ASC, created_at DESC
       LIMIT 6
     `,
-    sql`SELECT id, slug, name, price_paise, compare_price_paise, badge, jlpt_level, image_url, is_mega FROM products ORDER BY sort_order ASC`,
+    sql`
+      SELECT id, slug, name, price_paise, compare_price_paise, badge, jlpt_level, image_url, is_mega
+      FROM products
+      WHERE is_mega = true OR jlpt_level = ${primaryLevel} OR jlpt_level = 'N4'
+      ORDER BY sort_order ASC
+      LIMIT 4
+    `,
   ]);
 
   related = (Array.isArray(relatedRows) ? relatedRows : []) as LearnItemForFilter[];
-  allProducts = (Array.isArray(productRows) ? productRows : []) as typeof allProducts;
+  bundlesToShow = (Array.isArray(productRows) ? productRows : []) as typeof bundlesToShow;
+
+  // Relevant-first product loading: only fetch the top 4 relevant bundles unless none match.
+  if (bundlesToShow.length === 0) {
+    const fallbackRows = await sql`
+      SELECT id, slug, name, price_paise, compare_price_paise, badge, jlpt_level, image_url, is_mega
+      FROM products
+      ORDER BY sort_order ASC
+      LIMIT 4
+    `;
+    bundlesToShow = (Array.isArray(fallbackRows) ? fallbackRows : []) as typeof bundlesToShow;
+  }
 
   try {
     const commentsRows = await sql`
@@ -89,14 +148,7 @@ export default async function BlogLearnDetailPage({
   } catch {
     comments = [];
   }
-  const relevantProducts = allProducts.filter(
-    (p) =>
-      p.jlpt_level === primaryLevel ||
-      p.jlpt_level === "N4" ||
-      p.is_mega ||
-      (primaryLevel === "N5" && ["N5", "N4"].includes(p.jlpt_level || ""))
-  );
-  const bundlesToShow = relevantProducts.length > 0 ? relevantProducts.slice(0, 4) : allProducts.slice(0, 4);
+  // `bundlesToShow` already uses the relevant-first logic + fallback.
   const contentStr = item.content ?? "";
   const reorderedContent = contentStr ? reorderContentExamplesLast(contentStr) : "";
   const contentWithBoldLabels = reorderedContent ? boldContentLabels(reorderedContent) : "";

@@ -2,7 +2,9 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
+import type { LearnNavItem } from "@/lib/nav/learnNav";
+import { LEARN_NAV_ITEMS } from "@/lib/nav/learnNav";
 
 type Message = { role: "user" | "assistant"; content: string };
 type TutorHistoryItem = {
@@ -10,12 +12,6 @@ type TutorHistoryItem = {
   answer_preview: string;
   ask_count: number;
   user_email: string | null;
-};
-
-type LearnNavItem = {
-  href: string;
-  label: string;
-  requiresAuth?: boolean;
 };
 
 const GUEST_MESSAGE_LIMIT = 5;
@@ -26,30 +22,6 @@ const SUGGESTED_PROMPTS = [
   "Correct this sentence: 私はりんごを食べます",
   "What does です mean?",
   "Quiz me on N5 vocabulary",
-];
-
-const LEARN_NAV_ITEMS: LearnNavItem[] = [
-  { href: "/learn", label: "All" },
-  { href: "/learn/curriculum", label: "Curriculum" },
-  { href: "/learn/dashboard", label: "My dashboard", requiresAuth: true },
-  { href: "/review", label: "Review", requiresAuth: true },
-  { href: "/start-here", label: "Start Here" },
-  { href: "/jlpt", label: "JLPT" },
-  { href: "/free-n5-pack", label: "Free N5 Pack" },
-  { href: "/learn/grammar", label: "Grammar" },
-  { href: "/learn/vocabulary", label: "Vocabulary" },
-  { href: "/learn/kanji", label: "Kanji" },
-  { href: "/learn/reading", label: "Reading" },
-  { href: "/learn/reading/sandbox", label: "Reading sandbox" },
-  { href: "/learn/listening", label: "Listening" },
-  { href: "/learn/shadowing", label: "Shadowing" },
-  { href: "/learn/writing", label: "Writing" },
-  { href: "/learn/exam", label: "Mock exam" },
-  { href: "/learn/analytics", label: "Analytics", requiresAuth: true },
-  { href: "/learn/practice_test", label: "Practice Test" },
-  { href: "/learn/sounds", label: "Sounds" },
-  { href: "/learn/study_guide", label: "Study Guide" },
-  { href: "/quiz", label: "Placement Quiz" },
 ];
 
 function CorrectSentenceBlock() {
@@ -115,7 +87,7 @@ export default function TutorPage() {
   const [sessionEmail, setSessionEmail] = useState<string | null>(null);
   const [history, setHistory] = useState<TutorHistoryItem[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     fetch("/api/auth/session")
@@ -140,12 +112,16 @@ export default function TutorPage() {
   const userCount = messages.filter((m) => m.role === "user").length;
   const showRegisterPrompt = !sessionEmail && userCount >= GUEST_MESSAGE_LIMIT;
 
-  function handleLearnClick(item: LearnNavItem) {
-    if (item.requiresAuth && !sessionEmail) {
-      router.push(`/login?redirect=${encodeURIComponent(item.href)}`);
-      return;
+  function isLearnNavActive(item: LearnNavItem) {
+    if (!pathname) return false;
+    if (pathname === item.href) return true;
+    if (item.href === "/learn") return pathname.startsWith("/learn/") || pathname.startsWith("/blog/");
+    if (item.href === "/learn/curriculum") return pathname.startsWith("/learn/curriculum");
+    if (pathname.startsWith("/blog/") && item.href.startsWith("/learn/")) {
+      const typeSegment = pathname.split("/")[2];
+      return typeSegment ? item.href === `/learn/${typeSegment}` : false;
     }
-    router.push(item.href);
+    return false;
   }
 
   async function send(text?: string) {
@@ -287,12 +263,18 @@ export default function TutorPage() {
               <div className="mt-2 pt-2 border-t border-[var(--divider)] space-y-1 max-h-[420px] overflow-y-auto">
                 {LEARN_NAV_ITEMS.map((item) => {
                   const isLocked = item.requiresAuth && !sessionEmail;
+                  const targetHref = isLocked ? `/login?redirect=${encodeURIComponent(item.href)}` : item.href;
+                  const isActive = isLearnNavActive(item);
                   return (
-                    <button
+                    <Link
                       key={item.href}
-                      type="button"
-                      onClick={() => handleLearnClick(item)}
-                      className="w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-md text-xs text-left border border-transparent hover:border-[var(--divider)] hover:bg-[var(--base-soft)] transition"
+                      href={targetHref}
+                      className={`w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-md text-xs text-left border transition ${
+                        isActive
+                          ? "border-[var(--divider)] bg-[var(--base-soft)]"
+                          : "border-transparent hover:border-[var(--divider)] hover:bg-[var(--base-soft)]"
+                      }`}
+                      aria-current={isActive ? "page" : undefined}
                     >
                       <span className="truncate">{item.label}</span>
                       {item.requiresAuth && (
@@ -300,7 +282,7 @@ export default function TutorPage() {
                           {isLocked ? "Login" : "Private"}
                         </span>
                       )}
-                    </button>
+                    </Link>
                   );
                 })}
               </div>

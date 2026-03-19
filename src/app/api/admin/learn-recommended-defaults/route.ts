@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth/admin";
 import { sql } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 const LEVELS = ["all", "n5", "n4", "n3", "n2", "n1"] as const;
 const PER_LEVEL = 6;
 

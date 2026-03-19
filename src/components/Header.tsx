@@ -3,13 +3,14 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useState, useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
+import { LEARN_NAV_ITEMS } from "@/lib/nav/learnNav";
 
 const accountMenuItems = [
   { href: "/learn/dashboard", label: "My progress" },
-  { href: "/learn/dashboard", label: "My Rewards" },
   { href: "/scoreboard", label: "Scoreboard" },
   { href: "/library", label: "My Order" },
-  { href: "/account", label: "My Setting" },
+  { href: "/account", label: "My Settings" },
 ];
 
 const topNavLinks = [
@@ -21,34 +22,8 @@ const topNavLinks = [
   { href: "/contact", label: "Contact" },
 ];
 
-const learnDropdownItemsPublic = [
-  { href: "/learn", label: "All" },
-  { href: "/learn/curriculum", label: "Curriculum" },
-  { href: "/start-here", label: "Start Here" },
-  { href: "/jlpt", label: "JLPT" },
-  { href: "/free-n5-pack", label: "Free N5 Pack" },
-  { href: "/learn/grammar", label: "Grammar" },
-  { href: "/learn/vocabulary", label: "Vocabulary" },
-  { href: "/learn/kanji", label: "Kanji" },
-  { href: "/learn/reading", label: "Reading" },
-  { href: "/learn/reading/sandbox", label: "Reading sandbox" },
-  { href: "/learn/listening", label: "Listening" },
-  { href: "/learn/shadowing", label: "Shadowing" },
-  { href: "/learn/writing", label: "Writing" },
-  { href: "/learn/exam", label: "Mock exam" },
-  { href: "/learn/analytics", label: "Analytics" },
-  { href: "/learn/practice_test", label: "Practice Test" },
-  { href: "/learn/sounds", label: "Sounds" },
-  { href: "/learn/study_guide", label: "Study Guide" },
-  { href: "/quiz", label: "Placement Quiz" },
-];
-
-const learnDropdownItemsAuthOnly = [
-  { href: "/learn/dashboard", label: "My dashboard" },
-  { href: "/review", label: "Review" },
-];
-
 export function Header() {
+  const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [learnOpen, setLearnOpen] = useState(false);
@@ -122,6 +97,18 @@ export function Header() {
     };
   }, [mobileOpen]);
 
+  function isLearnNavActive(href: string) {
+    if (!pathname) return false;
+    if (pathname === href) return true;
+    if (href === "/learn") return pathname.startsWith("/learn/") || pathname.startsWith("/blog/");
+    if (href === "/learn/curriculum") return pathname.startsWith("/learn/curriculum");
+    if (pathname.startsWith("/blog/") && href.startsWith("/learn/")) {
+      const typeSegment = pathname.split("/")[2];
+      return typeSegment ? href === `/learn/${typeSegment}` : false;
+    }
+    return false;
+  }
+
   return (
     <>
       <header
@@ -162,6 +149,10 @@ export function Header() {
                 className="text-[#FAF8F5]/80 hover:text-primary font-medium text-[15px] transition-colors flex items-center gap-1"
                 aria-expanded={learnOpen}
                 aria-haspopup="true"
+                aria-controls="learn-dropdown"
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") setLearnOpen(false);
+                }}
               >
                 Learn
                 <svg className={`w-4 h-4 transition-transform ${learnOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -169,32 +160,15 @@ export function Header() {
                 </svg>
               </button>
               {learnOpen && (
-                <div className="absolute top-full left-0 mt-1 w-56 py-2 bg-[#2A2A2A] border border-[#3A3A3A] rounded-lg shadow-xl z-50">
-                  {learnDropdownItemsPublic.slice(0, 2).map((item) => (
+                <div id="learn-dropdown" className="absolute top-full left-0 mt-1 w-56 py-2 bg-[#2A2A2A] border border-[#3A3A3A] rounded-lg shadow-xl z-50">
+                  {(sessionEmail ? LEARN_NAV_ITEMS : LEARN_NAV_ITEMS.filter((i) => !i.requiresAuth)).map((item) => (
                     <Link
                       key={item.href}
                       href={item.href}
-                      className="block px-4 py-2 text-[#FAF8F5]/90 hover:bg-[#3A3A3A] hover:text-primary text-sm font-medium transition-colors"
-                      onClick={() => setLearnOpen(false)}
-                    >
-                      {item.label}
-                    </Link>
-                  ))}
-                  {sessionEmail && learnDropdownItemsAuthOnly.map((item) => (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className="block px-4 py-2 text-[#FAF8F5]/90 hover:bg-[#3A3A3A] hover:text-primary text-sm font-medium transition-colors"
-                      onClick={() => setLearnOpen(false)}
-                    >
-                      {item.label}
-                    </Link>
-                  ))}
-                  {learnDropdownItemsPublic.slice(2).map((item) => (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className="block px-4 py-2 text-[#FAF8F5]/90 hover:bg-[#3A3A3A] hover:text-primary text-sm font-medium transition-colors"
+                      className={`block px-4 py-2 text-sm font-medium transition-colors rounded ${
+                        isLearnNavActive(item.href) ? "bg-[#3A3A3A] text-primary" : "text-[#FAF8F5]/90 hover:bg-[#3A3A3A] hover:text-primary"
+                      }`}
+                      aria-current={isLearnNavActive(item.href) ? "page" : undefined}
                       onClick={() => setLearnOpen(false)}
                     >
                       {item.label}
@@ -214,6 +188,10 @@ export function Header() {
                   className="flex items-center gap-2 text-[#FAF8F5]/90 hover:text-primary font-medium text-sm rounded-full bg-[#2A2A2A] py-2 pl-3 pr-2 border border-[#3A3A3A]"
                   aria-expanded={accountOpen}
                   aria-haspopup="true"
+                  aria-controls="account-menu"
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") setAccountOpen(false);
+                  }}
                 >
                   {avatarUrl ? (
                     <img src={avatarUrl} alt="" className="w-6 h-6 rounded-full object-cover bg-primary/80" />
@@ -227,7 +205,7 @@ export function Header() {
                   </svg>
                 </button>
                 {accountOpen && (
-                  <div className="absolute top-full right-0 mt-1 w-52 py-2 bg-[#2A2A2A] border border-[#3A3A3A] rounded-lg shadow-xl z-50">
+                  <div id="account-menu" className="absolute top-full right-0 mt-1 w-52 py-2 bg-[#2A2A2A] border border-[#3A3A3A] rounded-lg shadow-xl z-50">
                     <Link
                       href="/account"
                       className="block px-4 py-2 text-[#FAF8F5]/90 hover:bg-[#3A3A3A] hover:text-primary text-sm font-medium transition-colors"
@@ -368,32 +346,15 @@ export function Header() {
               </button>
               {learnMobileExpanded && (
                 <div className="pl-4 pb-2 flex flex-col gap-0">
-                  {learnDropdownItemsPublic.slice(0, 2).map((item) => (
+                  {(sessionEmail ? LEARN_NAV_ITEMS : LEARN_NAV_ITEMS.filter((i) => !i.requiresAuth)).map((item) => (
                     <Link
                       key={item.href}
                       href={item.href}
                       onClick={() => { setMobileOpen(false); setLearnMobileExpanded(false); }}
-                      className="py-2 text-[#FAF8F5]/80 hover:text-primary text-sm"
-                    >
-                      {item.label}
-                    </Link>
-                  ))}
-                  {sessionEmail && learnDropdownItemsAuthOnly.map((item) => (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      onClick={() => { setMobileOpen(false); setLearnMobileExpanded(false); }}
-                      className="py-2 text-[#FAF8F5]/80 hover:text-primary text-sm"
-                    >
-                      {item.label}
-                    </Link>
-                  ))}
-                  {learnDropdownItemsPublic.slice(2).map((item) => (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      onClick={() => { setMobileOpen(false); setLearnMobileExpanded(false); }}
-                      className="py-2 text-[#FAF8F5]/80 hover:text-primary text-sm"
+                      className={`py-2 text-sm transition-colors ${
+                        isLearnNavActive(item.href) ? "text-primary font-medium" : "text-[#FAF8F5]/80 hover:text-primary"
+                      }`}
+                      aria-current={isLearnNavActive(item.href) ? "page" : undefined}
                     >
                       {item.label}
                     </Link>
