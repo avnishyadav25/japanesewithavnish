@@ -2,21 +2,26 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { AnnouncementBar } from "@/components/AnnouncementBar";
 import { ChatPanel } from "@/components/ChatPanel";
+import { FeedbackWidget } from "@/components/FeedbackWidget";
+import { getAdminSession } from "@/lib/auth/admin";
 
 const isComingSoon =
   process.env.COMING_SOON === "true" || process.env.COMING_SOON === "1";
 
-export default function MainLayout({
+export default async function MainLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const session = await getAdminSession();
+  const isAdmin = !!session;
+
   return (
     <div className="min-h-screen flex flex-col bg-base">
       {!isComingSoon && (
         <>
           <AnnouncementBar />
-          <Header />
+          <Header isAdmin={isAdmin} />
         </>
       )}
       <main className="flex-1">{children}</main>
@@ -26,6 +31,7 @@ export default function MainLayout({
           <ChatPanel />
         </>
       )}
+      <FeedbackWidget />
     </div>
   );
 }

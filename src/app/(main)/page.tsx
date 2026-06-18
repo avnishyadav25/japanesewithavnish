@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { sql } from "@/lib/db";
+import { getAdminSession } from "@/lib/auth/admin";
 import { HomeBundleCard } from "@/components/HomeBundleCard";
 import { BundleComparisonTable } from "@/components/BundleComparisonTable";
 import { StudyRoadmapMegaCta } from "@/components/StudyRoadmapMegaCta";
@@ -71,6 +72,9 @@ async function FullHomeView() {
     products = FALLBACK_PRODUCTS;
   }
 
+  const session = await getAdminSession();
+  const isAdmin = !!session;
+
   const mega = products.find((p: { is_mega?: boolean }) => p.is_mega);
   const restProducts = products.filter((p: { is_mega?: boolean }) => !p.is_mega);
   const TYPE_LABELS: Record<string, string> = {
@@ -81,11 +85,11 @@ async function FullHomeView() {
 
   return (
     <div>
-      {/* Hero — full-width row 1, 3-step cards row 2. Pattern limited to hero. */}
+      {/* Hero */}
       <section className="py-10 px-4 sm:py-16 sm:px-5 lg:px-6 hero-pattern-bg">
         <div className="max-w-[1100px] mx-auto">
           <div className="bento-grid">
-            {/* Row 1: Hero full width — radius 14px, H1 40px desktop / 28-32px mobile */}
+            {/* Row 1: Hero full width */}
             <div className="bento-span-6 flex flex-col justify-between bg-primary text-white border-0 min-h-[200px] sm:min-h-[240px] rounded-[14px] p-6 sm:p-9 shadow-card transition-all">
               <div>
                 <h1 className="font-heading text-[28px] sm:text-[40px] font-bold mb-4 leading-[1.15]">
@@ -99,39 +103,47 @@ async function FullHomeView() {
                 <Link href="/quiz" className="bg-white text-primary px-5 py-3 rounded-md font-semibold hover:bg-white/90 transition h-11 flex items-center hover:-translate-y-0.5 hover:shadow-lg">
                   Take the Quiz
                 </Link>
-                <Link href="/store" className="border-2 border-white/80 text-white px-5 py-3 rounded-md font-semibold hover:bg-white/10 transition h-11 flex items-center">
-                  Browse Bundles
-                </Link>
+                {isAdmin && (
+                  <Link href="/store" className="border-2 border-white/80 text-white px-5 py-3 rounded-md font-semibold hover:bg-white/10 transition h-11 flex items-center">
+                    Browse Bundles
+                  </Link>
+                )}
                 <Link href="/tutor" className="border-2 border-white/60 text-white px-5 py-3 rounded-md font-semibold hover:bg-white/10 transition h-11 flex items-center">
                   Nihongo Navi
                 </Link>
               </div>
-              <p className="text-white/85 text-[13px] mt-4">
-                Instant download • Lifetime access • Secure checkout
-              </p>
+              {isAdmin && (
+                <p className="text-white/85 text-[13px] mt-4">
+                  Instant download • Lifetime access • Secure checkout
+                </p>
+              )}
             </div>
 
-            {/* Row 2: 3-step cards — 14px radius, 24px padding, big number 40px */}
+            {/* Row 2: 3-step cards */}
             <div className="bento-span-2 card flex flex-col justify-center items-center text-center bg-white border-[#EEEEEE] rounded-[14px] p-6">
               <span className="text-[40px] font-bold text-primary mb-2">1</span>
               <h3 className="font-heading font-bold text-charcoal mb-1 text-base">Quiz</h3>
               <p className="text-secondary text-[14px] mb-4">Know your level in 3 minutes</p>
               <Link href="/quiz" className="text-primary text-sm font-medium hover:underline">Start →</Link>
             </div>
+            {isAdmin && (
+              <div className="bento-span-2 card flex flex-col justify-center items-center text-center bg-white border-[#EEEEEE] rounded-[14px] p-6">
+                <span className="text-[40px] font-bold text-primary mb-2">2</span>
+                <h3 className="font-heading font-bold text-charcoal mb-1 text-base">Bundle</h3>
+                <p className="text-secondary text-[14px] mb-4">Get structured PDFs + practice + mock tests</p>
+                <Link href="/store" className="text-primary text-sm font-medium hover:underline">Store →</Link>
+              </div>
+            )}
+            {isAdmin && (
+              <div className="bento-span-2 card flex flex-col justify-center items-center text-center bg-white border-[#EEEEEE] rounded-[14px] p-6">
+                <span className="text-[40px] font-bold text-primary mb-2">3</span>
+                <h3 className="font-heading font-bold text-charcoal mb-1 text-base">Library</h3>
+                <p className="text-secondary text-[14px] mb-4">Access anytime. Study offline.</p>
+                <Link href="/login" className="text-primary text-sm font-medium hover:underline">Login →</Link>
+              </div>
+            )}
             <div className="bento-span-2 card flex flex-col justify-center items-center text-center bg-white border-[#EEEEEE] rounded-[14px] p-6">
-              <span className="text-[40px] font-bold text-primary mb-2">2</span>
-              <h3 className="font-heading font-bold text-charcoal mb-1 text-base">Bundle</h3>
-              <p className="text-secondary text-[14px] mb-4">Get structured PDFs + practice + mock tests</p>
-              <Link href="/store" className="text-primary text-sm font-medium hover:underline">Store →</Link>
-            </div>
-            <div className="bento-span-2 card flex flex-col justify-center items-center text-center bg-white border-[#EEEEEE] rounded-[14px] p-6">
-              <span className="text-[40px] font-bold text-primary mb-2">3</span>
-              <h3 className="font-heading font-bold text-charcoal mb-1 text-base">Library</h3>
-              <p className="text-secondary text-[14px] mb-4">Access anytime. Study offline.</p>
-              <Link href="/login" className="text-primary text-sm font-medium hover:underline">Login →</Link>
-            </div>
-            <div className="bento-span-2 card flex flex-col justify-center items-center text-center bg-white border-[#EEEEEE] rounded-[14px] p-6">
-              <span className="text-[40px] font-bold text-primary mb-2">4</span>
+              <span className="text-[40px] font-bold text-primary mb-2">{isAdmin ? "4" : "2"}</span>
               <h3 className="font-heading font-bold text-charcoal mb-1 text-base">Nihongo Navi</h3>
               <p className="text-secondary text-[14px] mb-4">AI tutor — grammar, vocab, sentence correction.</p>
               <Link href="/tutor" className="text-primary text-sm font-medium hover:underline">Try it →</Link>
@@ -140,7 +152,7 @@ async function FullHomeView() {
         </div>
       </section>
 
-      {/* JLPT Levels — pills: 36px height, 8px 14px padding, 999px radius */}
+      {/* JLPT Levels */}
       <section className="py-10 px-4 sm:py-[60px] sm:px-5 lg:px-6">
         <div className="max-w-[1100px] mx-auto">
           <div className="bento-grid">
@@ -159,9 +171,11 @@ async function FullHomeView() {
                   {l.level.toUpperCase()} — {l.label}
                 </Link>
               ))}
-              <Link href={JLPT_LEVELS[5].href} className="btn-primary flex items-center">
-                Explore Levels
-              </Link>
+              {isAdmin && (
+                <Link href={JLPT_LEVELS[5].href} className="btn-primary flex items-center">
+                  Explore Levels
+                </Link>
+              )}
             </div>
             <div className="bento-span-2 card flex flex-col justify-center bg-[#FFF7F7] border-l-4 border-l-primary p-5">
               <h3 className="font-heading font-bold text-charcoal mb-1 text-base">Free N5 Kana Pack</h3>
@@ -174,67 +188,75 @@ async function FullHomeView() {
         </div>
       </section>
 
-      {/* Featured Bundles */}
-      <section className="py-10 px-4 sm:py-[60px] sm:px-5 lg:px-6">
-        <div className="max-w-[1100px] mx-auto">
-          <h2 className="font-heading text-2xl font-bold text-charcoal mb-8">Choose your bundle</h2>
-          <div className="bento-grid">
-            {mega && (
-              <div className="bento-span-4 bento-row-2">
-                <HomeBundleCard
-                  slug={mega.slug}
-                  name={mega.name}
-                  price={mega.price_paise}
-                  comparePrice={mega.compare_price_paise}
-                  badge={mega.badge === "premium" ? "premium" : undefined}
-                  jlptLevel={mega.jlpt_level}
-                  isMega={true}
-                  imageUrl={mega.image_url}
-                />
-              </div>
-            )}
-            {restProducts.map((product: { id: string; slug: string; name: string; price_paise: number; compare_price_paise?: number; jlpt_level?: string | null; badge?: string; image_url?: string | null }) => (
-              <div key={product.id} className="bento-span-2">
-                <HomeBundleCard
-                  slug={product.slug}
-                  name={product.name}
-                  price={product.price_paise}
-                  comparePrice={product.compare_price_paise}
-                  badge={product.badge === "premium" ? "premium" : product.badge === "offer" ? "offer" : undefined}
-                  jlptLevel={product.jlpt_level}
-                  isMega={false}
-                  imageUrl={product.image_url}
-                />
-              </div>
-            ))}
+      {/* Featured Bundles — admin only */}
+      {isAdmin && (
+        <section className="py-10 px-4 sm:py-[60px] sm:px-5 lg:px-6">
+          <div className="max-w-[1100px] mx-auto">
+            <h2 className="font-heading text-2xl font-bold text-charcoal mb-8">Choose your bundle</h2>
+            <div className="bento-grid">
+              {mega && (
+                <div className="bento-span-4 bento-row-2">
+                  <HomeBundleCard
+                    slug={mega.slug}
+                    name={mega.name}
+                    price={mega.price_paise}
+                    comparePrice={mega.compare_price_paise}
+                    badge={mega.badge === "premium" ? "premium" : undefined}
+                    jlptLevel={mega.jlpt_level}
+                    isMega={true}
+                    imageUrl={mega.image_url}
+                  />
+                </div>
+              )}
+              {restProducts.map((product: { id: string; slug: string; name: string; price_paise: number; compare_price_paise?: number; jlpt_level?: string | null; badge?: string; image_url?: string | null }) => (
+                <div key={product.id} className="bento-span-2">
+                  <HomeBundleCard
+                    slug={product.slug}
+                    name={product.name}
+                    price={product.price_paise}
+                    comparePrice={product.compare_price_paise}
+                    badge={product.badge === "premium" ? "premium" : product.badge === "offer" ? "offer" : undefined}
+                    jlptLevel={product.jlpt_level}
+                    isMega={false}
+                    imageUrl={product.image_url}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
-      {/* Bundle Comparison */}
-      <section className="py-10 px-4 sm:py-[60px] sm:px-5 lg:px-6">
-        <div className="max-w-[1100px] mx-auto">
-          <BundleComparisonTable data={settings.bundle_comparison as Parameters<typeof BundleComparisonTable>[0]["data"]} />
-        </div>
-      </section>
+      {/* Bundle Comparison — admin only */}
+      {isAdmin && (
+        <section className="py-10 px-4 sm:py-[60px] sm:px-5 lg:px-6">
+          <div className="max-w-[1100px] mx-auto">
+            <BundleComparisonTable data={settings.bundle_comparison as Parameters<typeof BundleComparisonTable>[0]["data"]} />
+          </div>
+        </section>
+      )}
 
-      {/* Study Roadmap + Mega CTA */}
-      <section className="py-10 px-4 sm:py-[60px] sm:px-5 lg:px-6">
-        <div className="max-w-[1100px] mx-auto">
-          <StudyRoadmapMegaCta
-            data={settings.study_roadmap as Parameters<typeof StudyRoadmapMegaCta>[0]["data"]}
-            megaPrice={mega?.price_paise}
-          />
-        </div>
-      </section>
+      {/* Study Roadmap + Mega CTA — admin only */}
+      {isAdmin && (
+        <section className="py-10 px-4 sm:py-[60px] sm:px-5 lg:px-6">
+          <div className="max-w-[1100px] mx-auto">
+            <StudyRoadmapMegaCta
+              data={settings.study_roadmap as Parameters<typeof StudyRoadmapMegaCta>[0]["data"]}
+              megaPrice={mega?.price_paise}
+            />
+          </div>
+        </section>
+      )}
 
-      {/* What's Inside */}
-      <section className="py-10 px-4 sm:py-[60px] sm:px-5 lg:px-6">
-        <div className="max-w-[1100px] mx-auto">
-          <h2 className="font-heading text-2xl font-bold text-charcoal mb-4 text-center">What&apos;s inside every bundle</h2>
-          <WhatsInsideStrip items={settings.homepage_feature_strip as Parameters<typeof WhatsInsideStrip>[0]["items"]} />
-        </div>
-      </section>
+      {/* What's Inside — admin only */}
+      {isAdmin && (
+        <section className="py-10 px-4 sm:py-[60px] sm:px-5 lg:px-6">
+          <div className="max-w-[1100px] mx-auto">
+            <h2 className="font-heading text-2xl font-bold text-charcoal mb-4 text-center">What&apos;s inside every bundle</h2>
+            <WhatsInsideStrip items={settings.homepage_feature_strip as Parameters<typeof WhatsInsideStrip>[0]["items"]} />
+          </div>
+        </section>
+      )}
 
       {/* Quiz CTA */}
       <section className="py-10 px-4 sm:py-[60px] sm:px-5 lg:px-6">
@@ -257,7 +279,7 @@ async function FullHomeView() {
         </div>
       </section>
 
-      {/* Latest Lessons — hide if empty to avoid placeholder look */}
+      {/* Latest Lessons */}
       {lessons.length > 0 && (
       <section className="py-10 px-4 sm:py-[60px] sm:px-5 lg:px-6">
         <div className="max-w-[1100px] mx-auto">
@@ -305,7 +327,7 @@ async function FullHomeView() {
         </div>
       </section>
 
-      {/* Get JLPT tips and updates — only on home */}
+      {/* Newsletter */}
       <NewsletterSection source="site" />
 
     </div>
