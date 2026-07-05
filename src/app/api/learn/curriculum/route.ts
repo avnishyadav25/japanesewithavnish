@@ -214,6 +214,9 @@ export async function GET(req: Request) {
       }
     }
 
+    const isLocalTest = process.env.LOCALTEST === "true";
+    const isLoggedIn = isLocalTest || !!session?.email;
+
     const payload = pathOnly
       ? {
           levels: tree,
@@ -221,9 +224,9 @@ export async function GET(req: Request) {
           totalEstimatedMinutes,
           pathProgressPercent,
           currentLevelCode,
-          isLoggedIn: !!session?.email,
-          completedLessonIds: session?.email ? completedLessonIds : undefined,
-          ...(session?.email && { dueReviewsCount, advanceBlocked, advanceBlockReason }),
+          isLoggedIn,
+          completedLessonIds: isLoggedIn ? (completedLessonIds || []) : undefined,
+          ...(isLoggedIn && { dueReviewsCount, advanceBlocked, advanceBlockReason }),
         }
       : {
           levels: tree,
@@ -231,8 +234,8 @@ export async function GET(req: Request) {
           totalEstimatedMinutes,
           pathProgressPercent,
           currentLevelCode,
-          isLoggedIn: !!session?.email,
-          ...(session?.email && { dueReviewsCount, advanceBlocked, advanceBlockReason }),
+          isLoggedIn,
+          ...(isLoggedIn && { dueReviewsCount, advanceBlocked, advanceBlockReason }),
         };
 
     const res = NextResponse.json(payload);

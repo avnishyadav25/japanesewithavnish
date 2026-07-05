@@ -265,7 +265,7 @@ export function CurriculumBrowserClient() {
                     {/* Info details */}
                     <div className="p-5 flex-1 flex flex-col justify-between">
                       <div>
-                        <h3 className="font-heading text-base font-bold text-[#1A1A1A] group-hover:text-primary transition-colors mb-2 line-clamp-2">
+                        <h3 className="font-heading text-base font-bold text-charcoal group-hover:text-primary transition-colors mb-2 block">
                           {mod.title}
                         </h3>
                         <p className="text-secondary text-xs">
