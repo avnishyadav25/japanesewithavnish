@@ -35,7 +35,7 @@ export function BlogHeroWithSearch({ initialSearch = "" }: { initialSearch?: str
           placeholder="Search grammar, kanji, vocab, roadmap…"
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
-          className="flex-1 min-w-0 px-4 py-2.5 border border-[#EEEEEE] rounded-md text-charcoal placeholder:text-[#555555] bg-white text-sm"
+          className="flex-1 min-w-0 px-4 py-2.5 border border-[var(--divider)] rounded-md text-charcoal placeholder:text-[#555555] bg-white text-sm"
         />
         <button type="submit" className="btn-primary px-4 shrink-0">
           Search

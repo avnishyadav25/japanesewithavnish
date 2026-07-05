@@ -9,7 +9,7 @@ export const metadata = {
 export default function FreeN5PackPage() {
   return (
     <div className="bg-[#FAF8F5] py-10 px-4 sm:py-[60px] sm:px-5 lg:px-6">
-      <div className="max-w-[1100px] mx-auto">
+      <div className="max-w-[1200px] mx-auto">
         <div className="mb-6">
           <Link
             href="/start-here"

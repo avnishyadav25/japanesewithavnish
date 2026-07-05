@@ -72,7 +72,7 @@ export default async function StartHerePage() {
 
       {/* Hero */}
       <section className="py-10 px-4 sm:py-[60px] sm:px-5 lg:px-6">
-        <div className="max-w-[1100px] mx-auto">
+        <div className="max-w-[1200px] mx-auto">
           <div className="grid md:grid-cols-2 gap-8">
             <div>
               <h1 className="font-heading text-3xl sm:text-4xl font-bold text-charcoal mb-4">
@@ -111,7 +111,7 @@ export default async function StartHerePage() {
 
       {/* 3-Step Cards */}
       <section className="py-10 px-4 sm:py-[60px] sm:px-5 lg:px-6">
-        <div className="max-w-[1100px] mx-auto">
+        <div className="max-w-[1200px] mx-auto">
           <div className="grid md:grid-cols-3 gap-4">
             <div className="card p-6">
               <span className="text-4xl font-bold text-primary mb-3 block">1</span>
@@ -143,14 +143,14 @@ export default async function StartHerePage() {
 
       {/* Choose Your Path */}
       <section className="py-10 px-4 sm:py-[60px] sm:px-5 lg:px-6">
-        <div className="max-w-[1100px] mx-auto">
+        <div className="max-w-[1200px] mx-auto">
           <ChooseYourPathTabs mega={mega} levelProducts={levelProducts} />
         </div>
       </section>
 
       {/* Recommended Bundles */}
       <section className="py-10 px-4 sm:py-[60px] sm:px-5 lg:px-6">
-        <div className="max-w-[1100px] mx-auto">
+        <div className="max-w-[1200px] mx-auto">
           <h2 className="font-heading text-2xl font-bold text-charcoal mb-8">Recommended bundles</h2>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {orderedBundles.map((product: { id: string; slug: string; name: string; price_paise: number; compare_price_paise?: number; jlpt_level?: string | null; badge?: string; is_mega?: boolean }) => (
@@ -172,7 +172,7 @@ export default async function StartHerePage() {
       {/* Curated Blog */}
       {curatedPosts.length > 0 && (
         <section className="py-10 px-4 sm:py-[60px] sm:px-5 lg:px-6">
-          <div className="max-w-[1100px] mx-auto">
+          <div className="max-w-[1200px] mx-auto">
             <StartHereCuratedBlog posts={curatedPosts} />
           </div>
         </section>
@@ -180,7 +180,7 @@ export default async function StartHerePage() {
 
       {/* FAQ */}
       <section className="py-10 px-4 sm:py-[60px] sm:px-5 lg:px-6">
-        <div className="max-w-[1100px] mx-auto">
+        <div className="max-w-[1200px] mx-auto">
           <HomeFaq items={faqItems} />
         </div>
       </section>

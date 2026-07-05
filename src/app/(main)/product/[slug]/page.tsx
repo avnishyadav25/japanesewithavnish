@@ -7,6 +7,7 @@ import { ProductSchema } from "@/components/JsonLd";
 import { BundleContentsTree } from "@/components/BundleContentsTree";
 import { getBundleContents } from "@/data/bundle-contents";
 import { ContentAnalytics } from "@/components/ContentAnalytics";
+import { SamplePreviewTabs } from "./SamplePreviewTabs";
 
 type ProductWithAssets = {
   id: string;
@@ -29,6 +30,39 @@ type ProductWithAssets = {
   product_assets?: { id: string; display_name: string; storage_path: string; type: string; sort_order?: number }[];
 };
 
+const BUNDLE_STATS: Record<string, { value: string; label: string }[]> = {
+  "japanese-n5-mastery-bundle": [
+    { value: "80+", label: "Kanji" },
+    { value: "800+", label: "Vocabulary" },
+    { value: "100+", label: "Grammar points" },
+    { value: "3", label: "Mock tests" },
+  ],
+  "japanese-n4-upgrade-bundle": [
+    { value: "170+", label: "Kanji" },
+    { value: "1,500+", label: "Vocabulary" },
+    { value: "150+", label: "Grammar points" },
+    { value: "3", label: "Mock tests" },
+  ],
+  "japanese-n3-power-bundle": [
+    { value: "370+", label: "Kanji" },
+    { value: "3,700+", label: "Vocabulary" },
+    { value: "170+", label: "Grammar points" },
+    { value: "4", label: "Mock tests" },
+  ],
+  "japanese-n2-pro-bundle": [
+    { value: "1,000+", label: "Kanji" },
+    { value: "6,000+", label: "Vocabulary" },
+    { value: "200+", label: "Grammar points" },
+    { value: "5", label: "Mock tests" },
+  ],
+  "japanese-n1-elite-bundle": [
+    { value: "2,000+", label: "Kanji" },
+    { value: "10,000+", label: "Vocabulary" },
+    { value: "250+", label: "Grammar points" },
+    { value: "5", label: "Mock tests" },
+  ],
+};
+
 export default async function ProductPage({
   params,
 }: {
@@ -42,7 +76,10 @@ export default async function ProductPage({
   const productRows = await sql`SELECT * FROM products WHERE slug = ${slug} LIMIT 1` as ProductWithAssets[];
   const prod = productRows[0];
   if (!prod) notFound();
-  const assetRows = await sql`SELECT id, display_name, storage_path, type, sort_order FROM product_assets WHERE product_id = ${prod.id} ORDER BY sort_order` as { id: string; display_name: string; storage_path: string; type: string; sort_order?: number }[];
+  const [assetRows, megaRows] = await Promise.all([
+    sql`SELECT id, display_name, storage_path, type, sort_order FROM product_assets WHERE product_id = ${prod.id} ORDER BY sort_order` as unknown as Promise<{ id: string; display_name: string; storage_path: string; type: string; sort_order?: number }[]>,
+    sql`SELECT slug, price_paise FROM products WHERE is_mega = true LIMIT 1` as unknown as Promise<{ slug: string; price_paise: number }[]>,
+  ]);
   product = { ...prod, product_assets: assetRows };
 
   if (!product) notFound();
@@ -62,11 +99,21 @@ export default async function ProductPage({
   const faq = (product.faq as { q: string; a: string }[]) || [];
   const galleryImages = (product.gallery_images as string[]) || [];
   const bundleContents = getBundleContents(slug);
+  const bundleStats = BUNDLE_STATS[slug] || null;
 
-  // Parse who_its_for into bullet list if line-separated
   const whoLines = product.who_its_for
     ? String(product.who_its_for).split("\n").map((l) => l.trim()).filter(Boolean)
     : [];
+
+  const outcomeLines = product.outcome
+    ? String(product.outcome).split("\n").filter(Boolean)
+    : [];
+
+  const megaProduct = megaRows[0] || null;
+  const megaSlug = megaProduct?.slug ?? null;
+  const megaPrice = megaProduct
+    ? `₹${Math.round(megaProduct.price_paise / 100)}`
+    : "₹899";
 
   const siteUrl =
     process.env.NEXT_PUBLIC_SITE_URL || "https://japanesewithavnish.com";
@@ -82,29 +129,69 @@ export default async function ProductPage({
         priceCurrency="INR"
         url={productUrl}
       />
-      <div className="bg-[#FAF8F5] py-12 sm:py-16 px-4 sm:px-6">
+
+      <div className="bg-[var(--background)] py-10 sm:py-14 px-4 sm:px-6">
         <div className="max-w-[1100px] mx-auto">
           {/* Breadcrumb */}
-          <nav className="text-sm text-secondary mb-8 flex items-center gap-2">
-            <Link href="/" className="hover:text-primary transition-colors">
-              Home
-            </Link>
-            <span className="opacity-50">／</span>
-            <Link href="/store" className="hover:text-primary transition-colors">
-              Store
-            </Link>
-            <span className="opacity-50">／</span>
-            <span className="text-charcoal truncate max-w-[200px] sm:max-w-none">
-              {product.name}
-            </span>
+          <nav className="text-[13px] text-[#888] mb-8 flex items-center gap-1.5">
+            <Link href="/" className="hover:text-primary transition-colors">Home</Link>
+            <span className="opacity-40">/</span>
+            <Link href="/store" className="hover:text-primary transition-colors">Store</Link>
+            <span className="opacity-40">/</span>
+            <span className="text-[#1A1A1A] truncate max-w-[200px] sm:max-w-none">{product.name}</span>
           </nav>
 
-          <div className="grid gap-10 lg:grid-cols-[minmax(0,680px)_340px]">
-            {/* ─── Left column ─────────────────────────────── */}
+          <div className="grid gap-10 lg:grid-cols-[minmax(0,660px)_340px]">
+            {/* ── Left column ── */}
             <div>
+              {/* Badge row + title */}
+              <div className="flex items-center gap-2 flex-wrap mb-3">
+                {product.badge === "premium" && (
+                  <span className="badge-premium">Premium</span>
+                )}
+                {product.badge === "offer" && (
+                  <span className="badge-offer">Offer</span>
+                )}
+                {product.jlpt_level && (
+                  <span className="text-[12px] px-3 py-1 rounded-full bg-[var(--background)] border border-[var(--divider)] text-[#555] font-medium">
+                    JLPT {product.jlpt_level}
+                  </span>
+                )}
+                {product.is_mega && (
+                  <span className="text-[12px] px-3 py-1 rounded-full bg-primary/10 text-primary font-semibold border border-primary/20">
+                    Mega Bundle
+                  </span>
+                )}
+              </div>
+
+              <h1 className="font-serif text-[32px] sm:text-[38px] font-normal text-[#1A1A1A] leading-[1.15] mb-3">
+                {product.name}
+              </h1>
+
+              {product.description && (
+                <p className="text-[15px] text-[#555] leading-[1.75] mb-5 max-w-[540px]">
+                  {product.description}
+                </p>
+              )}
+
+              {/* Stats strip */}
+              {bundleStats && (
+                <div className="flex flex-wrap gap-2 mb-6 pt-5 border-t border-[var(--divider)]">
+                  {bundleStats.map((s) => (
+                    <span
+                      key={s.label}
+                      className="px-3 py-1.5 bg-white border border-[var(--divider)] rounded-lg text-[13px] font-medium text-[#1A1A1A]"
+                    >
+                      <strong>{s.value}</strong>{" "}
+                      <span className="text-[#888]">{s.label}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+
               {/* Hero image */}
               {product.image_url && (
-                <div className="relative aspect-video w-full rounded-bento overflow-hidden mb-4 shadow-sm">
+                <div className="relative aspect-video w-full rounded-xl overflow-hidden mb-4 border border-[var(--divider)]">
                   <Image
                     src={product.image_url}
                     alt={product.name}
@@ -114,7 +201,7 @@ export default async function ProductPage({
                     priority
                   />
                   {discount && (
-                    <div className="absolute top-3 right-3 bg-primary text-white text-sm font-bold px-3 py-1 rounded-full shadow">
+                    <div className="absolute top-3 right-3 bg-primary text-white text-[12px] font-bold px-3 py-1 rounded-full shadow">
                       {discount}% OFF
                     </div>
                   )}
@@ -127,7 +214,7 @@ export default async function ProductPage({
                   {galleryImages.filter(Boolean).map((url, i) => (
                     <div
                       key={i}
-                      className="relative flex-shrink-0 w-24 h-16 rounded-bento overflow-hidden border border-[var(--divider)] bg-[var(--base)]"
+                      className="relative flex-shrink-0 w-24 h-16 rounded-lg overflow-hidden border border-[var(--divider)]"
                     >
                       <Image
                         src={url}
@@ -141,102 +228,74 @@ export default async function ProductPage({
                 </div>
               )}
 
-              {/* Badges + JLPT */}
-              <div className="flex items-center gap-2 flex-wrap mb-4">
-                {product.badge === "premium" && (
-                  <span className="badge-premium">Premium</span>
-                )}
-                {product.badge === "offer" && (
-                  <span className="badge-offer">Offer</span>
-                )}
-                {product.jlpt_level && (
-                  <span className="text-xs px-3 py-1 rounded-full bg-[var(--base)] border border-[var(--divider)] text-secondary font-medium">
-                    JLPT {product.jlpt_level}
-                  </span>
-                )}
-                {product.is_mega && (
-                  <span className="text-xs px-3 py-1 rounded-full bg-primary/10 text-primary font-semibold border border-primary/20">
-                    Mega Bundle
-                  </span>
-                )}
-              </div>
-
-              {/* Description card */}
-              {product.description && (
-                <article className="card mb-6">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="japanese-kanji-accent text-lg">概要</span>
-                    <span className="text-secondary text-sm">— Overview</span>
-                  </div>
-                  <p className="text-secondary text-sm leading-relaxed">
-                    {product.description}
-                  </p>
-                </article>
-              )}
-
-              {/* Sample / preview */}
-              <article className="card overflow-hidden mb-6">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="japanese-kanji-accent text-sm">サンプル</span>
-                  <span className="text-secondary text-xs">— Preview / Sample</span>
-                </div>
-                {product.preview_url ? (
-                  <a
-                    href={product.preview_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary font-medium hover:underline text-sm"
-                  >
-                    View sample content →
-                  </a>
-                ) : (
-                  <p className="text-secondary text-sm">
-                    Sample content available after purchase. Instant access to all materials.
-                  </p>
-                )}
-              </article>
-
-              {/* Who it's for */}
-              {whoLines.length > 0 && (
-                <section className="card mb-6">
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="japanese-kanji-accent text-lg">対象者</span>
-                    <span className="text-secondary text-sm">—</span>
-                    <span className="text-secondary text-sm">Who this is for</span>
-                  </div>
-                  <ul className="space-y-2">
-                    {whoLines.map((line: string, i: number) => (
-                      <li key={i} className="flex items-start gap-2 text-sm text-secondary">
-                        <span className="text-primary mt-0.5 flex-shrink-0">✓</span>
-                        {line}
-                      </li>
+              {/* What's included — 3-col grid */}
+              {included.length > 0 && (
+                <section className="mb-8">
+                  <h2 className="font-serif text-[20px] font-normal text-[#1A1A1A] mb-4">
+                    {"What's included"}
+                  </h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {included.map((item, i) => (
+                      <div
+                        key={i}
+                        className="flex items-start gap-3 bg-white border border-[var(--divider)] rounded-xl p-4"
+                      >
+                        <span className="text-primary font-bold flex-shrink-0 mt-0.5">→</span>
+                        <span className="text-[13px] text-[#555] leading-relaxed">{item}</span>
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                 </section>
               )}
 
-              {/* What's included */}
-              {included.length > 0 && (
-                <section className="card mb-6">
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="japanese-kanji-accent text-lg">内容</span>
-                    <span className="text-secondary text-sm">—</span>
-                    <span className="text-secondary text-sm">What&apos;s included</span>
+              {/* Sample preview tabs */}
+              <section className="mb-2">
+                <h2 className="font-serif text-[20px] font-normal text-[#1A1A1A] mb-4">
+                  Sample content
+                </h2>
+                <SamplePreviewTabs />
+              </section>
+
+              {/* Who it's for — 2-col */}
+              {whoLines.length > 0 && (
+                <section className="mb-8">
+                  <h2 className="font-serif text-[20px] font-normal text-[#1A1A1A] mb-4">
+                    Who this is for
+                  </h2>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <ul className="space-y-3">
+                      {whoLines.map((line, i) => (
+                        <li
+                          key={i}
+                          className="flex items-start gap-3 p-4 bg-white rounded-xl border border-[var(--divider)]"
+                        >
+                          <span className="w-6 h-6 rounded-full bg-[var(--red-light)] text-primary flex items-center justify-center text-[11px] font-bold flex-shrink-0 mt-0.5">
+                            ✓
+                          </span>
+                          <span className="text-[13px] text-[#1A1A1A] leading-relaxed">{line}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="bg-[var(--red-light)] border border-[#fecdd3] rounded-xl p-6 flex flex-col justify-between">
+                      <div>
+                        <h3 className="font-serif text-[18px] font-normal text-[#1A1A1A] mb-2">
+                          Not sure this is right for you?
+                        </h3>
+                        <p className="text-[13px] text-[#555]">
+                          Take the 3-minute placement quiz — we&apos;ll recommend the right level.
+                        </p>
+                      </div>
+                      <Link href="/quiz" className="btn-primary mt-5 self-start text-[14px]">
+                        Take Quiz →
+                      </Link>
+                    </div>
                   </div>
-                  <ul className="space-y-2">
-                    {included.map((item, i) => (
-                      <li key={i} className="flex items-start gap-2 text-sm text-secondary">
-                        <span className="text-primary mt-0.5 flex-shrink-0">→</span>
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
                 </section>
               )}
 
               {/* Bundle contents tree */}
               {bundleContents && (
-                <section className="card mb-6">
+                <section className="mb-8 bg-white border border-[var(--divider)] rounded-xl p-5">
                   <BundleContentsTree
                     items={bundleContents}
                     titleJa="含まれるファイル"
@@ -245,41 +304,74 @@ export default async function ProductPage({
                 </section>
               )}
 
-              {/* Outcome */}
-              {product.outcome && (
-                <section className="card mb-6">
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="japanese-kanji-accent text-lg">成果</span>
-                    <span className="text-secondary text-sm">—</span>
-                    <span className="text-secondary text-sm">What you&apos;ll achieve</span>
+              {/* Outcomes — numbered cards */}
+              {outcomeLines.length > 0 && (
+                <section className="mb-8">
+                  <h2 className="font-serif text-[20px] font-normal text-[#1A1A1A] mb-4">
+                    {"What you'll achieve"}
+                  </h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {outcomeLines.map((line, i) => (
+                      <div
+                        key={i}
+                        className="flex items-start gap-4 bg-white border border-[var(--divider)] rounded-xl p-5"
+                      >
+                        <span className="font-serif text-[40px] text-[var(--divider)] leading-none font-normal flex-shrink-0">
+                          {i + 1}
+                        </span>
+                        <p className="text-[13px] text-[#555] leading-relaxed mt-2">{line}</p>
+                      </div>
+                    ))}
                   </div>
-                  <p className="text-secondary text-sm leading-relaxed">
-                    {product.outcome}
-                  </p>
                 </section>
+              )}
+
+              {/* Mega upsell card (non-mega only) */}
+              {!product.is_mega && megaSlug && (
+                <div className="bg-[var(--gold-light)] border border-[var(--gold)] rounded-xl p-6 mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div>
+                    <p className="text-[11px] font-bold tracking-[.1em] uppercase text-[var(--gold-dark)] mb-1">
+                      Save more
+                    </p>
+                    <h3 className="font-serif text-[17px] font-normal text-[#1A1A1A] mb-1">
+                      Upgrade to the Complete Mega Bundle
+                    </h3>
+                    <p className="text-[13px] text-[#555]">
+                      All 5 levels + study roadmap at {megaPrice}
+                    </p>
+                  </div>
+                  <Link
+                    href={`/product/${megaSlug}`}
+                    className="btn-primary flex-shrink-0 text-[14px]"
+                  >
+                    View Mega Bundle →
+                  </Link>
+                </div>
               )}
 
               {/* FAQ */}
               {faq.length > 0 && (
-                <section className="card mb-6">
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className="japanese-kanji-accent text-lg">よくある質問</span>
-                    <span className="text-secondary text-sm">— FAQ</span>
-                  </div>
-                  <dl className="space-y-5">
+                <section className="mb-8">
+                  <h2 className="font-serif text-[20px] font-normal text-[#1A1A1A] mb-4">
+                    Frequently asked questions
+                  </h2>
+                  <dl className="space-y-0 border border-[var(--divider)] rounded-xl overflow-hidden">
                     {faq.map((item, i) => (
-                      <div key={i} className="border-b border-[var(--divider)] pb-4 last:border-0 last:pb-0">
-                        <dt className="font-medium text-charcoal text-sm mb-1">
-                          Q. {item.q}
+                      <div
+                        key={i}
+                        className="px-5 py-4 border-b border-[var(--divider)] last:border-0 bg-white"
+                      >
+                        <dt className="font-bold text-[14px] text-[#1A1A1A] mb-1.5">
+                          {item.q}
                         </dt>
-                        <dd className="text-secondary text-sm leading-relaxed pl-4">
+                        <dd className="text-[13px] text-[#555] leading-relaxed">
                           {item.a}
                         </dd>
                       </div>
                     ))}
                   </dl>
                   {product.no_refunds_note && (
-                    <p className="text-xs text-secondary mt-4 pt-3 border-t border-[var(--divider)]">
+                    <p className="text-[12px] text-[#888] mt-3">
                       ⚠ {product.no_refunds_note}
                     </p>
                   )}
@@ -287,7 +379,7 @@ export default async function ProductPage({
               )}
             </div>
 
-            {/* ─── Right column: sticky purchase card + quick checkout drawer ─────── */}
+            {/* ── Right column: sticky purchase card ── */}
             <ProductSidebarWithCheckout
               product={{
                 id: product.id,

@@ -43,7 +43,7 @@ export function LeadMagnetForm() {
             onChange={(e) => setEmail(e.target.value)}
             required
             disabled={status === "loading"}
-            className="flex-1 h-11 px-4 border border-[#EEEEEE] rounded-lg text-charcoal focus:border-primary focus:outline-none transition disabled:opacity-60"
+            className="flex-1 h-11 px-4 border border-[var(--divider)] rounded-lg text-charcoal focus:border-primary focus:outline-none transition disabled:opacity-60"
           />
           <button
             type="submit"

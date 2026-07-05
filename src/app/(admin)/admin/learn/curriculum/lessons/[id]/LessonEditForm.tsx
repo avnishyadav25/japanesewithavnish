@@ -47,7 +47,7 @@ export function LessonEditForm({ lessonId, levelCode = "N5", initial }: Props) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-2xl space-y-4">
+    <form onSubmit={handleSubmit} className="w-full space-y-4">
       {error && <p className="text-red-600 text-sm">{error}</p>}
       <div>
         <label className="block text-sm font-medium text-charcoal mb-1">Code</label>

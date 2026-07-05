@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { sql } from "@/lib/db";
 import { ProductCard } from "@/components/ProductCard";
-import { StoreFilters } from "./StoreFilters";
 import { BundleComparisonTable } from "@/components/BundleComparisonTable";
 import { HomeFaq } from "@/components/HomeFaq";
+import { NewsletterSection } from "@/components/NewsletterSection";
+import { StoreHero } from "@/components/StoreHero";
 
 interface StoreProduct {
   id: string;
@@ -17,6 +18,13 @@ interface StoreProduct {
   is_mega?: boolean | null;
   image_url?: string | null;
 }
+
+const MEGA_HIGHLIGHTS = [
+  "All Kanji, Vocab & Grammar N5→N1",
+  "Mock tests at every level",
+  "Audio drills + Day-by-day roadmap",
+  "Lifetime access via Library",
+];
 
 export default async function StorePage({
   searchParams,
@@ -57,8 +65,8 @@ export default async function StorePage({
   const levelFilter = level?.toUpperCase();
   let filtered = levelFilter
     ? itemsToUse.filter(
-      (p) => p.jlpt_level === levelFilter || (levelFilter === "MEGA" && p.is_mega)
-    )
+        (p) => p.jlpt_level === levelFilter || (levelFilter === "MEGA" && p.is_mega)
+      )
     : itemsToUse;
 
   const sortKey = sort === "price" || sort === "newest" ? sort : "recommended";
@@ -74,120 +82,148 @@ export default async function StorePage({
   const comparisonData = comparisonValue || null;
   const faqItems = (faqValue as { q: string; a: string }[]) || null;
 
-  return (
-    <div className="min-h-screen bg-[#FAF8F5]">
-      {/* Hero + filters (pattern background) */}
-      <div className="japanese-wave-bg">
-        <div className="max-w-[1200px] mx-auto px-4 sm:px-6 py-12 sm:py-16">
-          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="japanese-kanji-accent text-xl">教材</span>
-                <span className="text-secondary">—</span>
-                <h1 className="font-heading text-3xl sm:text-4xl font-bold text-charcoal">
-                  Store
-                </h1>
-              </div>
-              <p className="text-secondary">
-                JLPT bundles from N5 to N1. Choose your level or get the Mega Bundle.
-              </p>
-            </div>
-            <div className="flex gap-4 text-sm">
-              <Link href="/quiz" className="text-primary font-medium hover:underline">
-                Take Placement Quiz →
-              </Link>
-              <Link
-                href="/start-here"
-                className="text-primary font-medium hover:underline"
-              >
-                Start Here →
-              </Link>
-            </div>
-          </div>
-          <div className="flex items-center justify-between gap-3 mb-4">
-            <StoreFilters currentLevel={level} />
-            <div className="text-right text-sm">
-              <Link
-                href="/store#comparison"
-                className="text-primary font-medium hover:underline"
-              >
-                Compare bundles →
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
+  const megaPrice = mega ? `₹${Math.round(mega.price_paise / 100)}` : "₹899";
+  const megaCompare = mega?.compare_price_paise
+    ? `₹${Math.round(mega.compare_price_paise / 100)}`
+    : "₹3,599";
 
-      {/* Main content */}
-      <div className="max-w-[1200px] mx-auto px-4 sm:px-6 py-10 sm:py-12">
-        {filtered.length === 0 ? (
-          <div className="card p-12 text-center max-w-md mx-auto">
-            <p className="text-secondary mb-4">No bundles match this filter.</p>
-            <Link href="/store" className="btn-primary">
-              View all
+  return (
+    <div className="min-h-screen bg-[var(--background)]">
+      {/* Dark hero with filter tabs */}
+      <StoreHero currentLevel={level} />
+
+      {/* Bundle grid — light section, seamlessly follows dark hero */}
+      <section className="py-10 px-4 sm:px-6 bg-[var(--background)] border-b border-[var(--divider)]">
+        <div className="max-w-[1100px] mx-auto">
+          {/* Active filter label */}
+          {level && (
+            <div className="mb-6 flex items-center gap-2 text-[14px] text-[#555]">
+              Showing:{" "}
+              <strong className="text-[#1A1A1A]">{level.toUpperCase()}</strong>
+              <Link href="/store" className="text-primary font-bold ml-1 hover:underline">
+                Clear ×
+              </Link>
+            </div>
+          )}
+
+          {filtered.length === 0 ? (
+            <div className="bg-white border border-[var(--divider)] rounded-xl p-12 text-center max-w-md mx-auto">
+              <p className="text-[#555] mb-4">No bundles match this filter.</p>
+              <Link href="/store" className="btn-primary">View all</Link>
+            </div>
+          ) : (
+            <>
+              {/* Mega featured card */}
+              {mega && (
+                <div
+                  className="border-2 border-[var(--gold)] rounded-[18px] p-8 sm:p-9 mb-5 relative overflow-hidden bg-gradient-to-br from-[#1A1A1A] to-[#2d2d2d]"
+                >
+                  <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-8 items-center">
+                    <div>
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold tracking-[.06em] uppercase bg-[#fffdf0] text-[#92610a]">
+                          ⭐ Best Value
+                        </span>
+                        <span className="text-[12px] text-white/40 font-semibold flex items-center">
+                          Save 60%
+                        </span>
+                      </div>
+                      <h2 className="font-serif text-[22px] text-white mb-1.5 leading-snug">
+                        Complete N5→N1 Mega Bundle
+                      </h2>
+                      <p className="text-[13px] text-white/50 mb-5">
+                        Everything from beginner to advanced in one pack
+                      </p>
+                      <div className="flex flex-wrap gap-x-5 gap-y-2">
+                        {MEGA_HIGHLIGHTS.map((f) => (
+                          <div key={f} className="flex items-center gap-2 text-[13px] text-white/70">
+                            <span className="text-[var(--gold)]">✓</span>
+                            {f}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-start lg:items-end gap-3 flex-shrink-0">
+                      <div>
+                        <span className="text-[30px] font-extrabold text-white">{megaPrice}</span>
+                        <span className="text-[14px] text-white/30 line-through ml-2">{megaCompare}</span>
+                      </div>
+                      <Link
+                        href={`/product/${mega.slug}`}
+                        className="inline-flex items-center gap-1 bg-primary text-white font-bold rounded-lg px-5 py-2.5 text-[14px] hover:bg-primary/90 transition-colors"
+                      >
+                        View Mega Bundle →
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Level cards — 3-col grid */}
+              {rest.length > 0 && (
+                <>
+                  {mega && rest.length > 0 && (
+                    <div className="flex items-center gap-4 mb-5">
+                      <div className="flex-1 h-px bg-[var(--divider)]" />
+                      <span className="text-[13px] text-[#888] font-semibold whitespace-nowrap">
+                        Or choose by level
+                      </span>
+                      <div className="flex-1 h-px bg-[var(--divider)]" />
+                    </div>
+                  )}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {rest.map((product, i) => (
+                      <ProductCard
+                        key={product.id}
+                        slug={product.slug}
+                        name={product.name}
+                        description={product.description}
+                        price={product.price_paise}
+                        comparePrice={product.compare_price_paise || undefined}
+                        badge={
+                          product.badge === "premium"
+                            ? "premium"
+                            : product.badge === "offer"
+                            ? "offer"
+                            : undefined
+                        }
+                        jlptLevel={product.jlpt_level || undefined}
+                        size="medium"
+                        imageUrl={product.image_url}
+                        index={i}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
+          )}
+
+          {/* Quiz nudge */}
+          <div className="text-center mt-8">
+            <Link href="/quiz" className="text-[14px] text-[#555]">
+              Not sure which level?{" "}
+              <span className="text-primary font-bold">Take the 3-minute quiz →</span>
             </Link>
           </div>
-        ) : (
-          <div className="bento-grid mb-12">
-            {mega && (
-              <div className="bento-span-4 bento-row-2">
-                <ProductCard
-                  slug={mega.slug}
-                  name={mega.name}
-                  description={mega.description}
-                  price={mega.price_paise}
-                  comparePrice={mega.compare_price_paise || undefined}
-                  badge={
-                    mega.badge === "premium"
-                      ? "premium"
-                      : mega.badge === "offer"
-                        ? "offer"
-                        : undefined
-                  }
-                  jlptLevel={mega.jlpt_level || undefined}
-                  size="large"
-                  imageUrl={mega.image_url}
-                  index={0}
-                />
-              </div>
-            )}
-            {rest.map((product, i) => (
-              <div key={product.id} className="bento-span-2">
-                <ProductCard
-                  slug={product.slug}
-                  name={product.name}
-                  description={product.description}
-                  price={product.price_paise}
-                  comparePrice={product.compare_price_paise || undefined}
-                  badge={
-                    product.badge === "premium"
-                      ? "premium"
-                      : product.badge === "offer"
-                        ? "offer"
-                        : undefined
-                  }
-                  jlptLevel={product.jlpt_level || undefined}
-                  size="medium"
-                  imageUrl={product.image_url}
-                  index={(mega ? 1 : 0) + i}
-                />
-              </div>
-            ))}
-          </div>
-        )}
+        </div>
+      </section>
 
-        {/* Comparison table */}
-        <section id="comparison" className="mb-12">
+      {/* Bundle comparison */}
+      <section id="comparison" className="py-[60px] px-4 sm:px-6 bg-white border-t border-[var(--divider)]">
+        <div className="max-w-[1100px] mx-auto">
           <BundleComparisonTable data={comparisonData} />
-        </section>
+        </div>
+      </section>
 
-        {/* FAQ strip (3 items) */}
-        <section className="mb-12">
+      {/* FAQ */}
+      <section className="py-[60px] px-4 sm:px-6 bg-[var(--background)] border-t border-[var(--divider)]">
+        <div className="max-w-[1100px] mx-auto">
           <HomeFaq items={faqItems ? faqItems.slice(0, 3) : null} />
-        </section>
+        </div>
+      </section>
 
-      </div>
+      <NewsletterSection source="store" />
     </div>
   );
 }
-

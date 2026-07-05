@@ -3,13 +3,17 @@ import { sql } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth/admin";
 import { HomeBundleCard } from "@/components/HomeBundleCard";
 import { BundleComparisonTable } from "@/components/BundleComparisonTable";
-import { StudyRoadmapMegaCta } from "@/components/StudyRoadmapMegaCta";
-import { WhatsInsideStrip } from "@/components/WhatsInsideStrip";
-import { TestimonialsAbout } from "@/components/TestimonialsAbout";
 import { HomeFaq } from "@/components/HomeFaq";
 import { LeadMagnetForm } from "@/components/LeadMagnetForm";
 import { RecentBlogSection } from "@/components/RecentBlogSection";
 import { NewsletterSection } from "@/components/NewsletterSection";
+import { HeroDark } from "@/components/HeroDark";
+import {
+  StepsSection,
+  NihongoNaviSection,
+  QuizCTASection,
+  WhyAvnishSection,
+} from "@/components/HomeSections";
 
 const isComingSoon = process.env.COMING_SOON === "true" || process.env.COMING_SOON === "1";
 
@@ -22,13 +26,11 @@ const FALLBACK_PRODUCTS = [
   { id: "6", slug: "complete-japanese-n5-n1-mega-bundle", name: "🎌 Japanese Complete N5–N1 Mega Bundle", price_paise: 89900, compare_price_paise: 359900, jlpt_level: null, badge: "premium", is_mega: true, image_url: null },
 ];
 
-const JLPT_LEVELS = [
-  { level: "n5", label: "Beginner", href: "/jlpt?level=n5" },
-  { level: "n4", label: "Elementary", href: "/jlpt?level=n4" },
-  { level: "n3", label: "Intermediate", href: "/jlpt?level=n3" },
-  { level: "n2", label: "Professional", href: "/jlpt?level=n2" },
-  { level: "n1", label: "Elite", href: "/jlpt?level=n1" },
-  { level: "mega", label: "Save 60% vs buying separately", href: "/product/complete-japanese-n5-n1-mega-bundle" },
+const MEGA_HIGHLIGHTS = [
+  "All Kanji, Vocab & Grammar N5→N1",
+  "Mock tests at every level",
+  "Audio drills + Day-by-day roadmap",
+  "Lifetime access via Library",
 ];
 
 function ComingSoonView() {
@@ -83,253 +85,186 @@ async function FullHomeView() {
     kanji: "Kanji",
   };
 
+  const megaPrice = mega ? `₹${Math.round(mega.price_paise / 100)}` : "₹899";
+  const megaCompare = mega?.compare_price_paise
+    ? `₹${Math.round(mega.compare_price_paise / 100)}`
+    : "₹3,599";
+
   return (
     <div>
-      {/* Hero */}
-      <section className="py-10 px-4 sm:py-16 sm:px-5 lg:px-6 hero-pattern-bg">
-        <div className="max-w-[1100px] mx-auto">
-          <div className="bento-grid">
-            {/* Row 1: Hero full width */}
-            <div className="bento-span-6 flex flex-col justify-between bg-primary text-white border-0 min-h-[200px] sm:min-h-[240px] rounded-[14px] p-6 sm:p-9 shadow-card transition-all">
-              <div>
-                <h1 className="font-heading text-[28px] sm:text-[40px] font-bold mb-4 leading-[1.15]">
-                  Learn Japanese the Right Way
-                </h1>
-                <p className="text-white/90 text-base max-w-xl">
-                  Premium JLPT resources from N5 to N1. Structured bundles, placement quiz, AI tutor (Nihongo Navi), and lessons.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-3 mt-6">
-                <Link href="/quiz" className="bg-white text-primary px-5 py-3 rounded-md font-semibold hover:bg-white/90 transition h-11 flex items-center hover:-translate-y-0.5 hover:shadow-lg">
-                  Take the Quiz
-                </Link>
-                {isAdmin && (
-                  <Link href="/store" className="border-2 border-white/80 text-white px-5 py-3 rounded-md font-semibold hover:bg-white/10 transition h-11 flex items-center">
-                    Browse Bundles
-                  </Link>
-                )}
-                <Link href="/tutor" className="border-2 border-white/60 text-white px-5 py-3 rounded-md font-semibold hover:bg-white/10 transition h-11 flex items-center">
-                  Nihongo Navi
-                </Link>
-              </div>
-              {isAdmin && (
-                <p className="text-white/85 text-[13px] mt-4">
-                  Instant download • Lifetime access • Secure checkout
-                </p>
-              )}
-            </div>
+      {/* Dark ink hero */}
+      <HeroDark megaProduct={mega ?? null} isAdmin={isAdmin} />
 
-            {/* Row 2: 3-step cards */}
-            <div className="bento-span-2 card flex flex-col justify-center items-center text-center bg-white border-[#EEEEEE] rounded-[14px] p-6">
-              <span className="text-[40px] font-bold text-primary mb-2">1</span>
-              <h3 className="font-heading font-bold text-charcoal mb-1 text-base">Quiz</h3>
-              <p className="text-secondary text-[14px] mb-4">Know your level in 3 minutes</p>
-              <Link href="/quiz" className="text-primary text-sm font-medium hover:underline">Start →</Link>
-            </div>
-            {isAdmin && (
-              <div className="bento-span-2 card flex flex-col justify-center items-center text-center bg-white border-[#EEEEEE] rounded-[14px] p-6">
-                <span className="text-[40px] font-bold text-primary mb-2">2</span>
-                <h3 className="font-heading font-bold text-charcoal mb-1 text-base">Bundle</h3>
-                <p className="text-secondary text-[14px] mb-4">Get structured PDFs + practice + mock tests</p>
-                <Link href="/store" className="text-primary text-sm font-medium hover:underline">Store →</Link>
-              </div>
-            )}
-            {isAdmin && (
-              <div className="bento-span-2 card flex flex-col justify-center items-center text-center bg-white border-[#EEEEEE] rounded-[14px] p-6">
-                <span className="text-[40px] font-bold text-primary mb-2">3</span>
-                <h3 className="font-heading font-bold text-charcoal mb-1 text-base">Library</h3>
-                <p className="text-secondary text-[14px] mb-4">Access anytime. Study offline.</p>
-                <Link href="/login" className="text-primary text-sm font-medium hover:underline">Login →</Link>
-              </div>
-            )}
-            <div className="bento-span-2 card flex flex-col justify-center items-center text-center bg-white border-[#EEEEEE] rounded-[14px] p-6">
-              <span className="text-[40px] font-bold text-primary mb-2">{isAdmin ? "4" : "2"}</span>
-              <h3 className="font-heading font-bold text-charcoal mb-1 text-base">Nihongo Navi</h3>
-              <p className="text-secondary text-[14px] mb-4">AI tutor — grammar, vocab, sentence correction.</p>
-              <Link href="/tutor" className="text-primary text-sm font-medium hover:underline">Try it →</Link>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* How it works — 3 steps */}
+      <StepsSection />
 
-      {/* JLPT Levels */}
-      <section className="py-10 px-4 sm:py-[60px] sm:px-5 lg:px-6">
-        <div className="max-w-[1100px] mx-auto">
-          <div className="bento-grid">
-            <div className="bento-span-4 card flex flex-wrap gap-3 items-center bg-white p-5">
-              <h2 className="font-heading text-2xl font-bold text-charcoal w-full">JLPT Levels</h2>
-              {JLPT_LEVELS.slice(0, 5).map((l) => (
-                <Link
-                  key={l.level}
-                  href={l.href}
-                  className={`h-9 px-[14px] py-2 rounded-full font-medium text-sm transition ${
-                    l.level === "n1"
-                      ? "bg-[#FFFDF5] border border-[var(--gold)] text-[var(--gold)]"
-                      : "bg-[#FAF8F5] border border-[#EEEEEE] text-[#555555] hover:border-primary hover:text-primary"
-                  }`}
-                >
-                  {l.level.toUpperCase()} — {l.label}
-                </Link>
-              ))}
-              {isAdmin && (
-                <Link href={JLPT_LEVELS[5].href} className="btn-primary flex items-center">
-                  Explore Levels
-                </Link>
-              )}
-            </div>
-            <div className="bento-span-2 card flex flex-col justify-center bg-[#FFF7F7] border-l-4 border-l-primary p-5">
-              <h3 className="font-heading font-bold text-charcoal mb-1 text-base">Free N5 Kana Pack</h3>
-              <p className="text-secondary text-sm mb-3">Get it in 30 seconds. No spam.</p>
-              <Link href="#free-pack" className="text-primary font-medium hover:underline text-sm">
-                Get Free Pack →
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Featured Bundles — admin only */}
+      {/* Bundle grid — admin only */}
       {isAdmin && (
-        <section className="py-10 px-4 sm:py-[60px] sm:px-5 lg:px-6">
+        <section className="py-[80px] px-4 sm:px-6 bg-[var(--background)] border-t border-[var(--divider)]">
           <div className="max-w-[1100px] mx-auto">
-            <h2 className="font-heading text-2xl font-bold text-charcoal mb-8">Choose your bundle</h2>
-            <div className="bento-grid">
-              {mega && (
-                <div className="bento-span-4 bento-row-2">
-                  <HomeBundleCard
-                    slug={mega.slug}
-                    name={mega.name}
-                    price={mega.price_paise}
-                    comparePrice={mega.compare_price_paise}
-                    badge={mega.badge === "premium" ? "premium" : undefined}
-                    jlptLevel={mega.jlpt_level}
-                    isMega={true}
-                    imageUrl={mega.image_url}
-                  />
+            <div className="mb-10">
+              <div className="text-[11px] font-bold tracking-[.1em] uppercase text-[var(--subtle)] mb-2">
+                Digital bundles
+              </div>
+              <h2 className="font-serif text-[32px] font-normal text-[#1A1A1A] mb-3">
+                Choose your path
+              </h2>
+              <p className="text-[16px] text-[#555] max-w-[560px]">
+                Every bundle includes worksheets, mock tests, audio drills, and lifetime access via your Library.
+              </p>
+            </div>
+
+            {/* Mega hero card */}
+            {mega && (
+              <div
+                className="border-2 border-[var(--gold)] rounded-[20px] p-8 sm:p-10 mb-6 relative overflow-hidden bg-gradient-to-br from-[#1A1A1A] to-[#2a2a2a]"
+              >
+                <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-8 items-center">
+                  <div>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold tracking-[.06em] uppercase bg-[#fffdf0] text-[#92610a]">
+                        ⭐ Best Value
+                      </span>
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold tracking-[.06em] uppercase bg-white/10 text-white/70">
+                        Save 60%
+                      </span>
+                    </div>
+                    <h3 className="font-serif text-[24px] text-white mb-1.5 leading-snug">
+                      Complete N5→N1 Mega Bundle
+                    </h3>
+                    <p className="text-[14px] text-white/50 mb-5">
+                      Everything from beginner to advanced in one pack
+                    </p>
+                    <div className="flex flex-wrap gap-x-6 gap-y-2">
+                      {MEGA_HIGHLIGHTS.map((f) => (
+                        <div key={f} className="flex items-center gap-2 text-[13px] text-white/70">
+                          <span className="text-[var(--gold)]">✓</span>
+                          {f}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-start lg:items-end gap-3 flex-shrink-0">
+                    <div>
+                      <span className="text-[32px] font-extrabold text-white">{megaPrice}</span>
+                      <span className="text-[15px] text-white/30 line-through ml-2">{megaCompare}</span>
+                    </div>
+                    <Link
+                      href={`/product/${mega.slug}`}
+                      className="inline-flex items-center gap-1 bg-primary text-white font-bold rounded-lg px-5 py-2.5 text-[14px] hover:bg-primary/90 transition-colors"
+                    >
+                      Buy Mega Bundle →
+                    </Link>
+                  </div>
                 </div>
-              )}
-              {restProducts.map((product: { id: string; slug: string; name: string; price_paise: number; compare_price_paise?: number; jlpt_level?: string | null; badge?: string; image_url?: string | null }) => (
-                <div key={product.id} className="bento-span-2">
-                  <HomeBundleCard
-                    slug={product.slug}
-                    name={product.name}
-                    price={product.price_paise}
-                    comparePrice={product.compare_price_paise}
-                    badge={product.badge === "premium" ? "premium" : product.badge === "offer" ? "offer" : undefined}
-                    jlptLevel={product.jlpt_level}
-                    isMega={false}
-                    imageUrl={product.image_url}
-                  />
-                </div>
+              </div>
+            )}
+
+            {/* Divider */}
+            <div className="flex items-center gap-4 mb-6">
+              <div className="flex-1 h-px bg-[var(--divider)]" />
+              <span className="text-[13px] text-[#888] font-semibold whitespace-nowrap">
+                Or choose by JLPT level
+              </span>
+              <div className="flex-1 h-px bg-[var(--divider)]" />
+            </div>
+
+            {/* Level cards — 5-col grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+              {restProducts.map((product) => (
+                <HomeBundleCard
+                  key={product.id}
+                  slug={product.slug}
+                  name={product.name}
+                  price={product.price_paise}
+                  comparePrice={product.compare_price_paise}
+                  badge={product.badge === "premium" ? "premium" : product.badge === "offer" ? "offer" : undefined}
+                  jlptLevel={product.jlpt_level}
+                  isMega={false}
+                  imageUrl={product.image_url}
+                />
               ))}
+            </div>
+
+            {/* Quiz nudge */}
+            <div className="text-center">
+              <Link href="/quiz" className="text-[14px] text-[#555]">
+                Not sure which level?{" "}
+                <span className="text-primary font-bold">Take the 3-minute quiz →</span>
+              </Link>
             </div>
           </div>
         </section>
       )}
 
-      {/* Bundle Comparison — admin only */}
+      {/* Bundle comparison — admin only */}
       {isAdmin && (
-        <section className="py-10 px-4 sm:py-[60px] sm:px-5 lg:px-6">
+        <section className="py-[60px] px-4 sm:px-6 bg-white border-t border-[var(--divider)]">
           <div className="max-w-[1100px] mx-auto">
             <BundleComparisonTable data={settings.bundle_comparison as Parameters<typeof BundleComparisonTable>[0]["data"]} />
           </div>
         </section>
       )}
 
-      {/* Study Roadmap + Mega CTA — admin only */}
-      {isAdmin && (
-        <section className="py-10 px-4 sm:py-[60px] sm:px-5 lg:px-6">
-          <div className="max-w-[1100px] mx-auto">
-            <StudyRoadmapMegaCta
-              data={settings.study_roadmap as Parameters<typeof StudyRoadmapMegaCta>[0]["data"]}
-              megaPrice={mega?.price_paise}
-            />
-          </div>
-        </section>
-      )}
-
-      {/* What's Inside — admin only */}
-      {isAdmin && (
-        <section className="py-10 px-4 sm:py-[60px] sm:px-5 lg:px-6">
-          <div className="max-w-[1100px] mx-auto">
-            <h2 className="font-heading text-2xl font-bold text-charcoal mb-4 text-center">What&apos;s inside every bundle</h2>
-            <WhatsInsideStrip items={settings.homepage_feature_strip as Parameters<typeof WhatsInsideStrip>[0]["items"]} />
-          </div>
-        </section>
-      )}
+      {/* Nihongo Navi — dark section */}
+      <NihongoNaviSection />
 
       {/* Quiz CTA */}
-      <section className="py-10 px-4 sm:py-[60px] sm:px-5 lg:px-6">
-        <div className="max-w-[1100px] mx-auto">
-          <div className="card text-center max-w-2xl mx-auto">
-            <h2 className="font-heading text-2xl font-bold text-charcoal mb-2">Not sure your level? Take the quiz.</h2>
-            <p className="text-secondary mb-2">Get recommended N5/N4/N3/N2/N1 bundle.</p>
-            <p className="text-secondary text-sm mb-4">Takes 3–5 minutes</p>
-            <Link href="/quiz" className="btn-primary">Start Quiz</Link>
-          </div>
-        </div>
-      </section>
+      <QuizCTASection />
 
-      {/* Lead Magnet */}
-      <section id="free-pack" className="py-10 px-4 sm:py-[60px] sm:px-5 lg:px-6">
-        <div className="max-w-[1100px] mx-auto">
-          <div className="max-w-md mx-auto">
-            <LeadMagnetForm />
-          </div>
-        </div>
-      </section>
+      {/* Why Avnish */}
+      <WhyAvnishSection />
 
-      {/* Latest Lessons */}
+      {/* Latest lessons — hide if empty */}
       {lessons.length > 0 && (
-      <section className="py-10 px-4 sm:py-[60px] sm:px-5 lg:px-6">
-        <div className="max-w-[1100px] mx-auto">
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="font-heading text-2xl font-bold text-charcoal">Latest lessons</h2>
-            <Link href="/learn" className="text-primary font-medium hover:underline text-sm">
-              View all lessons
-            </Link>
-          </div>
-          <div className="bento-grid">
-            {lessons.map((item: { id: string; slug: string; title: string; content_type: string; jlpt_level?: string | null }) => (
-              <Link
-                key={item.id}
-                href={`/blog/${item.content_type}/${item.slug}`}
-                className="bento-span-2 card block hover:no-underline group"
-              >
-                <h3 className="font-heading font-bold text-charcoal group-hover:text-primary transition">
-                  {item.title}
-                </h3>
-                <span className="text-xs text-secondary mt-1 block">
-                  {TYPE_LABELS[item.content_type] || item.content_type}
-                  {item.jlpt_level ? ` • ${item.jlpt_level}` : ""}
-                </span>
+        <section className="py-[60px] px-4 sm:px-6 bg-[var(--background)] border-t border-[var(--divider)]">
+          <div className="max-w-[1100px] mx-auto">
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="font-serif text-[26px] font-normal text-[#1A1A1A]">Latest lessons</h2>
+              <Link href="/learn" className="text-primary font-bold text-[13px] hover:underline">
+                View all →
               </Link>
-            ))}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {lessons.map((item) => (
+                <Link
+                  key={item.id}
+                  href={`/blog/${item.content_type}/${item.slug}`}
+                  className="block bg-white border border-[var(--divider)] rounded-xl p-5 hover:border-primary/40 hover:shadow-card-hover transition-all group"
+                >
+                  <h3 className="font-bold text-[15px] text-[#1A1A1A] group-hover:text-primary transition mb-1.5">
+                    {item.title}
+                  </h3>
+                  <span className="text-[12px] text-[#888]">
+                    {TYPE_LABELS[item.content_type] || item.content_type}
+                    {item.jlpt_level ? ` • ${item.jlpt_level}` : ""}
+                  </span>
+                </Link>
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
       )}
 
-      {/* Recent Blog */}
+      {/* Recent blog */}
       <RecentBlogSection />
 
-      {/* Testimonials / About */}
-      <section className="py-10 px-4 sm:py-[60px] sm:px-5 lg:px-6">
-        <div className="max-w-[1100px] mx-auto">
-          <TestimonialsAbout data={settings.testimonials_about as Parameters<typeof TestimonialsAbout>[0]["data"]} />
-        </div>
-      </section>
-
       {/* FAQ */}
-      <section className="py-10 px-4 sm:py-[60px] sm:px-5 lg:px-6">
+      <section className="py-[60px] px-4 sm:px-6 bg-white border-t border-[var(--divider)]">
         <div className="max-w-[1100px] mx-auto">
           <HomeFaq items={settings.homepage_faq as Parameters<typeof HomeFaq>[0]["items"]} />
         </div>
       </section>
 
+      {/* Lead magnet */}
+      <section id="free-pack" className="py-[60px] px-4 sm:px-6 bg-[var(--background)] border-t border-[var(--divider)]">
+        <div className="max-w-[480px] mx-auto">
+          <LeadMagnetForm />
+        </div>
+      </section>
+
       {/* Newsletter */}
       <NewsletterSection source="site" />
-
     </div>
   );
 }

@@ -59,35 +59,35 @@ export async function Footer() {
 
   return (
     <footer className="bg-[#1A1A1A] mt-auto">
-      <div className="max-w-[1100px] mx-auto px-5 lg:px-6 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-10 md:gap-8">
+      <div className="max-w-[1100px] mx-auto px-5 lg:px-6 py-14">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-12 md:gap-10 mb-12">
           {/* Column 1 — Brand */}
           <div>
             <Link
               href="/"
-              className="flex items-center gap-2.5 font-heading font-bold text-[#FAF8F5] hover:text-primary transition-colors"
+              className="flex items-center gap-2.5 text-white font-bold hover:text-primary transition-colors mb-3"
             >
               <Image
                 src="/logo-dark.png"
                 alt="Learn Japanese with Avnish"
-                width={40}
-                height={40}
-                className="rounded-full object-contain"
+                width={36}
+                height={36}
+                className="rounded-full object-contain opacity-90"
               />
-              Japanese with Avnish
+              <span className="text-[15px]">Japanese with Avnish</span>
             </Link>
-            <p className="text-[#FAF8F5]/80 text-sm mt-2 mb-4">
-              Clean JLPT mastery system from N5 to N1.
+            <p className="text-white/60 text-[14px] leading-relaxed mb-5 max-w-[260px]">
+              Clean JLPT mastery system from N5 to N1. Bundles, AI tutor, placement quiz.
             </p>
-            <p className="text-[#FAF8F5]/70 text-xs mb-3">JLPT tips + updates. No spam.</p>
+            <p className="text-white/50 text-[12px] mb-2">JLPT tips + updates. No spam.</p>
             <NewsletterForm variant="dark" />
-            <div className="flex gap-4 mt-4">
+            <div className="flex gap-4 mt-5">
               {social.youtube && (
                 <a
                   href={social.youtube}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[#FAF8F5]/80 hover:text-primary transition-colors"
+                  className="text-white/60 hover:text-primary transition-colors"
                   aria-label="YouTube"
                 >
                   <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -100,7 +100,7 @@ export async function Footer() {
                   href={social.instagram}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[#FAF8F5]/80 hover:text-primary transition-colors"
+                  className="text-white/60 hover:text-primary transition-colors"
                   aria-label="Instagram @japanesewithavnish"
                 >
                   <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -113,7 +113,7 @@ export async function Footer() {
                   href={social.twitter}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[#FAF8F5]/80 hover:text-primary transition-colors"
+                  className="text-white/60 hover:text-primary transition-colors"
                   aria-label="X / Twitter"
                 >
                   <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -126,15 +126,15 @@ export async function Footer() {
 
           {/* Column 2 — Quick Links */}
           <div>
-            <h3 className="font-heading font-bold text-[#FAF8F5] mb-4 text-sm uppercase tracking-wider">
+            <h3 className="text-[11px] font-bold text-white/35 uppercase tracking-[.1em] mb-4">
               Quick Links
             </h3>
-            <ul className="space-y-2">
+            <ul className="space-y-[7px]">
               {visibleQuickLinks.map((link) => (
                 <li key={link.href}>
                   <Link
                     href={link.href}
-                    className="text-[#FAF8F5]/80 hover:text-primary text-sm transition-colors"
+                    className="text-white/60 hover:text-white text-[13.5px] transition-colors"
                   >
                     {link.label}
                   </Link>
@@ -145,14 +145,14 @@ export async function Footer() {
 
           {/* Column 3 — Support / Policies */}
           <div>
-            <h3 className="font-heading font-bold text-[#FAF8F5] mb-4 text-sm uppercase tracking-wider">
+            <h3 className="text-[11px] font-bold text-white/35 uppercase tracking-[.1em] mb-4">
               Support
             </h3>
-            <ul className="space-y-2">
+            <ul className="space-y-[7px]">
               <li>
                 <Link
                   href="/contact"
-                  className="text-[#FAF8F5]/80 hover:text-primary text-sm transition-colors"
+                  className="text-white/60 hover:text-white text-[13.5px] transition-colors"
                 >
                   Contact
                 </Link>
@@ -161,7 +161,7 @@ export async function Footer() {
                 <li>
                   <a
                     href={`mailto:${contactEmail}`}
-                    className="text-[#FAF8F5]/80 hover:text-primary text-sm transition-colors"
+                    className="text-white/60 hover:text-white text-[13.5px] transition-colors"
                   >
                     Email us
                   </a>
@@ -171,7 +171,7 @@ export async function Footer() {
                 <li key={link.href}>
                   <Link
                     href={link.href}
-                    className="text-[#FAF8F5]/80 hover:text-primary text-sm transition-colors"
+                    className="text-white/60 hover:text-white text-[13.5px] transition-colors"
                   >
                     {link.label}
                   </Link>
@@ -182,10 +182,11 @@ export async function Footer() {
         </div>
 
         {/* Bottom strip */}
-        <div className="mt-10 pt-8 border-t border-white/10 text-center">
-          <p className="text-[#FAF8F5]/70 text-sm">
+        <div className="pt-5 border-t border-white/[.08] flex flex-col sm:flex-row justify-between items-center gap-2">
+          <p className="text-white/50 text-[12.5px]">
             © {new Date().getFullYear()} Japanese with Avnish. All rights reserved.
           </p>
+          <p className="text-white/30 text-[12px]">Made with ♥ for Japanese learners</p>
         </div>
       </div>
     </footer>

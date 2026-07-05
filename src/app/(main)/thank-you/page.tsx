@@ -10,7 +10,7 @@ export default async function ThankYouPage({
 
   return (
     <div className="bg-[#FAF8F5] py-12 sm:py-20 px-4 sm:px-6">
-      <div className="max-w-[1100px] mx-auto">
+      <div className="max-w-[1200px] mx-auto">
         <ThankYouContent orderId={orderId} />
       </div>
     </div>

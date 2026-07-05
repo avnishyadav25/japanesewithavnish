@@ -33,7 +33,7 @@ export function BundleComparisonTable({ data }: { data: BundleComparisonData | n
       <div className="overflow-x-auto -mx-5 -mb-5">
         <table className="w-full min-w-[600px] text-[13px]">
           <thead>
-            <tr className="border-b border-[#EEEEEE]">
+            <tr className="border-b border-[var(--divider)]">
               <th className="text-left py-2.5 px-4 font-medium text-charcoal w-28 sticky left-0 bg-white z-10 h-10"> </th>
               {COLUMNS.map((col) => (
                 <th
@@ -49,7 +49,7 @@ export function BundleComparisonTable({ data }: { data: BundleComparisonData | n
           </thead>
           <tbody>
             {data.rows.map((row, i) => (
-              <tr key={i} className="border-b border-[#EEEEEE] last:border-0 h-10">
+              <tr key={i} className="border-b border-[var(--divider)] last:border-0 h-10">
                 <td className="py-2.5 px-4 text-secondary font-medium sticky left-0 bg-white z-10">{row.label}</td>
                 {COLUMNS.map((col) => (
                   <td
@@ -64,7 +64,7 @@ export function BundleComparisonTable({ data }: { data: BundleComparisonData | n
               </tr>
             ))}
             {data.prices && (
-              <tr className="border-t-2 border-[#EEEEEE] font-semibold h-10">
+              <tr className="border-t-2 border-[var(--divider)] font-semibold h-10">
                 <td className="py-2.5 px-4 text-charcoal sticky left-0 bg-white z-10">Price</td>
                 {COLUMNS.map((col) => (
                   <td

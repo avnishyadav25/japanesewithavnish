@@ -242,7 +242,7 @@ export function LessonLinksSection({ lessonId, lessonTitle = "", levelCode = "N5
   }
 
   return (
-    <div className="mt-10 space-y-8 max-w-2xl">
+    <div className="space-y-8 w-full">
       <section>
         <h3 className="font-heading font-semibold text-charcoal mb-2">Content links (slugs)</h3>
         <ul className="space-y-1 mb-2">

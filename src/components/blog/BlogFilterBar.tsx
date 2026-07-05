@@ -61,7 +61,7 @@ export function BlogFilterBar() {
 
   const pillClass = (active: boolean) =>
     `px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition ${
-      active ? "bg-primary text-white" : "bg-[#FAF8F5] border border-[#EEEEEE] text-[#555555] hover:border-primary hover:text-primary"
+      active ? "bg-primary text-white" : "bg-[#FAF8F5] border border-[var(--divider)] text-[#555555] hover:border-primary hover:text-primary"
     }`;
 
   return (

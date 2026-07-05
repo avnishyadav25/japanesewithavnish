@@ -15,7 +15,7 @@ export function HomeFaq({ items }: { items: FaqItem[] | null }) {
   return (
     <div className="card p-5">
       <h2 className="font-heading text-2xl font-bold text-charcoal mb-6">FAQ</h2>
-      <div className="divide-y divide-[#EEEEEE]">
+      <div className="divide-y divide-[var(--divider)]">
         {items.map((item, i) => (
           <div
             key={i}

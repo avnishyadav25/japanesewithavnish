@@ -68,7 +68,7 @@ export function LearnLevelTabs({ active, basePath = "/learn", showHelpText = tru
               className={`px-4 py-2 rounded-full text-sm font-medium transition ${
                 isActive
                   ? "bg-primary text-white"
-                  : "bg-[#FAF8F5] border border-[#EEEEEE] text-[#555555] hover:border-primary hover:text-primary"
+                  : "bg-[#FAF8F5] border border-[var(--divider)] text-[#555555] hover:border-primary hover:text-primary"
               }`}
             >
               {tab.label}

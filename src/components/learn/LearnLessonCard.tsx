@@ -47,11 +47,11 @@ export function LearnLessonCard({ item, variant = "card" }: LearnLessonCardProps
           </h3>
           <div className="flex flex-wrap gap-2 mt-1">
             {item.jlpt_level && (
-              <span className="text-xs px-2 py-0.5 rounded bg-[#FAF8F5] border border-[#EEEEEE] text-[#555555]">
+              <span className="text-xs px-2 py-0.5 rounded bg-[#FAF8F5] border border-[var(--divider)] text-[#555555]">
                 {item.jlpt_level}
               </span>
             )}
-            <span className="text-xs px-2 py-0.5 rounded bg-[#FAF8F5] border border-[#EEEEEE] text-[#555555]">
+            <span className="text-xs px-2 py-0.5 rounded bg-[#FAF8F5] border border-[var(--divider)] text-[#555555]">
               {typeLabel}
             </span>
           </div>
@@ -82,11 +82,11 @@ export function LearnLessonCard({ item, variant = "card" }: LearnLessonCardProps
       </h3>
       <div className="flex flex-wrap gap-2 mt-2">
         {item.jlpt_level && (
-          <span className="text-xs px-2 py-1 rounded-md bg-[#FAF8F5] border border-[#EEEEEE] text-[#555555]">
+          <span className="text-xs px-2 py-1 rounded-md bg-[#FAF8F5] border border-[var(--divider)] text-[#555555]">
             {item.jlpt_level}
           </span>
         )}
-        <span className="text-xs px-2 py-1 rounded-md bg-[#FAF8F5] border border-[#EEEEEE] text-[#555555]">
+        <span className="text-xs px-2 py-1 rounded-md bg-[#FAF8F5] border border-[var(--divider)] text-[#555555]">
           {typeLabel}
         </span>
       </div>

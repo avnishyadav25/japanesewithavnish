@@ -7,7 +7,10 @@ const VALID_EVENT_TYPES = ["view", "duration"];
 export async function POST(req: NextRequest) {
   try {
     if (!sql) return NextResponse.json({ ok: false }, { status: 503 });
-    const body = await req.json();
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "valid JSON body required" }, { status: 400 });
+    }
     const content_type = String(body.content_type ?? "").toLowerCase();
     const content_id = String(body.content_id ?? "");
     const event_type = String(body.event_type ?? "view").toLowerCase();

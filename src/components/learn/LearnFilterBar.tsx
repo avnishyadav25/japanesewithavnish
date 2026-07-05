@@ -44,7 +44,7 @@ export function LearnFilterBar({ basePath = "/learn" }: LearnFilterBarProps) {
               className={`px-3 py-1.5 rounded-full text-sm font-medium transition ${
                 sort === s.id
                   ? "bg-primary text-white"
-                  : "bg-[#FAF8F5] border border-[#EEEEEE] text-[#555555] hover:border-primary"
+                  : "bg-[#FAF8F5] border border-[var(--divider)] text-[#555555] hover:border-primary"
               }`}
             >
               {s.label}

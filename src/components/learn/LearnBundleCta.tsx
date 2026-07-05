@@ -22,7 +22,7 @@ export function LearnBundleCta({ level }: LearnBundleCtaProps) {
   const buttonLabel = isAll ? "View Mega Bundle" : `Get ${level.toUpperCase()} Bundle`;
 
   return (
-    <div className="card p-6 bg-white border border-[#EEEEEE]">
+    <div className="card p-6 bg-white border border-[var(--divider)]">
       <h3 className="font-heading text-xl font-bold text-charcoal mb-2">
         {isAll ? "Want the complete JLPT system (N5 → N1)?" : `Ready for structured ${level.toUpperCase()} practice?`}
       </h3>

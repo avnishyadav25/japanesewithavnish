@@ -14,7 +14,7 @@ export default async function LearnExamPage() {
   }
   return (
     <div className="min-h-screen bg-[var(--base)]">
-      <div className="max-w-[720px] mx-auto px-4 py-8">
+      <div className="max-w-[1200px] mx-auto px-4 py-8">
         <nav className="text-sm text-secondary mb-4">
           <Link href="/learn/dashboard" className="hover:text-primary">Dashboard</Link>
           <span className="mx-2">/</span>

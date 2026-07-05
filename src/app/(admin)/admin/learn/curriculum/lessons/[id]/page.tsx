@@ -32,13 +32,19 @@ export default async function AdminCurriculumLessonPage({ params }: { params: Pr
           { label: row.title },
         ]}
       />
-      <LessonEditForm
-        lessonId={row.id}
-        levelCode={row.level_code}
-        initial={{ code: row.code, title: row.title, goal: row.goal ?? "", introduction: row.introduction ?? "", sort_order: row.sort_order, feature_image_url: row.feature_image_url ?? "" }}
-      />
-      <LessonBodySection lessonId={row.id} lessonTitle={row.title} levelCode={row.level_code} />
-      <LessonLinksSection lessonId={row.id} lessonTitle={row.title} levelCode={row.level_code} />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="md:col-span-2 space-y-4">
+          <LessonEditForm
+            lessonId={row.id}
+            levelCode={row.level_code}
+            initial={{ code: row.code, title: row.title, goal: row.goal ?? "", introduction: row.introduction ?? "", sort_order: row.sort_order, feature_image_url: row.feature_image_url ?? "" }}
+          />
+          <LessonBodySection lessonId={row.id} lessonTitle={row.title} levelCode={row.level_code} />
+        </div>
+        <div className="md:col-span-1">
+          <LessonLinksSection lessonId={row.id} lessonTitle={row.title} levelCode={row.level_code} />
+        </div>
+      </div>
     </div>
   );
 }

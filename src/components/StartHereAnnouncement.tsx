@@ -11,7 +11,7 @@ export function StartHereAnnouncement({ config }: { config: AnnouncementConfig |
 
   return (
     <div
-      className="h-10 flex items-center justify-center px-4 border-b border-[#EEEEEE]"
+      className="h-10 flex items-center justify-center px-4 border-b border-[var(--divider)]"
       style={{ background: "#FFF7F7", color: "#1A1A1A", fontSize: "14px" }}
     >
       {config.href ? (

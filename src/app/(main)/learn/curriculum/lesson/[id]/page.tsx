@@ -181,7 +181,7 @@ export default async function LearnCurriculumLessonPage({ params }: { params: Pr
 
   return (
     <div className="min-h-screen bg-[var(--base)]">
-      <div className="max-w-[720px] mx-auto px-4 py-8">
+      <div className="max-w-[1200px] mx-auto px-4 py-8">
         <nav className="text-sm text-secondary mb-4">
           <Link href="/learn/dashboard" className="hover:text-primary">Dashboard</Link>
           <span className="mx-2">/</span>
@@ -196,158 +196,165 @@ export default async function LearnCurriculumLessonPage({ params }: { params: Pr
             <p>{row.introduction}</p>
           </div>
         )}
-
-        <section className="mb-8">
-          <h2 className="font-heading text-xl font-semibold text-charcoal mb-3">Lesson</h2>
-          {mainBlocks.length ? (
-            <div className="space-y-6">
-              {mainBlocks.map((b) => (
-                <div key={b.id} className="bg-white border border-[var(--divider)] rounded-bento p-5">
-                  <div className="prose prose-charcoal max-w-none">
-                    <LearnMarkdown content={(b.content ?? "").trim() || "_Content coming soon._"} meta={b.meta ?? {}} contentType={b.content_type ?? undefined} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-secondary text-sm">No main lesson content yet.</p>
-          )}
-        </section>
-
-        <section id="lists" className="mb-8">
-          <h2 className="font-heading text-xl font-semibold text-charcoal mb-3">Lists</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-white border border-[var(--divider)] rounded-bento p-5">
-              <h3 className="font-heading font-semibold text-charcoal mb-2">Vocabulary</h3>
-              {vocab.length ? (
-                <ul className="space-y-2">
-                  {vocab.map((v) => (
-                    <li key={v.id} className="flex items-baseline justify-between gap-3">
-                      <Link href={`/learn/vocabulary/${v.slug}`} className="text-primary hover:underline">
-                        {v.word || v.slug}
-                      </Link>
-                      <span className="text-xs text-secondary truncate">{v.meaning || ""}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-secondary text-sm">No vocabulary linked yet.</p>
-              )}
-            </div>
-
-            <div className="bg-white border border-[var(--divider)] rounded-bento p-5">
-              <h3 className="font-heading font-semibold text-charcoal mb-2">Grammar</h3>
-              {grammar.length ? (
-                <ul className="space-y-2">
-                  {grammar.map((g) => (
-                    <li key={g.id} className="flex items-baseline justify-between gap-3">
-                      <Link href={`/learn/grammar/${g.slug}`} className="text-primary hover:underline">
-                        {g.pattern || g.slug}
-                      </Link>
-                      <span className="text-xs text-secondary truncate">{g.structure || ""}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-secondary text-sm">No grammar linked yet.</p>
-              )}
-            </div>
-
-            <div className="bg-white border border-[var(--divider)] rounded-bento p-5">
-              <h3 className="font-heading font-semibold text-charcoal mb-2">Kanji</h3>
-              {kanji.length ? (
-                <ul className="space-y-2">
-                  {kanji.map((k) => (
-                    <li key={k.id} className="flex items-baseline justify-between gap-3">
-                      <Link href={`/learn/kanji/${k.slug}`} className="text-primary hover:underline">
-                        {k.character || k.slug}
-                      </Link>
-                      <span className="text-xs text-secondary truncate">{k.meaning || ""}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-secondary text-sm">No kanji linked yet.</p>
-              )}
-            </div>
-
-            <div className="bg-white border border-[var(--divider)] rounded-bento p-5">
-              <h3 className="font-heading font-semibold text-charcoal mb-2">Kana</h3>
-              {kana.length ? (
-                <div className="flex flex-wrap gap-2">
-                  {kana.map((k) => (
-                    <span key={k.id} className="px-2 py-1 rounded border border-[var(--divider)] text-charcoal bg-[var(--divider)]/10 text-sm">
-                      {k.character} <span className="text-secondary text-xs">({k.romaji})</span>
-                    </span>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="md:col-span-2 space-y-8">
+            <section>
+              <h2 className="font-heading text-xl font-semibold text-charcoal mb-3">Lesson</h2>
+              {mainBlocks.length ? (
+                <div className="space-y-6">
+                  {mainBlocks.map((b) => (
+                    <div key={b.id} className="bg-white border border-[var(--divider)] rounded-bento p-5">
+                      <div className="prose prose-charcoal max-w-none">
+                        <LearnMarkdown content={(b.content ?? "").trim() || "_Content coming soon._"} meta={b.meta ?? {}} contentType={b.content_type ?? undefined} />
+                      </div>
+                    </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-secondary text-sm">No kana linked yet.</p>
+                <p className="text-secondary text-sm">No main lesson content yet.</p>
               )}
-            </div>
+            </section>
+
+            <section id="exercises">
+              <h2 className="font-heading text-xl font-semibold text-charcoal mb-3">Exercises</h2>
+              {exercises.length ? (
+                <div className="space-y-4">
+                  {exercises.map((ex) => (
+                    <div key={ex.id} className="bg-white border border-[var(--divider)] rounded-bento p-5">
+                      <h3 className="font-heading font-semibold text-charcoal mb-3">
+                        {ex.title?.trim() || ex.content_slug || "Exercise"}
+                      </h3>
+                      <div className="prose prose-charcoal max-w-none">
+                        <LearnMarkdown content={(ex.content ?? "").trim() || "_Exercise content coming soon._"} meta={ex.meta ?? {}} contentType={ex.content_type ?? undefined} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-secondary text-sm">No exercises yet for this lesson.</p>
+              )}
+            </section>
+
+            <section id="examples">
+              <h2 className="font-heading text-xl font-semibold text-charcoal mb-3">Examples</h2>
+              {examples.length ? (
+                <div className="space-y-3">
+                  {examples.map((ex) => (
+                    <div key={ex.id} className="bg-white border border-[var(--divider)] rounded-bento p-4">
+                      <p className="text-charcoal text-base mb-1">{ex.sentence_ja}</p>
+                      {ex.sentence_romaji && <p className="text-secondary text-sm mb-2">{ex.sentence_romaji}</p>}
+                      <p className="text-secondary text-sm">{ex.sentence_en}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-secondary text-sm">No examples yet for this lesson.</p>
+              )}
+            </section>
           </div>
-        </section>
 
-        <section id="exercises" className="mb-8">
-          <h2 className="font-heading text-xl font-semibold text-charcoal mb-3">Exercises</h2>
-          {exercises.length ? (
-            <div className="space-y-4">
-              {exercises.map((ex) => (
-                <div key={ex.id} className="bg-white border border-[var(--divider)] rounded-bento p-5">
-                  <h3 className="font-heading font-semibold text-charcoal mb-3">
-                    {ex.title?.trim() || ex.content_slug || "Exercise"}
-                  </h3>
-                  <div className="prose prose-charcoal max-w-none">
-                    <LearnMarkdown content={(ex.content ?? "").trim() || "_Exercise content coming soon._"} meta={ex.meta ?? {}} contentType={ex.content_type ?? undefined} />
-                  </div>
+          <aside className="md:col-span-1 space-y-8">
+            <section id="lists">
+              <h2 className="font-heading text-xl font-semibold text-charcoal mb-3">Lists</h2>
+              <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+                <div className="bg-white border border-[var(--divider)] rounded-bento p-5">
+                  <h3 className="font-heading font-semibold text-charcoal mb-2">Vocabulary</h3>
+                  {vocab.length ? (
+                    <ul className="space-y-2">
+                      {vocab.map((v) => (
+                        <li key={v.id} className="flex items-baseline justify-between gap-3">
+                          <Link href={`/learn/vocabulary/${v.slug}`} className="text-primary hover:underline">
+                            {v.word || v.slug}
+                          </Link>
+                          <span className="text-xs text-secondary truncate">{v.meaning || ""}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-secondary text-sm">No vocabulary linked yet.</p>
+                  )}
                 </div>
-              ))}
-            </div>
-          ) : <p className="text-secondary text-sm">No exercises yet for this lesson.</p>}
-        </section>
 
-        <section id="examples" className="mb-8">
-          <h2 className="font-heading text-xl font-semibold text-charcoal mb-3">Examples</h2>
-          {examples.length ? (
-            <div className="space-y-3">
-              {examples.map((ex) => (
-                <div key={ex.id} className="bg-white border border-[var(--divider)] rounded-bento p-4">
-                  <p className="text-charcoal text-base mb-1">{ex.sentence_ja}</p>
-                  {ex.sentence_romaji && <p className="text-secondary text-sm mb-2">{ex.sentence_romaji}</p>}
-                  <p className="text-secondary text-sm">{ex.sentence_en}</p>
+                <div className="bg-white border border-[var(--divider)] rounded-bento p-5">
+                  <h3 className="font-heading font-semibold text-charcoal mb-2">Grammar</h3>
+                  {grammar.length ? (
+                    <ul className="space-y-2">
+                      {grammar.map((g) => (
+                        <li key={g.id} className="flex items-baseline justify-between gap-3">
+                          <Link href={`/learn/grammar/${g.slug}`} className="text-primary hover:underline">
+                            {g.pattern || g.slug}
+                          </Link>
+                          <span className="text-xs text-secondary truncate">{g.structure || ""}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-secondary text-sm">No grammar linked yet.</p>
+                  )}
                 </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-secondary text-sm">No examples yet for this lesson.</p>
-          )}
-        </section>
 
-        <section id="practice" className="mb-8">
-          <h2 className="font-heading text-xl font-semibold text-charcoal mb-3">Practice</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Link href={`/learn/grammar-drills?lessonId=${row.id}`} className="bg-white border border-[var(--divider)] rounded-bento p-5 hover:border-primary transition">
-              <div className="font-heading font-semibold text-charcoal mb-1">Grammar drills</div>
-              <div className="text-secondary text-sm">Quick multiple-choice drills for this lesson.</div>
-            </Link>
-            <Link href="/learn/listening" className="bg-white border border-[var(--divider)] rounded-bento p-5 hover:border-primary transition">
-              <div className="font-heading font-semibold text-charcoal mb-1">Listening</div>
-              <div className="text-secondary text-sm">Scenarios + questions.</div>
-            </Link>
-            <Link href="/learn/reading/sandbox" className="bg-white border border-[var(--divider)] rounded-bento p-5 hover:border-primary transition">
-              <div className="font-heading font-semibold text-charcoal mb-1">Reading sandbox</div>
-              <div className="text-secondary text-sm">Read with glossary support.</div>
-            </Link>
-            <Link href={writingHref} className="bg-white border border-[var(--divider)] rounded-bento p-5 hover:border-primary transition">
-              <div className="font-heading font-semibold text-charcoal mb-1">Writing</div>
-              <div className="text-secondary text-sm">Write, get feedback, and track mistakes.</div>
-            </Link>
-            <Link href="/learn/exam" className="bg-white border border-[var(--divider)] rounded-bento p-5 hover:border-primary transition md:col-span-2">
-              <div className="font-heading font-semibold text-charcoal mb-1">Mock exam</div>
-              <div className="text-secondary text-sm">Try a full practice test.</div>
-            </Link>
-          </div>
-        </section>
+                <div className="bg-white border border-[var(--divider)] rounded-bento p-5">
+                  <h3 className="font-heading font-semibold text-charcoal mb-2">Kanji</h3>
+                  {kanji.length ? (
+                    <ul className="space-y-2">
+                      {kanji.map((k) => (
+                        <li key={k.id} className="flex items-baseline justify-between gap-3">
+                          <Link href={`/learn/kanji/${k.slug}`} className="text-primary hover:underline">
+                            {k.character || k.slug}
+                          </Link>
+                          <span className="text-xs text-secondary truncate">{k.meaning || ""}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-secondary text-sm">No kanji linked yet.</p>
+                  )}
+                </div>
+
+                <div className="bg-white border border-[var(--divider)] rounded-bento p-5">
+                  <h3 className="font-heading font-semibold text-charcoal mb-2">Kana</h3>
+                  {kana.length ? (
+                    <div className="flex flex-wrap gap-2">
+                      {kana.map((k) => (
+                        <span key={k.id} className="px-2 py-1 rounded border border-[var(--divider)] text-charcoal bg-[var(--divider)]/10 text-sm">
+                          {k.character} <span className="text-secondary text-xs">({k.romaji})</span>
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-secondary text-sm">No kana linked yet.</p>
+                  )}
+                </div>
+              </div>
+            </section>
+
+            <section id="practice">
+              <h2 className="font-heading text-xl font-semibold text-charcoal mb-3">Practice</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Link href={`/learn/grammar-drills?lessonId=${row.id}`} className="bg-white border border-[var(--divider)] rounded-bento p-5 hover:border-primary transition">
+                  <div className="font-heading font-semibold text-charcoal mb-1">Grammar drills</div>
+                  <div className="text-secondary text-sm">Quick multiple-choice drills for this lesson.</div>
+                </Link>
+                <Link href="/learn/listening" className="bg-white border border-[var(--divider)] rounded-bento p-5 hover:border-primary transition">
+                  <div className="font-heading font-semibold text-charcoal mb-1">Listening</div>
+                  <div className="text-secondary text-sm">Scenarios + questions.</div>
+                </Link>
+                <Link href="/learn/reading/sandbox" className="bg-white border border-[var(--divider)] rounded-bento p-5 hover:border-primary transition">
+                  <div className="font-heading font-semibold text-charcoal mb-1">Reading sandbox</div>
+                  <div className="text-secondary text-sm">Read with glossary support.</div>
+                </Link>
+                <Link href={writingHref} className="bg-white border border-[var(--divider)] rounded-bento p-5 hover:border-primary transition">
+                  <div className="font-heading font-semibold text-charcoal mb-1">Writing</div>
+                  <div className="text-secondary text-sm">Write, get feedback, and track mistakes.</div>
+                </Link>
+                <Link href="/learn/exam" className="bg-white border border-[var(--divider)] rounded-bento p-5 hover:border-primary transition md:col-span-2">
+                  <div className="font-heading font-semibold text-charcoal mb-1">Mock exam</div>
+                  <div className="text-secondary text-sm">Try a full practice test.</div>
+                </Link>
+              </div>
+            </section>
+          </aside>
+        </div>
 
         {session?.email ? (
           <LessonCompleteButton lessonId={row.id} nextLesson={nextLesson} />

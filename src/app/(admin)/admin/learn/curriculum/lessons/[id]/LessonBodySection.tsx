@@ -103,14 +103,14 @@ export function LessonBodySection({
 
   if (loading) {
     return (
-      <div className="mt-10 max-w-2xl">
+      <div className="w-full">
         <p className="text-secondary text-sm">Loading lesson body…</p>
       </div>
     );
   }
 
   return (
-    <div className="mt-10 space-y-4 max-w-2xl">
+    <div className="space-y-4 w-full">
       <section>
         <h3 className="font-heading font-semibold text-charcoal mb-2">Lesson body (main content)</h3>
         <p className="text-secondary text-sm mb-2">

@@ -81,7 +81,7 @@ export function LearnContent({
 
   return (
     <div className="py-12 sm:py-16 px-4 sm:px-6">
-      <div className="max-w-[1100px] mx-auto">
+      <div className="max-w-[1200px] mx-auto">
         {/* Hero: title left, search + links top right */}
         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6 mb-8">
           <div>
@@ -99,7 +99,7 @@ export function LearnContent({
                 placeholder="Search grammar, kanji, vocab…"
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
-                className="flex-1 min-w-0 px-4 py-2.5 border border-[#EEEEEE] rounded-md text-charcoal placeholder:text-[#555555] bg-white text-sm"
+                className="flex-1 min-w-0 px-4 py-2.5 border border-[var(--divider)] rounded-md text-charcoal placeholder:text-[#555555] bg-white text-sm"
               />
               <button type="submit" className="btn-primary px-4 shrink-0">
                 Search

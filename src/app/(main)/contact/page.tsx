@@ -20,7 +20,7 @@ export default async function ContactPage() {
 
   return (
     <div className="py-12 sm:py-16 px-4 sm:px-6">
-      <div className="max-w-[1100px] mx-auto">
+      <div className="max-w-[1200px] mx-auto">
         <nav className="text-sm text-secondary mb-8">
           <Link href="/" className="hover:text-primary">
             Home

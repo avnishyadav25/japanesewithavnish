@@ -117,7 +117,7 @@ export function ChooseYourPathTabs({ mega, levelProducts }: ChooseYourPathTabsPr
                 ? tab.gold
                   ? "bg-[#C8A35F] text-white"
                   : "bg-primary text-white"
-                : "bg-[#FAF8F5] border border-[#EEEEEE] text-[#555555] hover:border-primary hover:text-primary"
+                : "bg-[#FAF8F5] border border-[var(--divider)] text-[#555555] hover:border-primary hover:text-primary"
             }`}
           >
             {tab.label}

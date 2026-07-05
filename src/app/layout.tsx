@@ -1,19 +1,23 @@
 import type { Metadata } from "next";
 import Script from "next/script";
-import { Inter, Source_Serif_4 } from "next/font/google";
+import { DM_Sans, DM_Serif_Display } from "next/font/google";
 import "./globals.css";
 import { OrganizationSchema } from "@/components/JsonLd";
 import { ThirdPartyScripts } from "@/components/ThirdPartyScripts";
 import { sql } from "@/lib/db";
 
-const inter = Inter({
+const dmSans = DM_Sans({
   subsets: ["latin"],
   variable: "--font-sans",
+  display: "swap",
 });
 
-const sourceSerif = Source_Serif_4({
+const dmSerif = DM_Serif_Display({
   subsets: ["latin"],
+  weight: "400",
+  style: ["normal", "italic"],
   variable: "--font-serif",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -48,7 +52,7 @@ export default async function RootLayout({
   }
 
   return (
-    <html lang="en" className={`${inter.variable} ${sourceSerif.variable}`}>
+    <html lang="en" className={`${dmSans.variable} ${dmSerif.variable}`}>
       <head>
         {ADSENSE_CLIENT ? (
           <meta

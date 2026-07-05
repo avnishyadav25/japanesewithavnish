@@ -8,17 +8,23 @@
   --primary: #D0021B;
   --primary-hover: #A00016;
   --gold: #C8A35F;
+  --gold-light: #fffdf0;
+  --gold-dark: #92610a;
   --base: #FAF8F5;
   --charcoal: #1A1A1A;
   --secondary: #555555;
-  --divider: #EEEEEE;
+  --muted: #555;
+  --subtle: #888;
+  --divider: #E8E4DE;
+  --border-light: #f0ece6;
+  --red-light: #fff1f2;
   --card-bg: #FFFFFF;
 }
 
 body {
   color: #1A1A1A;
   background: #FAF8F5;
-  font-family: var(--font-sans), Inter, system-ui, sans-serif;
+  font-family: var(--font-sans), "DM Sans", system-ui, sans-serif;
   font-size: 16px;
   line-height: 1.6;
 }
@@ -32,35 +38,30 @@ body, body * {
   body { --section-padding: 60px 24px; }
 }
 
-/* Pattern limited to hero only - rest of page is plain #FAF8F5 */
-.hero-pattern-bg {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cpath fill='%23D0021B' fill-opacity='0.04' d='M60 0c0 0-30 20-30 60s30 60 30 60 30-20 30-60S60 0 60 0z'/%3E%3Cpath fill='%23D0021B' fill-opacity='0.04' d='M0 60c0 0 20-30 60-30s60 30 60 30-20 30-60 30S0 60 0 60z'/%3E%3Cpath fill='%23D0021B' fill-opacity='0.04' d='M60 120c0 0 30-20 30-60s-30-60-30-60-30 20-30 60 30 60 30 60z'/%3E%3Cpath fill='%23D0021B' fill-opacity='0.04' d='M120 60c0 0-20 30-60 30S0 60 0 60s20-30 60-30 60 30 60 30z'/%3E%3C/svg%3E");
-}
-
 @layer components {
   .font-heading {
-    font-family: var(--font-serif), Georgia, serif;
+    font-family: var(--font-serif), "DM Serif Display", Georgia, serif;
   }
   .btn-primary {
     @apply bg-primary text-white font-semibold;
     height: 44px;
     padding: 12px 20px;
-    border-radius: 6px;
-    transition: all 0.3s ease;
+    border-radius: 8px;
+    transition: all 0.2s ease;
     display: inline-flex;
     align-items: center;
   }
   .btn-primary:hover {
     @apply bg-primary-hover;
-    transform: translateY(-2px);
+    transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(208, 2, 27, 0.3);
   }
   .btn-secondary {
     @apply bg-transparent border-2 border-primary text-primary font-semibold;
     height: 44px;
     padding: 10px 18px;
-    border-radius: 6px;
-    transition: all 0.3s ease;
+    border-radius: 8px;
+    transition: all 0.2s ease;
     display: inline-flex;
     align-items: center;
   }
@@ -68,17 +69,17 @@ body, body * {
     @apply bg-primary text-white;
   }
   .badge-offer {
-    @apply bg-[#FFF7F7] text-primary border border-[#E6E6E6] rounded-badge px-2 py-1 text-xs font-medium uppercase tracking-wider;
+    @apply bg-[#fff1f2] text-primary border border-[#fecdd3] rounded-full px-2 py-0.5 text-xs font-bold uppercase tracking-wider;
   }
   .badge-premium {
-    @apply bg-base text-gold border border-gold rounded-badge px-2 py-1 text-xs font-medium uppercase tracking-wider;
+    @apply bg-[#fffdf0] text-[#92610a] border border-[var(--gold)] rounded-full px-2 py-0.5 text-xs font-bold uppercase tracking-wider;
   }
   .card {
     @apply bg-white shadow-card;
     padding: 20px;
     border-radius: 10px;
-    transition: all 0.3s ease;
-    border: 1px solid #EEEEEE;
+    transition: all 0.2s ease;
+    border: 1px solid var(--divider);
   }
   .card:hover {
     @apply shadow-card-hover;
@@ -146,6 +147,15 @@ body, body * {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'%3E%3Cpath fill='%23D0021B' fill-opacity='0.02' d='M30 0L60 30l-30 30L0 30z'/%3E%3C/svg%3E");
 }
 
+/* Typing indicator bounce animation for NihongoNavi chat demo */
+@keyframes bounce-dot {
+  0%, 80%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-6px); }
+}
+.bounce-dot {
+  animation: bounce-dot 0.8s ease-in-out infinite;
+}
+
 @keyframes fade-in-up {
   from {
     opacity: 0;
@@ -203,7 +213,7 @@ body, body * {
   animation: drawer-in 0.3s ease-out both;
 }
 
-/* Page-level entrance — wrap page root with this */
+/* Page-level entrance */
 .page-enter > * {
   opacity: 0;
   animation: fade-in-up 0.4s ease-out both;
@@ -213,4 +223,3 @@ body, body * {
 .page-enter > *:nth-child(3) { animation-delay: 0.14s; }
 .page-enter > *:nth-child(4) { animation-delay: 0.21s; }
 .page-enter > *:nth-child(5) { animation-delay: 0.28s; }
-

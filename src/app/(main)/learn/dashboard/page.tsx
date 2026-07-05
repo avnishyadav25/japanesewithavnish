@@ -95,7 +95,7 @@ export default function LearnDashboardPage() {
 
   return (
     <div className="min-h-screen bg-[var(--base)]">
-      <div className="max-w-[1100px] mx-auto px-4 py-8">
+      <div className="max-w-[1200px] mx-auto px-4 py-8">
         <h1 className="font-heading text-3xl font-bold text-charcoal mb-2">My Progress</h1>
         <p className="text-secondary mb-8">
           Your level and activity. Take the <Link href="/quiz" className="text-primary hover:underline">placement quiz</Link> to set your level.
