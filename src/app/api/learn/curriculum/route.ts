@@ -221,6 +221,7 @@ export async function GET(req: Request) {
           totalEstimatedMinutes,
           pathProgressPercent,
           currentLevelCode,
+          isLoggedIn: !!session?.email,
           completedLessonIds: session?.email ? completedLessonIds : undefined,
           ...(session?.email && { dueReviewsCount, advanceBlocked, advanceBlockReason }),
         }
@@ -230,6 +231,7 @@ export async function GET(req: Request) {
           totalEstimatedMinutes,
           pathProgressPercent,
           currentLevelCode,
+          isLoggedIn: !!session?.email,
           ...(session?.email && { dueReviewsCount, advanceBlocked, advanceBlockReason }),
         };
 
