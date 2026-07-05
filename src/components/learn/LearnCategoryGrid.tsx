@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { LearnLevel } from "@/lib/learn-filters";
 
 const CATEGORIES = [
+  { type: "kana", label: "Kana Portal", desc: "仮名 & 漢字 — Hiragana, Katakana & Kanji practice", kanji: "仮名" },
   { type: "grammar", label: "Grammar", desc: "文法 — Grammar patterns and structures", kanji: "文法" },
   { type: "vocabulary", label: "Vocabulary", desc: "語彙 — Words and expressions", kanji: "語彙" },
   { type: "kanji", label: "Kanji", desc: "漢字 — Characters and readings", kanji: "漢字" },
@@ -23,9 +24,11 @@ export function LearnCategoryGrid({ level, activeCategory }: LearnCategoryGridPr
     <div className="flex flex-wrap gap-2">
       {CATEGORIES.map((item) => {
         const href =
-          level === "all"
-            ? `/learn/${item.type}`
-            : `/learn/${item.type}?level=${level}`;
+          item.type === "kana"
+            ? `/learn/kana`
+            : level === "all"
+              ? `/learn/${item.type}`
+              : `/learn/${item.type}?level=${level}`;
         const isActive = activeCategory === item.type;
         return (
           <Link

@@ -1,8 +1,12 @@
+"use client";
+
+import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import { slugify } from "@/lib/slugify";
 import { TTSPlayButton, SoundsTableCellWithTTS } from "@/components/learn/LessonMetaContent";
+import { WritingPracticeModal } from "./WritingPracticeModal";
 
 type SectionAudio = Record<string, string>;
 type Meta = Record<string, unknown> | null | undefined;
@@ -30,6 +34,29 @@ export function LearnMarkdown({
   const sectionAudio = (meta?.section_audio as SectionAudio | undefined) ?? {};
   const m = meta ?? {};
   const audio = hasAudio(meta);
+
+  // Writing Modal State
+  const [writingChar, setWritingChar] = useState("");
+  const [writingType, setWritingType] = useState<"kanji" | "hiragana" | "katakana">("kanji");
+  const [writingStrokes, setWritingStrokes] = useState<number | null>(null);
+  const [writingReading, setWritingReading] = useState<string | null>(null);
+  const [writingMeaning, setWritingMeaning] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const handleOpenWritingModal = (
+    char: string,
+    type: "kanji" | "hiragana" | "katakana",
+    strokes: number | null | undefined,
+    reading: string | null | undefined,
+    meaning: string | null | undefined
+  ) => {
+    setWritingChar(char);
+    setWritingType(type);
+    setWritingStrokes(strokes ?? null);
+    setWritingReading(reading ?? null);
+    setWritingMeaning(meaning ?? null);
+    setIsModalOpen(true);
+  };
 
   function SectionWithAudio({
     level,
@@ -63,12 +90,19 @@ export function LearnMarkdown({
       {/* Vocabulary: japanese, reading, type, meaning — before markdown */}
       {contentType === "vocabulary" && (metaStr(meta, "japanese") || metaStr(meta, "meaning")) && (
         <div className="mb-6 p-4 rounded-bento bg-[var(--divider)]/20 text-center overflow-hidden bg-white">
-          <div className="flex flex-wrap items-baseline justify-center gap-2 mb-2">
+          <div className="flex flex-wrap items-center justify-center gap-3 mb-2">
             {metaStr(meta, "japanese") && (
-              <>
-                <span className="text-2xl font-medium text-charcoal">{metaStr(meta, "japanese")}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-3xl font-bold text-charcoal">{metaStr(meta, "japanese")}</span>
                 {!audio && <TTSPlayButton text={metaStr(meta, "japanese")} />}
-              </>
+                <button
+                  type="button"
+                  onClick={() => handleOpenWritingModal(metaStr(meta, "japanese"), "kanji", null, metaStr(meta, "reading"), metaStr(meta, "meaning"))}
+                  className="text-xs py-1 px-2.5 border border-primary/40 text-primary font-bold rounded hover:bg-primary/5 transition"
+                >
+                  Practice Drawing
+                </button>
+              </div>
             )}
             {metaStr(meta, "reading") && (
               <span className="text-secondary text-lg">({metaStr(meta, "reading")})</span>
@@ -79,7 +113,7 @@ export function LearnMarkdown({
               </span>
             )}
           </div>
-          {metaStr(meta, "meaning") && <p className="text-charcoal mb-2">{metaStr(meta, "meaning")}</p>}
+          {metaStr(meta, "meaning") && <p className="text-charcoal mb-2 font-medium">{metaStr(meta, "meaning")}</p>}
         </div>
       )}
 
@@ -106,29 +140,36 @@ export function LearnMarkdown({
 
       {/* Kanji: character, meaning, stroke_count, onyomi, kunyomi — before markdown */}
       {contentType === "kanji" && (metaStr(meta, "character") || metaStr(meta, "meaning")) && (
-        <div className="mb-6 p-4 rounded-bento bg-[var(--divider)]/20 text-center overflow-hidden bg-white">
-          <div className="flex flex-wrap items-baseline justify-center gap-3 mb-2">
+        <div className="mb-6 p-6 rounded-bento bg-[var(--divider)]/20 text-center overflow-hidden bg-white border border-[var(--divider)] shadow-sm">
+          <div className="flex flex-wrap items-center justify-center gap-4 mb-3">
             {metaStr(meta, "character") && (
-              <>
-                <span className="text-4xl font-medium text-charcoal">{metaStr(meta, "character")}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-5xl font-bold text-charcoal">{metaStr(meta, "character")}</span>
                 {!audio && <TTSPlayButton text={metaStr(meta, "character")} />}
-              </>
+                <button
+                  type="button"
+                  onClick={() => handleOpenWritingModal(metaStr(meta, "character"), "kanji", meta?.stroke_count ? Number(meta.stroke_count) : null, null, metaStr(meta, "meaning"))}
+                  className="text-xs py-1 px-2.5 border border-primary/40 text-primary font-bold rounded hover:bg-primary/5 transition"
+                >
+                  Practice Drawing
+                </button>
+              </div>
             )}
-            {metaStr(meta, "meaning") && <span className="text-charcoal">{metaStr(meta, "meaning")}</span>}
+            {metaStr(meta, "meaning") && <span className="text-charcoal text-lg font-bold">({metaStr(meta, "meaning")})</span>}
             {meta?.stroke_count != null && (
-              <span className="text-xs text-secondary">{Number(meta.stroke_count)} strokes</span>
+              <span className="text-xs font-semibold px-2 py-0.5 rounded bg-base border border-[var(--divider)]">{Number(meta.stroke_count)} strokes</span>
             )}
           </div>
-          <div className="flex flex-wrap justify-center gap-4 text-[1rem]">
+          <div className="flex flex-wrap justify-center gap-6 text-sm text-secondary">
             {Array.isArray(m.onyomi) && (m.onyomi as string[]).length > 0 && (
               <span>
-                <span className="text-secondary">On: </span>
+                <strong className="text-charcoal font-semibold">On-yomi: </strong>
                 {(m.onyomi as string[]).join(", ")}
               </span>
             )}
             {Array.isArray(m.kunyomi) && (m.kunyomi as string[]).length > 0 && (
               <span>
-                <span className="text-secondary">Kun: </span>
+                <strong className="text-charcoal font-semibold">Kun-yomi: </strong>
                 {(m.kunyomi as string[]).join(", ")}
               </span>
             )}
@@ -139,99 +180,113 @@ export function LearnMarkdown({
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkBreaks]}
         components={{
-        img: ({ alt, src, ...props }) => (
-          <span className="block my-4 text-center">
-            <img
-              {...props}
-              alt={alt || ""}
-              src={src || ""}
-              className="max-w-md w-full mx-auto rounded-[10px] object-cover object-center border border-[var(--divider)] bg-[var(--divider)]/10"
-            />
-          </span>
-        ),
-        h2: ({ children, ...props }) => (
-          <SectionWithAudio level={2} {...props}>
-            {children}
-          </SectionWithAudio>
-        ),
-        h3: ({ children, ...props }) => (
-          <SectionWithAudio level={3} {...props}>
-            {children}
-          </SectionWithAudio>
-        ),
-        table: ({ children, ...props }) => (
-          <div className="my-6 overflow-x-auto">
-            <table className="w-full border-collapse border border-[var(--divider)]" {...props}>
-              {children}
-            </table>
-          </div>
-        ),
-        thead: ({ children, ...props }) => (
-          <thead className="bg-[var(--divider)]/20" {...props}>
-            {children}
-          </thead>
-        ),
-        tbody: ({ children, ...props }) => (
-          <tbody {...props}>{children}</tbody>
-        ),
-        tr: ({ children, ...props }) => (
-          <tr className="border-b border-[var(--divider)] last:border-b-0" {...props}>
-            {children}
-          </tr>
-        ),
-        th: ({ children, ...props }) => (
-          <th className="border border-[var(--divider)] px-3 py-2 text-left font-bold text-charcoal" {...props}>
-            {children}
-          </th>
-        ),
-        td: ({ children, ...props }) =>
-          contentType === "sounds" ? (
-            <SoundsTableCellWithTTS className="border border-[var(--divider)] px-3 py-2 align-top" {...props}>
-              {children}
-            </SoundsTableCellWithTTS>
-          ) : (
-            <td className="border border-[var(--divider)] px-3 py-2 align-top" {...props}>
-              {children}
-            </td>
+          img: ({ alt, src, ...props }) => (
+            <span className="block my-4 text-center">
+              <img
+                {...props}
+                alt={alt || ""}
+                src={src || ""}
+                className="max-w-md w-full mx-auto rounded-[10px] object-cover object-center border border-[var(--divider)] bg-[var(--divider)]/10"
+              />
+            </span>
           ),
-        ul: ({ children, ...props }) =>
-          contentType === "sounds" ? (
-            <ol className="list-decimal list-inside mb-4 space-y-2 [&_p]:inline [&_p]:my-0">
+          h2: ({ children, ...props }) => (
+            <SectionWithAudio level={2} {...props}>
+              {children}
+            </SectionWithAudio>
+          ),
+          h3: ({ children, ...props }) => (
+            <SectionWithAudio level={3} {...props}>
+              {children}
+            </SectionWithAudio>
+          ),
+          table: ({ children, ...props }) => (
+            <div className="my-6 overflow-x-auto">
+              <table className="w-full border-collapse border border-[var(--divider)]" {...props}>
+                {children}
+              </table>
+            </div>
+          ),
+          thead: ({ children, ...props }) => (
+            <thead className="bg-[var(--divider)]/20" {...props}>
+              {children}
+            </thead>
+          ),
+          tbody: ({ children, ...props }) => (
+            <tbody {...props}>{children}</tbody>
+          ),
+          tr: ({ children, ...props }) => (
+            <tr className="border-b border-[var(--divider)] last:border-b-0" {...props}>
+              {children}
+            </tr>
+          ),
+          th: ({ children, ...props }) => (
+            <th className="border border-[var(--divider)] px-3 py-2 text-left font-bold text-charcoal" {...props}>
+              {children}
+            </th>
+          ),
+          td: ({ children, ...props }) =>
+            contentType === "sounds" ? (
+              <SoundsTableCellWithTTS className="border border-[var(--divider)] px-3 py-2 align-top" {...props}>
+                {children}
+              </SoundsTableCellWithTTS>
+            ) : (
+              <td className="border border-[var(--divider)] px-3 py-2 align-top" {...props}>
+                {children}
+              </td>
+            ),
+          ul: ({ children, ...props }) =>
+            contentType === "sounds" ? (
+              <ol className="list-decimal list-inside mb-4 space-y-2 [&_p]:inline [&_p]:my-0">
+                {children}
+              </ol>
+            ) : (
+              <ul className="list-disc list-outside pl-5 mb-4 space-y-2" {...props}>
+                {children}
+              </ul>
+            ),
+          ol: ({ children, ...props }) => (
+            <ol className="list-decimal list-outside pl-5 mb-4 space-y-2" {...props}>
               {children}
             </ol>
-          ) as React.ReactElement : (
-            <ul {...props}>{children}</ul>
           ),
-        ol: ({ children, ...props }) =>
-          contentType === "sounds" ? (
-            <ol className="list-decimal list-inside mb-4 space-y-2 [&_p]:inline [&_p]:my-0" {...props}>
+          li: ({ children, ...props }) => {
+            if (contentType !== "sounds") return <li {...props}>{children}</li>;
+            const nodes = Array.isArray(children) ? children : [children];
+            const first = nodes[0];
+            const rest = nodes.slice(1);
+            const japanese = first != null ? extractJapaneseFromNode(first) : null;
+            return (
+              <li className="leading-[1.7] text-[1rem]" {...props}>
+                {first != null && (
+                  <span className="inline-flex items-center gap-2 flex-wrap">
+                    <>{first}</>
+                    {japanese && <TTSPlayButton text={japanese} />}
+                  </span>
+                )}
+                {rest.length > 0 && rest}
+              </li>
+            );
+          },
+          blockquote: ({ children, ...props }) => (
+            <blockquote className="border-l-4 border-primary pl-4 italic my-4 text-secondary" {...props}>
               {children}
-            </ol>
-          ) : (
-            <ol {...props}>{children}</ol>
+            </blockquote>
           ),
-        li: ({ children, ...props }) => {
-          if (contentType !== "sounds") return <li {...props}>{children}</li>;
-          const nodes = Array.isArray(children) ? children : [children];
-          const first = nodes[0];
-          const rest = nodes.slice(1);
-          const japanese = first != null ? extractJapaneseFromNode(first) : null;
-          return (
-            <li className="leading-[1.7] text-[1rem]" {...props}>
-              {first != null && (
-                <span className="inline-flex items-center gap-2 flex-wrap">
-                  <>{first}</>
-                  {japanese && <TTSPlayButton text={japanese} />}
-                </span>
-              )}
-              {rest.length > 0 && rest}
-            </li>
-          );
-        },
-      }}
-    >
+        }}
+      >
         {content}
       </ReactMarkdown>
+
+      <WritingPracticeModal
+        character={writingChar}
+        characterType={writingType}
+        expectedStrokeCount={writingStrokes}
+        reading={writingReading}
+        meaning={writingMeaning}
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+      />
     </>
   );
 }
@@ -249,4 +304,3 @@ function extractJapaneseFromNode(node: React.ReactNode): string | null {
   const match = s.match(new RegExp(`[${JAPANESE_CHAR.source}]+`));
   return match ? match[0] : null;
 }
-

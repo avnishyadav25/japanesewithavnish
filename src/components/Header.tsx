@@ -20,6 +20,7 @@ const topNavLinks = [
 ];
 
 const LESSONS_NAV_ITEMS = [
+  { href: "/learn/kana", label: "Kana Portal" },
   { href: "/learn/grammar", label: "Grammar" },
   { href: "/learn/vocabulary", label: "Vocab" },
   { href: "/learn/listening", label: "Listening" },

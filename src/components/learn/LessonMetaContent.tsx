@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, type ReactNode } from "react";
+import { WritingPracticeModal } from "./WritingPracticeModal";
 
 type Meta = Record<string, unknown>;
 
@@ -210,6 +211,17 @@ function hasVal(v: string | null | undefined): boolean {
 
 /** Characters table for sounds: hide columns that are all null, show — for null cells, TTS after Hiragana/Katakana. */
 export function SoundsCharactersBlock({ meta, headingLevel = "h2" }: { meta: Meta; headingLevel?: "h2" | "h3" }) {
+  // Writing Modal State
+  const [writingChar, setWritingChar] = useState("");
+  const [writingType, setWritingType] = useState<"hiragana" | "katakana">("hiragana");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const handleOpenWritingModal = (char: string, type: "hiragana" | "katakana") => {
+    setWritingChar(char);
+    setWritingType(type);
+    setIsModalOpen(true);
+  };
+
   const chars = Array.isArray(meta?.characters) ? (meta.characters as SoundChar[]) : [];
   if (chars.length === 0) return null;
 
@@ -224,7 +236,7 @@ export function SoundsCharactersBlock({ meta, headingLevel = "h2" }: { meta: Met
     <div className="mb-6 p-4 rounded-bento bg-[var(--divider)]/20 text-center">
       <Heading className="text-3xl font-heading font-bold text-charcoal mb-3 scroll-mt-24">Characters</Heading>
       <div className="overflow-x-auto">
-        <table className="w-full text-[1rem] border-collapse mx-auto border border-[var(--divider)]">
+        <table className="w-full text-[1rem] border-collapse mx-auto border border-[var(--divider)] bg-white">
           <thead>
             <tr className="border-b border-[var(--divider)] bg-[var(--divider)]/20">
               {hasHiragana && (
@@ -251,6 +263,14 @@ export function SoundsCharactersBlock({ meta, headingLevel = "h2" }: { meta: Met
                         <>
                           <span>{String(c.hiragana).trim()}</span>
                           <TTSPlayButton text={String(c.hiragana).trim()} />
+                          <button
+                            type="button"
+                            onClick={() => handleOpenWritingModal(String(c.hiragana).trim(), "hiragana")}
+                            className="text-xs text-primary font-bold hover:underline ml-1"
+                            title="Practice writing"
+                          >
+                            ✍️
+                          </button>
                         </>
                       ) : (
                         "—"
@@ -265,6 +285,14 @@ export function SoundsCharactersBlock({ meta, headingLevel = "h2" }: { meta: Met
                         <>
                           <span>{String(c.katakana).trim()}</span>
                           <TTSPlayButton text={String(c.katakana).trim()} />
+                          <button
+                            type="button"
+                            onClick={() => handleOpenWritingModal(String(c.katakana).trim(), "katakana")}
+                            className="text-xs text-primary font-bold hover:underline ml-1"
+                            title="Practice writing"
+                          >
+                            ✍️
+                          </button>
                         </>
                       ) : (
                         "—"
@@ -287,6 +315,13 @@ export function SoundsCharactersBlock({ meta, headingLevel = "h2" }: { meta: Met
           </tbody>
         </table>
       </div>
+
+      <WritingPracticeModal
+        character={writingChar}
+        characterType={writingType}
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+      />
     </div>
   );
 }
