@@ -22,7 +22,9 @@ const topNavLinks = [
   { href: "/contact", label: "Contact" },
 ];
 
-export function Header() {
+const SALES_NAV_HREFS = new Set(["/store", "/library"]);
+
+export function Header({ isAdmin = false }: { isAdmin?: boolean }) {
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -33,6 +35,14 @@ export function Header() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const learnRef = useRef<HTMLDivElement>(null);
   const accountRef = useRef<HTMLDivElement>(null);
+
+  const visibleTopNavLinks = isAdmin
+    ? topNavLinks
+    : topNavLinks.filter((l) => !SALES_NAV_HREFS.has(l.href));
+
+  const visibleAccountMenuItems = isAdmin
+    ? accountMenuItems
+    : accountMenuItems.filter((item) => !SALES_NAV_HREFS.has(item.href));
 
   useEffect(() => {
     fetch("/api/auth/session")
@@ -133,7 +143,7 @@ export function Header() {
           </Link>
 
           <nav className="hidden md:flex items-center gap-8">
-            {topNavLinks.map((link) => (
+            {visibleTopNavLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
@@ -213,7 +223,7 @@ export function Header() {
                     >
                       Edit profile
                     </Link>
-                    {accountMenuItems.map((item) => (
+                    {visibleAccountMenuItems.map((item) => (
                       <Link
                         key={item.href + item.label}
                         href={item.href}
@@ -290,7 +300,7 @@ export function Header() {
             </svg>
           </button>
           <nav className="flex flex-col gap-1">
-            {topNavLinks.map((link) => (
+            {visibleTopNavLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
@@ -305,7 +315,7 @@ export function Header() {
                 <Link href="/account" onClick={() => setMobileOpen(false)} className="py-3 text-[#FAF8F5]/90 hover:text-primary font-medium text-[15px]">
                   Edit profile
                 </Link>
-                {accountMenuItems.map((item) => (
+                {visibleAccountMenuItems.map((item) => (
                   <Link
                     key={item.href + item.label}
                     href={item.href}

@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { sql } from "@/lib/db";
 import { NewsletterForm } from "@/components/NewsletterForm";
+import { getAdminSession } from "@/lib/auth/admin";
 
 const FOOTER_KEYS = [
   "contact_email",
@@ -39,7 +40,11 @@ const policyLinks = [
 ];
 
 export async function Footer() {
-  const settings = await getFooterSettings();
+  const [settings, session] = await Promise.all([
+    getFooterSettings(),
+    getAdminSession(),
+  ]);
+  const isAdmin = !!session;
   const contactEmail = settings.contact_email || settings.support_email || "";
   const instagramUrl = settings.instagram_url?.trim() || "https://www.instagram.com/japanesewithavnish";
   const social = {
@@ -47,6 +52,10 @@ export async function Footer() {
     instagram: instagramUrl,
     twitter: settings.twitter_url,
   };
+
+  const visibleQuickLinks = isAdmin
+    ? quickLinks
+    : quickLinks.filter((l) => l.href !== "/store");
 
   return (
     <footer className="bg-[#1A1A1A] mt-auto">
@@ -121,7 +130,7 @@ export async function Footer() {
               Quick Links
             </h3>
             <ul className="space-y-2">
-              {quickLinks.map((link) => (
+              {visibleQuickLinks.map((link) => (
                 <li key={link.href}>
                   <Link
                     href={link.href}
