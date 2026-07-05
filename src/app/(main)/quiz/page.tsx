@@ -9,161 +9,207 @@ interface Question {
   question_text: string;
   options: string[];
   correct_index: number;
+  jlpt_level: string;
 }
 
-const SAMPLE_QUESTIONS: Question[] = [
-  { id: "1", question_text: "What does こんにちは mean?", options: ["Good morning", "Hello", "Goodbye", "Thank you"], correct_index: 1 },
-  { id: "2", question_text: "Which is the correct reading of 水?", options: ["hi", "mizu", "ki", "tsuki"], correct_index: 1 },
-  { id: "3", question_text: "What particle indicates the subject?", options: ["を", "に", "は", "で"], correct_index: 2 },
-  { id: "4", question_text: "How do you say 'I eat' in polite form?", options: ["食べる", "食べます", "食べた", "食べて"], correct_index: 1 },
-  { id: "5", question_text: "What is 本 (hon) commonly used for?", options: ["Book", "Tree", "Car", "House"], correct_index: 0 },
-  { id: "6", question_text: "Which is the past tense of 行く?", options: ["行きます", "行った", "行って", "行く"], correct_index: 1 },
-  { id: "7", question_text: "What does ありがとう mean?", options: ["Sorry", "Please", "Thank you", "Hello"], correct_index: 2 },
-  { id: "8", question_text: "How do you say 'big' in Japanese?", options: ["小さい", "大きい", "新しい", "古い"], correct_index: 1 },
-  { id: "9", question_text: "What is 今日?", options: ["Yesterday", "Today", "Tomorrow", "Week"], correct_index: 1 },
-  { id: "10", question_text: "Which level is the easiest JLPT level?", options: ["N1", "N2", "N3", "N5"], correct_index: 3 },
-];
+interface Step {
+  question: Question;
+  level: string;
+  selectedIndex: number | null; // null = unanswered, -1 = unsure, 0..3 = chosen
+}
+
+const JLPT_LEVELS = ["N5", "N4", "N3", "N2", "N1"];
+const TARGET_QUESTION_COUNT = 25;
 
 export default function QuizPage() {
   const router = useRouter();
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [questionPool, setQuestionPool] = useState<Question[]>([]);
+  const [steps, setSteps] = useState<Step[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<number, number>>({});
+  const [loading, setLoading] = useState(true);
 
+  // 1. Fetch entire question pool on mount
   useEffect(() => {
     fetch("/api/quiz/questions")
       .then((r) => r.json())
       .then((data) => {
-        if (data.questions?.length) {
-          setQuestions(data.questions.slice(0, 10));
-        } else {
-          setQuestions(SAMPLE_QUESTIONS);
+        if (data.questions && data.questions.length > 0) {
+          const pool: Question[] = data.questions;
+          setQuestionPool(pool);
+
+          // Restore progress if possible, otherwise initialize
+          try {
+            const raw = window.localStorage.getItem("jlpt_adaptive_quiz_state_v1");
+            if (raw) {
+              const parsed = JSON.parse(raw) as {
+                steps: Step[];
+                currentIndex: number;
+              };
+              if (parsed && Array.isArray(parsed.steps) && parsed.steps.length > 0) {
+                setSteps(parsed.steps);
+                setCurrentIndex(parsed.currentIndex);
+                setLoading(false);
+                return;
+              }
+            }
+          } catch {
+            // fallback to init
+          }
+
+          // Initial step at N3
+          const n3Pool = pool.filter((q) => q.jlpt_level.toUpperCase() === "N3");
+          const firstQuestion = n3Pool.length > 0 
+            ? n3Pool[Math.floor(Math.random() * n3Pool.length)]
+            : pool[Math.floor(Math.random() * pool.length)];
+
+          setSteps([{
+            question: firstQuestion,
+            level: firstQuestion.jlpt_level,
+            selectedIndex: null
+          }]);
+          setCurrentIndex(0);
         }
         setLoading(false);
       })
-      .catch(() => {
-        setQuestions(SAMPLE_QUESTIONS);
+      .catch((err) => {
+        console.error("Failed to load quiz pool", err);
         setLoading(false);
       });
   }, []);
 
-  // Restore progress if available
+  // 2. Persist progress
   useEffect(() => {
-    if (!questions.length) return;
-    try {
-      const raw = window.localStorage.getItem("jlpt_quiz_state_v1");
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as {
-        currentIndex?: number;
-        answers?: Record<number, number>;
-        questionCount?: number;
-      };
-      if (
-        parsed &&
-        typeof parsed === "object" &&
-        parsed.questionCount === questions.length
-      ) {
-        setAnswers(parsed.answers || {});
-        const idx =
-          typeof parsed.currentIndex === "number"
-            ? Math.min(Math.max(parsed.currentIndex, 0), questions.length - 1)
-            : 0;
-        setCurrentIndex(idx);
-      }
-    } catch {
-      // ignore restore errors
-    }
-  }, [questions.length]);
-
-  // Persist progress
-  useEffect(() => {
-    if (!questions.length) return;
+    if (steps.length === 0) return;
     try {
       window.localStorage.setItem(
-        "jlpt_quiz_state_v1",
-        JSON.stringify({
-          currentIndex,
-          answers,
-          questionCount: questions.length,
-        })
+        "jlpt_adaptive_quiz_state_v1",
+        JSON.stringify({ steps, currentIndex })
       );
     } catch {
-      // ignore save errors
+      // ignore localstorage errors
     }
-  }, [questions.length, currentIndex, answers]);
+  }, [steps, currentIndex]);
 
   if (loading) {
     return (
-      <div className="py-24 px-4">
-        <div className="max-w-[1200px] mx-auto">
-          <div className="bento-grid">
-            <div className="bento-span-6 card p-12 text-center">
-              <p className="text-secondary">Loading quiz...</p>
-            </div>
-          </div>
+      <div className="py-24 px-4 bg-[#FAF8F5] min-h-screen">
+        <div className="max-w-[1200px] mx-auto text-center">
+          <p className="text-secondary">Loading adaptive placement quiz...</p>
         </div>
       </div>
     );
   }
 
-  const q = questions[currentIndex];
-  if (!q) {
+  const currentStep = steps[currentIndex];
+  if (!currentStep) {
     return (
-      <div className="py-24 px-4">
-        <div className="bento-grid">
-          <div className="bento-span-6 card p-12 text-center">
-            <p className="text-secondary">No questions available.</p>
-          </div>
+      <div className="py-24 px-4 bg-[#FAF8F5] min-h-screen">
+        <div className="max-w-[1200px] mx-auto text-center">
+          <p className="text-secondary">No questions available. Please try again later.</p>
         </div>
       </div>
     );
   }
 
+  const q = currentStep.question;
   const options = Array.isArray(q.options) ? q.options : [];
-  const progress = ((currentIndex + 1) / questions.length) * 100;
-  const selectedIndex = answers[currentIndex];
+  const selectedIndex = currentStep.selectedIndex;
+  const progress = ((currentIndex + 1) / TARGET_QUESTION_COUNT) * 100;
 
   function handleSelect(optionIndex: number) {
-    setAnswers({ ...answers, [currentIndex]: optionIndex });
+    const newSteps = [...steps];
+    newSteps[currentIndex].selectedIndex = optionIndex;
+    setSteps(newSteps);
   }
 
-  function handleNotSure() {
-    // -1 = "I'm not sure" → 0 points, then move to next (or finish)
-    const newAnswers = { ...answers, [currentIndex]: -1 };
-    setAnswers(newAnswers);
-    if (currentIndex < questions.length - 1) {
-      setCurrentIndex(currentIndex + 1);
-    } else {
+  function getNextQuestion(baseSteps: Step[], nextLevel: string): Question {
+    // Filter out already asked questions
+    const askedIds = new Set(baseSteps.map((s) => s.question.id));
+    let levelPool = questionPool.filter(
+      (q) => q.jlpt_level.toUpperCase() === nextLevel.toUpperCase() && !askedIds.has(q.id)
+    );
+
+    // If level pool is empty, expand to nearest level
+    if (levelPool.length === 0) {
+      levelPool = questionPool.filter((q) => !askedIds.has(q.id));
+    }
+
+    // Default fallback
+    if (levelPool.length === 0) {
+      return questionPool[Math.floor(Math.random() * questionPool.length)];
+    }
+
+    return levelPool[Math.floor(Math.random() * levelPool.length)];
+  }
+
+  function handleNextOrUnsure(forceUnsure = false) {
+    let finalSelectedIndex = selectedIndex;
+    if (forceUnsure) {
+      finalSelectedIndex = -1;
+      const newSteps = [...steps];
+      newSteps[currentIndex].selectedIndex = -1;
+      setSteps(newSteps);
+    }
+
+    const isCorrect = finalSelectedIndex === q.correct_index;
+    
+    // Check if we are finished
+    if (currentIndex === TARGET_QUESTION_COUNT - 1) {
+      // Calculate final recommended level
+      const updatedSteps = [...steps];
+      updatedSteps[currentIndex].selectedIndex = finalSelectedIndex;
+      
+      const recommendedLevel = calculateRecommendedLevel(updatedSteps);
+      const totalCorrect = updatedSteps.filter(
+        (s) => s.selectedIndex === s.question.correct_index
+      ).length;
+
+      // Clear localStorage
       try {
-        window.localStorage.removeItem("jlpt_quiz_state_v1");
+        window.localStorage.removeItem("jlpt_adaptive_quiz_state_v1");
       } catch {
         // ignore
       }
-      const score = questions.reduce(
-        (acc, question, index) =>
-          acc + (newAnswers[index] === question.correct_index ? 1 : 0),
-        0
-      );
-      router.push(`/quiz/result?score=${score}&total=${questions.length}`);
-    }
-  }
 
-  function handleNext() {
-    if (currentIndex < questions.length - 1) {
-      setCurrentIndex(currentIndex + 1);
+      router.push(
+        `/quiz/result?recommendedLevel=${recommendedLevel}&score=${totalCorrect}&total=${TARGET_QUESTION_COUNT}`
+      );
       return;
     }
-    // Finished – compute score and go to result
-    try {
-      window.localStorage.removeItem("jlpt_quiz_state_v1");
-    } catch {
-      // ignore
+
+    // Determine next level
+    const currentLevelIdx = JLPT_LEVELS.indexOf(currentStep.level.toUpperCase());
+    let nextLevelIdx = currentLevelIdx;
+    if (isCorrect) {
+      nextLevelIdx = Math.min(JLPT_LEVELS.length - 1, currentLevelIdx + 1);
+    } else {
+      nextLevelIdx = Math.max(0, currentLevelIdx - 1);
     }
-    const score = questions.reduce((acc, question, index) => {
-      return acc + (answers[index] === question.correct_index ? 1 : 0);
-    }, 0);
-    router.push(`/quiz/result?score=${score}&total=${questions.length}`);
+    const nextLevel = JLPT_LEVELS[nextLevelIdx];
+
+    // Branch off or progress forward
+    const baseSteps = steps.slice(0, currentIndex + 1);
+    
+    // If the next step already exists and has the same question/level, just advance.
+    // However, if the user changed their answer, we branch and create a new future path.
+    const hasExistingNext = steps[currentIndex + 1] !== undefined;
+    const sameLevel = hasExistingNext && steps[currentIndex + 1].level.toUpperCase() === nextLevel.toUpperCase();
+    
+    if (hasExistingNext && sameLevel) {
+      setCurrentIndex(currentIndex + 1);
+    } else {
+      const nextQuestion = getNextQuestion(baseSteps, nextLevel);
+      const newSteps = [
+        ...baseSteps,
+        {
+          question: nextQuestion,
+          level: nextQuestion.jlpt_level,
+          selectedIndex: null,
+        },
+      ];
+      setSteps(newSteps);
+      setCurrentIndex(currentIndex + 1);
+    }
   }
 
   function handleBack() {
@@ -173,18 +219,45 @@ export default function QuizPage() {
 
   function handleExit() {
     try {
-      window.localStorage.removeItem("jlpt_quiz_state_v1");
+      window.localStorage.removeItem("jlpt_adaptive_quiz_state_v1");
     } catch {
       // ignore
     }
     router.push("/jlpt");
   }
 
-  const isLast = currentIndex === questions.length - 1;
-  const canGoNext = typeof selectedIndex === "number";
+  function calculateRecommendedLevel(completedSteps: Step[]): string {
+    if (!completedSteps.length) return "N5";
+    
+    // Look at last 8 steps for convergence
+    const lastSteps = completedSteps.slice(-8);
+    const levelValues: Record<string, number> = { N5: 1, N4: 2, N3: 3, N2: 4, N1: 5 };
+    const valueToLevel: Record<number, string> = { 1: "N5", 2: "N4", 3: "N3", 4: "N2", 5: "N1" };
+    
+    let totalValue = 0;
+    let correctCount = 0;
+    for (const s of lastSteps) {
+      const isCorrect = s.selectedIndex === s.question.correct_index;
+      totalValue += levelValues[s.level.toUpperCase()] || 1;
+      if (isCorrect) correctCount++;
+    }
+    const avgValue = totalValue / lastSteps.length;
+    const accuracy = correctCount / lastSteps.length;
+    
+    let finalVal = Math.round(avgValue);
+    if (accuracy < 0.4) {
+      finalVal = Math.max(1, finalVal - 1);
+    } else if (accuracy > 0.8) {
+      finalVal = Math.min(5, finalVal + 1);
+    }
+    return valueToLevel[finalVal] || "N5";
+  }
+
+  const isLast = currentIndex === TARGET_QUESTION_COUNT - 1;
+  const canGoNext = selectedIndex !== null;
 
   return (
-    <div className="bg-[#FAF8F5] py-12 sm:py-16 px-4 sm:px-6">
+    <div className="bg-[#FAF8F5] py-12 sm:py-16 px-4 sm:px-6 min-h-screen">
       <div className="max-w-[1200px] mx-auto">
         <div className="mb-6">
           <Link
@@ -198,7 +271,7 @@ export default function QuizPage() {
           <div className="bento-span-4 card">
             <div className="flex items-center justify-between mb-4">
               <p className="text-sm text-secondary font-medium">
-                Question {currentIndex + 1} of {questions.length}
+                Question {currentIndex + 1} of {TARGET_QUESTION_COUNT} ({currentStep.level})
               </p>
               <button
                 type="button"
@@ -241,8 +314,8 @@ export default function QuizPage() {
             </div>
             <button
               type="button"
-              onClick={handleNotSure}
-              className="mt-4 text-sm text-secondary hover:text-primary underline-offset-2 hover:underline"
+              onClick={() => handleNextOrUnsure(true)}
+              className="mt-4 text-sm text-secondary hover:text-primary underline-offset-2 hover:underline block"
             >
               I&apos;m not sure
             </button>
@@ -258,7 +331,7 @@ export default function QuizPage() {
               </button>
               <button
                 type="button"
-                onClick={handleNext}
+                onClick={() => handleNextOrUnsure(false)}
                 disabled={!canGoNext}
                 className="btn-primary disabled:opacity-60 disabled:cursor-not-allowed"
               >
@@ -273,9 +346,10 @@ export default function QuizPage() {
                 How this quiz works
               </h2>
               <ul className="text-secondary text-sm space-y-1 mb-4">
-                <li>10 questions • 3–5 minutes</li>
-                <li>We&apos;ll recommend your JLPT level.</li>
-                <li>Get the best matching bundle.</li>
+                <li>25 questions • 5–8 minutes</li>
+                <li>Computer Adaptive: Gets harder or easier based on your answers.</li>
+                <li>Determines your exact JLPT level.</li>
+                <li>Matches you with the perfect course bundle.</li>
               </ul>
             </div>
             <div className="mt-4">

@@ -7,6 +7,7 @@ import {
 } from "@/lib/learn-filters";
 import { LearnContent } from "@/components/learn/LearnContent";
 import { getLearnCatalog } from "@/lib/learn/getLearnCatalog";
+import { getDirectoryItems } from "@/lib/learn/getDirectoryItems";
 
 export const revalidate = 60;
 
@@ -38,6 +39,10 @@ export default async function LearnTypePage({
     respectCuratedLevel: false,
   });
 
+  const directoryItems = level !== "all" && ["grammar", "vocabulary", "kanji", "listening", "writing"].includes(normalizedType)
+    ? await getDirectoryItems(normalizedType as "grammar" | "vocabulary" | "kanji" | "listening" | "writing", level)
+    : [];
+
   const label = LEARN_TYPE_LABELS[normalizedType as LearnContentType] || normalizedType;
 
   return (
@@ -53,6 +58,7 @@ export default async function LearnTypePage({
       lockCategory={normalizedType}
       heroTitle={label}
       heroSubtext={`Browse ${label.toLowerCase()} content by JLPT level.`}
+      directoryItems={directoryItems}
     />
   );
 }

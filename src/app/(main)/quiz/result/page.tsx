@@ -20,8 +20,11 @@ function ResultContent() {
   const [status, setStatus] = useState<"gate" | "loading" | "shown" | "error">("gate");
   const [newsletterOptIn, setNewsletterOptIn] = useState(true);
   const recommendation = useMemo(() => {
+    const requestedLevel = searchParams?.get("recommendedLevel") || "";
+    const matched = THRESHOLDS.find((t) => t.level.toUpperCase() === requestedLevel.toUpperCase());
+    if (matched) return matched;
     return [...THRESHOLDS].reverse().find((t) => score >= t.minScore) || THRESHOLDS[0];
-  }, [score]);
+  }, [score, searchParams]);
 
   async function handleEmailSubmit(e: React.FormEvent) {
     e.preventDefault();

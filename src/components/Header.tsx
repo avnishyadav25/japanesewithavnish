@@ -208,7 +208,7 @@ export function Header({ isAdmin = false }: { isAdmin?: boolean }) {
             </div>
 
             {/* Store, Blog, Contact */}
-            {topNavLinks.filter(l => l.href !== "/").map((link) => (
+            {visibleTopNavLinks.filter(l => l.href !== "/").map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
@@ -398,7 +398,7 @@ export function Header({ isAdmin = false }: { isAdmin?: boolean }) {
             </div>
 
             {/* Store, Blog, Contact */}
-            {topNavLinks.filter(l => l.href !== "/").map((link) => (
+            {visibleTopNavLinks.filter(l => l.href !== "/").map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
