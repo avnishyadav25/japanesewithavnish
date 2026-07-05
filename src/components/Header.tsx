@@ -20,6 +20,7 @@ const topNavLinks = [
 ];
 
 const LESSONS_NAV_ITEMS = [
+  { href: "/learn", label: "Learn Hub" },
   { href: "/learn/kana", label: "Kana Portal" },
   { href: "/learn/grammar", label: "Grammar" },
   { href: "/learn/vocabulary", label: "Vocab" },
@@ -175,7 +176,7 @@ export function Header({ isAdmin = false }: { isAdmin?: boolean }) {
               <button
                 type="button"
                 onClick={() => setLearnOpen((o) => !o)}
-                className={`font-medium text-[14px] transition-colors flex items-center gap-1 pb-0.5 ${pathname?.startsWith("/learn/") || pathname?.startsWith("/blog/grammar") || pathname?.startsWith("/blog/vocabulary") || pathname?.startsWith("/blog/kanji")
+                className={`font-medium text-[14px] transition-colors flex items-center gap-1 pb-0.5 ${pathname?.startsWith("/learn") || pathname?.startsWith("/blog/grammar") || pathname?.startsWith("/blog/vocabulary") || pathname?.startsWith("/blog/kanji")
                   ? "text-primary border-b-2 border-primary"
                   : "text-[#555] hover:text-[#1A1A1A]"
                   }`}
@@ -184,7 +185,7 @@ export function Header({ isAdmin = false }: { isAdmin?: boolean }) {
                 aria-controls="learn-dropdown"
                 onKeyDown={(e) => { if (e.key === "Escape") setLearnOpen(false); }}
               >
-                Lessons
+                Learn
                 <svg className={`w-4 h-4 transition-transform ${learnOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
@@ -376,7 +377,7 @@ export function Header({ isAdmin = false }: { isAdmin?: boolean }) {
                 onClick={() => setLearnMobileExpanded((e) => !e)}
                 className="py-3 w-full text-left text-[#1A1A1A] hover:text-primary font-medium text-[15px] flex items-center justify-between border-b border-[var(--divider)]"
               >
-                Lessons
+                Learn
                 <svg className={`w-4 h-4 transition-transform ${learnMobileExpanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
