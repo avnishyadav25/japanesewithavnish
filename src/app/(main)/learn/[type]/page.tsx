@@ -9,7 +9,7 @@ import { LearnContent } from "@/components/learn/LearnContent";
 import { getLearnCatalog } from "@/lib/learn/getLearnCatalog";
 import { getDirectoryItems } from "@/lib/learn/getDirectoryItems";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 export default async function LearnTypePage({
   params,

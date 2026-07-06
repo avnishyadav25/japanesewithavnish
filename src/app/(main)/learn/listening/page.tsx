@@ -3,7 +3,7 @@ import { getDirectoryItems } from "@/lib/learn/getDirectoryItems";
 import { normalizeLearnLevel } from "@/lib/learn-filters";
 import { LearnContent } from "@/components/learn/LearnContent";
 
-export const revalidate = 60;
+
 
 export default async function LearnListeningPage({
   searchParams,
