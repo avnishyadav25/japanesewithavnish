@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { getSession } from "@/lib/auth/session";
 import { LearnBundleCta } from "@/components/learn/LearnBundleCta";
 
 const SETS = [
@@ -9,6 +8,7 @@ const SETS = [
     level: "N5",
     charsCount: 5,
     desc: "Practice stroke order guides for vowels (あ, い, う, え, お).",
+    label: "characters",
   },
   {
     slug: "hiragana-k-row",
@@ -16,6 +16,7 @@ const SETS = [
     level: "N5",
     charsCount: 5,
     desc: "Practice KA, KI, KU, KE, KO character sequences.",
+    label: "characters",
   },
   {
     slug: "hiragana-s-row",
@@ -23,6 +24,7 @@ const SETS = [
     level: "N5",
     charsCount: 5,
     desc: "Practice SA, SHI, SU, SE, SO character sequences.",
+    label: "characters",
   },
   {
     slug: "katakana-basics",
@@ -30,6 +32,7 @@ const SETS = [
     level: "N5",
     charsCount: 5,
     desc: "Brush stroke practices for vowels (ア, イ, ウ, エ, オ).",
+    label: "characters",
   },
   {
     slug: "basic-kanji-numbers",
@@ -37,8 +40,14 @@ const SETS = [
     level: "N5",
     charsCount: 10,
     desc: "Learn tracing number characters (一 through 十).",
+    label: "kanji",
   },
 ];
+
+export const metadata = {
+  title: "Writing Practice | Japanese with Avnish",
+  description: "Practice hiragana, katakana, and kanji with correct stroke order guides.",
+};
 
 export default async function LearnWritingPage({
   searchParams,
@@ -46,29 +55,30 @@ export default async function LearnWritingPage({
   searchParams?: Promise<{ level?: string; search?: string }>;
 }) {
   const sp = await searchParams;
-  const level = (sp?.level || "n5").toUpperCase();
+  const level = (sp?.level || "n5").toLowerCase();
   const search = (sp?.search || "").toLowerCase().trim();
 
   // Filter sets by level & search query
   const filteredSets = SETS.filter((s) => {
-    const matchesLevel = s.level === level;
-    const matchesSearch = !search || s.title.toLowerCase().includes(search) || s.desc.toLowerCase().includes(search);
+    const matchesLevel = s.level.toLowerCase() === level;
+    const matchesSearch =
+      !search || s.title.toLowerCase().includes(search) || s.desc.toLowerCase().includes(search);
     return matchesLevel && matchesSearch;
   });
 
   const levelsInfo = [
-    { code: "N5", label: "Beginner" },
-    { code: "N4", label: "Elementary" },
-    { code: "N3", label: "Intermediate" },
-    { code: "N2", label: "Upper Intermediate" },
-    { code: "N1", label: "Advanced" },
+    { code: "n5", title: "N5", label: "Beginner" },
+    { code: "n4", title: "N4", label: "Elementary" },
+    { code: "n3", title: "N3", label: "Intermediate" },
+    { code: "n2", title: "N2", label: "Upper Intermediate" },
+    { code: "n1", title: "N1", label: "Advanced" },
   ];
 
   return (
-    <div className="py-12 sm:py-16 px-4 sm:px-6 bg-[#FAF8F5]">
+    <div className="py-12 sm:py-16 px-4 sm:px-6">
       <div className="max-w-[1200px] mx-auto space-y-10">
         
-        {/* Header */}
+        {/* Header & Hero */}
         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
           <div>
             <h1 className="font-heading text-3xl sm:text-4xl font-bold text-charcoal mb-2">
@@ -95,95 +105,108 @@ export default async function LearnWritingPage({
               <Link href="/quiz" className="text-primary font-medium hover:underline">
                 Take the Quiz →
               </Link>
+              <Link href="/jlpt" className="text-primary font-medium hover:underline">
+                Explore JLPT Levels →
+              </Link>
             </div>
           </div>
         </div>
 
-        {/* Level Selector Tabs */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-          {levelsInfo.map((l) => {
-            const active = level === l.code;
-            return (
-              <Link
-                key={l.code}
-                href={`/learn/writing?level=${l.code.toLowerCase()}`}
-                className={`card p-6 text-center flex flex-col justify-center items-center hover:shadow-md transition border-2 ${
-                  active
-                    ? "border-primary bg-[#FFF7F7] ring-1 ring-primary/20"
-                    : "border-[var(--divider)] bg-white hover:border-primary/50"
-                }`}
-              >
-                <span className="text-3xl font-bold text-charcoal">{l.code}</span>
-                <span className="text-secondary text-xs mt-1.5 font-medium">{l.label}</span>
-              </Link>
-            );
-          })}
+        {/* Level Tabs */}
+        <div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+            {levelsInfo.map((l) => {
+              const active = level === l.code;
+              return (
+                <Link
+                  key={l.code}
+                  href={`/learn/writing?level=${l.code}`}
+                  className={`card p-6 text-center flex flex-col justify-center items-center hover:shadow-md transition border-2 hover:no-underline ${
+                    active
+                      ? "border-[#D0021B] bg-[#D0021B] text-white"
+                      : "border-[#EEEEEE] bg-white hover:border-[#D0021B]/40 text-[#1A1A1A]"
+                  }`}
+                >
+                  <span className="text-3xl font-bold font-heading">{l.title}</span>
+                  <span className={`text-xs mt-1.5 font-medium ${active ? "text-white/80" : "text-secondary"}`}>
+                    {l.label}
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
         </div>
 
-        {/* Recommended Sets */}
-        {level === "N5" && !search && (
+        {/* Recommended Section */}
+        {level === "n5" && !search && (
           <div className="space-y-4">
-            <h2 className="font-heading text-xl font-bold text-charcoal">Recommended writing</h2>
+            <h2 className="font-heading text-xl font-bold text-charcoal">Recommended writing practice</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {SETS.slice(0, 3).map((item) => (
-                <div key={item.slug} className="card bg-white border border-[var(--divider)] p-5 rounded-2xl flex flex-col justify-between hover:shadow-md transition">
+                <Link
+                  key={item.slug}
+                  href={`/learn/writing/${item.slug}`}
+                  className="card bg-white border border-[var(--divider)] p-5 rounded-2xl flex flex-col justify-between hover:shadow-md transition hover:no-underline group"
+                >
                   <div>
                     <span className="text-[10px] font-bold text-primary bg-[#FFF7F7] border border-primary/15 px-2.5 py-0.5 rounded-full uppercase">
-                      {item.level} • Writing
+                      {item.level} • Writing • {item.charsCount} {item.label}
                     </span>
-                    <h3 className="font-heading text-base font-bold text-charcoal mt-3">{item.title}</h3>
-                    <p className="text-secondary text-xs mt-1 leading-relaxed">{item.desc}</p>
+                    <h3 className="font-heading text-base font-bold text-charcoal mt-3 group-hover:text-primary transition">{item.title}</h3>
+                    <p className="text-secondary text-xs mt-1 leading-relaxed line-clamp-2">{item.desc}</p>
                   </div>
-                  <div className="mt-4 flex justify-between items-center text-xs">
-                    <span className="text-secondary font-bold">{item.charsCount} characters</span>
-                    <Link href={`/learn/writing/${item.slug}`} className="text-primary font-bold hover:underline">
-                      Practice stroke order →
-                    </Link>
-                  </div>
-                </div>
+                  <span className="text-primary text-xs font-bold mt-4 inline-block group-hover:underline">
+                    Practice stroke order →
+                  </span>
+                </Link>
               ))}
             </div>
           </div>
         )}
 
-        {/* Sets Grid */}
+        {/* Main Content Grid: Writing Sets */}
         <div className="space-y-4">
           <h2 className="font-heading text-xl font-bold text-charcoal">
-            Practice Sets ({filteredSets.length})
+            Writing sets
           </h2>
 
           {filteredSets.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredSets.map((item) => (
-                <div key={item.slug} className="card bg-white border border-[var(--divider)] p-5 rounded-2xl flex flex-col justify-between hover:shadow-md transition">
+                <Link
+                  key={item.slug}
+                  href={`/learn/writing/${item.slug}`}
+                  className="card bg-white border border-[var(--divider)] p-5 rounded-2xl flex flex-col justify-between hover:shadow-md transition hover:no-underline group"
+                >
                   <div>
                     <span className="text-[10px] font-bold text-secondary bg-base border border-[var(--divider)] px-2.5 py-0.5 rounded-full uppercase">
-                      {item.level} • {item.charsCount} Chars
+                      {item.level} • Writing • {item.charsCount} {item.label}
                     </span>
-                    <h3 className="font-heading text-base font-bold text-charcoal mt-3">{item.title}</h3>
-                    <p className="text-secondary text-xs mt-1 leading-relaxed">{item.desc}</p>
+                    <h3 className="font-heading text-base font-bold text-charcoal mt-3 group-hover:text-primary transition">{item.title}</h3>
+                    <p className="text-secondary text-xs mt-1 leading-relaxed line-clamp-2">{item.desc}</p>
                   </div>
-                  <div className="mt-4 flex justify-between items-center text-xs">
-                    <span className="text-secondary font-bold">Set: {item.title}</span>
-                    <Link href={`/learn/writing/${item.slug}`} className="text-primary font-bold hover:underline">
-                      Practice writing →
-                    </Link>
-                  </div>
-                </div>
+                  <span className="text-primary text-xs font-bold mt-4 inline-block group-hover:underline">
+                    Practice writing →
+                  </span>
+                </Link>
               ))}
             </div>
           ) : (
             <div className="card p-12 text-center bg-white border border-[var(--divider)] rounded-3xl">
-              <p className="text-secondary text-xs">No writing sets found for this level yet.</p>
+              <p className="text-secondary text-xs">No {level.toUpperCase()} writing practice found yet. Try another level or browse all lessons.</p>
+              <Link href="/learn/writing" className="text-primary font-bold mt-2 inline-block hover:underline">
+                Clear filters →
+              </Link>
             </div>
           )}
         </div>
 
-        {/* Subscription Pass Cta */}
-        <LearnBundleCta level={level.toLowerCase() as any} />
+        {/* Premium CTA */}
+        <LearnBundleCta level={level} />
 
       </div>
     </div>
   );
 }
+
 export const dynamic = "force-dynamic";

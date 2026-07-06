@@ -557,7 +557,11 @@ export function LearnContent({
             </>
           ) : (
             <div className="card p-12 text-center bg-white border border-[var(--divider)] rounded-3xl">
-              <p className="text-secondary text-xs">No lessons match your filters yet. Try a different level or category.</p>
+              <p className="text-secondary text-xs">
+                {lockCategory 
+                  ? `No ${level.toUpperCase()} ${lockCategory.toLowerCase()} lessons found yet. Try another level or browse all lessons.`
+                  : "No lessons match your filters yet. Try a different level or category."}
+              </p>
               <Link href={basePath} className="text-primary font-bold mt-2 inline-block hover:underline">
                 Clear filters →
               </Link>

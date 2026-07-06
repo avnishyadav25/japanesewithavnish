@@ -18,10 +18,6 @@ interface LearnStickyCtaProps {
 
 export function LearnStickyCta({ contentType, primaryLevel }: LearnStickyCtaProps) {
   const typeLabel = LEARN_TYPE_LABELS[contentType as LearnContentType] ?? contentType;
-  const bundle =
-    primaryLevel && LEVEL_TO_BUNDLE[primaryLevel]
-      ? LEVEL_TO_BUNDLE[primaryLevel]
-      : { slug: "complete-japanese-n5-n1-mega-bundle", label: "Get Mega Bundle" };
 
   return (
     <>
@@ -34,13 +30,16 @@ export function LearnStickyCta({ contentType, primaryLevel }: LearnStickyCtaProp
             ← Back to {typeLabel}
           </Link>
           <h3 className="font-heading font-bold text-charcoal mb-3">
-            Want the complete system?
+            Want unlimited access?
           </h3>
+          <p className="text-secondary text-xs mb-4 leading-relaxed">
+            Get premium pass to unlock all lessons, practice tests, writing canvas, and streaks.
+          </p>
           <Link
-            href={`/product/${bundle.slug}`}
+            href="/pricing"
             className="btn-primary block text-center mb-3"
           >
-            {bundle.label}
+            Upgrade to Premium
           </Link>
           <Link
             href="/quiz"

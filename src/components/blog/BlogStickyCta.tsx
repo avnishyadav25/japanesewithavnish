@@ -16,25 +16,22 @@ interface BlogStickyCtaProps {
 }
 
 export function BlogStickyCta({ primaryLevel, tags }: BlogStickyCtaProps) {
-  const isRoadmap = tags.some((t) => t.toLowerCase().includes("roadmap"));
-  const bundle =
-    isRoadmap || !primaryLevel
-      ? { slug: "complete-japanese-n5-n1-mega-bundle", label: "Get Mega Bundle" }
-      : LEVEL_TO_BUNDLE[primaryLevel] || LEVEL_TO_BUNDLE.N5;
-
   return (
     <>
       {/* Desktop: sticky sidebar */}
       <div className="hidden lg:block lg:sticky lg:top-24">
         <div className="card p-5">
           <h3 className="font-heading font-bold text-charcoal mb-3">
-            Want the complete system?
+            Want unlimited access?
           </h3>
+          <p className="text-secondary text-xs mb-4 leading-relaxed">
+            Get premium pass to unlock all lessons, practice tests, writing canvas, and streaks.
+          </p>
           <Link
-            href={`/product/${bundle.slug}`}
+            href="/pricing"
             className="btn-primary block text-center mb-3"
           >
-            {bundle.label}
+            Upgrade to Premium
           </Link>
           <Link
             href="/quiz"
@@ -47,10 +44,10 @@ export function BlogStickyCta({ primaryLevel, tags }: BlogStickyCtaProps) {
       {/* Mobile: bottom sticky bar */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-[var(--divider)] p-4 flex items-center gap-4">
         <Link
-          href={`/product/${bundle.slug}`}
+          href="/pricing"
           className="btn-primary flex-1 text-center"
         >
-          {bundle.label}
+          Upgrade to Premium
         </Link>
         <Link
           href="/quiz"

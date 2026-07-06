@@ -103,42 +103,51 @@ export default async function BlogPage({
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <nav className="flex justify-center gap-2 items-center">
-                {currentPage > 1 && (
-                  <Link
-                    href={
-                      currentPage === 2
+              <nav className="flex justify-center gap-4 items-center mt-8 text-xs font-bold font-heading">
+                <Link
+                  href={
+                    currentPage > 1
+                      ? currentPage === 2
                         ? `/blog${queryStr ? `?${queryStr}` : ""}`
                         : `/blog?${new URLSearchParams({
                             ...Object.fromEntries(baseQuery),
                             page: String(currentPage - 1),
                           }).toString()}`
-                    }
-                    className="px-4 py-2 border border-[var(--divider)] rounded-md text-secondary hover:border-primary hover:text-primary"
-                  >
-                    Previous
-                  </Link>
-                )}
-                <span className="px-4 py-2 text-secondary text-sm">
+                      : "#"
+                  }
+                  className={`btn-secondary h-9 px-4 flex items-center justify-center rounded-xl ${
+                    currentPage <= 1 ? "opacity-40 cursor-not-allowed pointer-events-none" : ""
+                  }`}
+                >
+                  ← Previous
+                </Link>
+                <span className="text-secondary">
                   Page {currentPage} of {totalPages}
                 </span>
-                {currentPage < totalPages && (
-                  <Link
-                    href={`/blog?${new URLSearchParams({
-                      ...Object.fromEntries(baseQuery),
-                      page: String(currentPage + 1),
-                    }).toString()}`}
-                    className="px-4 py-2 border border-[var(--divider)] rounded-md text-secondary hover:border-primary hover:text-primary"
-                  >
-                    Next
-                  </Link>
-                )}
+                <Link
+                  href={
+                    currentPage < totalPages
+                      ? `/blog?${new URLSearchParams({
+                          ...Object.fromEntries(baseQuery),
+                          page: String(currentPage + 1),
+                        }).toString()}`
+                      : "#"
+                  }
+                  className={`btn-secondary h-9 px-4 flex items-center justify-center rounded-xl ${
+                    currentPage >= totalPages ? "opacity-40 cursor-not-allowed pointer-events-none" : ""
+                  }`}
+                >
+                  Next →
+                </Link>
               </nav>
             )}
           </>
         ) : (
-          <div className="card p-12 text-center">
-            <p className="text-secondary">No posts match your filters. Try adjusting your search.</p>
+          <div className="card p-12 text-center bg-white border border-[var(--divider)] rounded-3xl">
+            <p className="text-secondary text-sm">No blog posts found matching your filters.</p>
+            <Link href="/blog" className="text-primary font-bold mt-2 inline-block hover:underline">
+              Clear filters →
+            </Link>
           </div>
         )}
       </div>
