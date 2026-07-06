@@ -5,76 +5,111 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { AdminLogout } from "@/app/(admin)/AdminLogout";
 
-const manageAIPrompts = { href: "/admin/prompts", label: "Manage AI Prompts" };
-
 const navGroups = [
   {
     label: "Dashboard",
     items: [
-      { href: "/admin", label: "All" },
-      { href: "/admin/students", label: "User" },
-      { href: "/admin/chatbot", label: "Chatbot" },
-      { href: "/admin/products", label: "Product" },
-      { href: "/admin/orders", label: "Order" },
-      { href: "/admin/quiz", label: "Quiz" },
-      manageAIPrompts,
-    ],
+      { href: "/admin", label: "All Stats" }
+    ]
   },
   {
-    label: "Student",
+    label: "Users",
     items: [
-      { href: "/admin/students", label: "All" },
-      { href: "/admin/students", label: "Students" },
-      { href: "/admin/students/progress", label: "Progress" },
-      manageAIPrompts,
-    ],
+      { href: "/admin/users", label: "All Users" },
+      { href: "/admin/users?plan=free", label: "Free Users" },
+      { href: "/admin/users?plan=premium", label: "Premium Users" },
+      { href: "/admin/users?plan=trial", label: "Trial Users" },
+      { href: "/admin/users?status=suspended", label: "Suspended Users" },
+      { href: "/admin/users/roles", label: "Staff & Roles" },
+      { href: "/admin/users/activity", label: "User Activity" }
+    ]
+  },
+  {
+    label: "Premium Access",
+    items: [
+      { href: "/admin/premium/plans", label: "Plans" },
+      { href: "/admin/premium/passes", label: "Active Passes" },
+      { href: "/admin/premium/passes?status=expired", label: "Expired Passes" },
+      { href: "/admin/premium/manual-access", label: "Manual Access" },
+      { href: "/admin/payments", label: "Payments" }
+    ]
+  },
+  {
+    label: "Offers",
+    items: [
+      { href: "/admin/coupons", label: "Coupons" },
+      { href: "/admin/offers/banners", label: "Offer Banners" },
+      { href: "/admin/offers/trial-codes", label: "Trial Codes" }
+    ]
   },
   {
     label: "Learning Content",
     items: [
       { href: "/admin/learn/curriculum", label: "Curriculum" },
+      { href: "/admin/learn/lessons", label: "Lessons" },
       { href: "/admin/learn/vocabulary", label: "Vocabulary" },
       { href: "/admin/learn/grammar", label: "Grammar" },
       { href: "/admin/learn/kanji", label: "Kanji" },
-      { href: "/admin/grammar-drills", label: "Grammar drills" },
-      { href: "/admin/listening-generator", label: "Listening generator" },
-      { href: "/admin/reading-glossary", label: "Reading glossary" },
-      { href: "/admin/blogs", label: "Blog" },
-      { href: "/admin/comments", label: "Comment" },
-      { href: "/admin/blogs/recommended", label: "Recommend" },
-      manageAIPrompts,
-    ],
+      { href: "/admin/learn/reading", label: "Reading" },
+      { href: "/admin/learn/listening", label: "Listening" },
+      { href: "/admin/learn/writing", label: "Writing" },
+      { href: "/admin/learn/practice_test", label: "Mock Tests" }
+    ]
   },
   {
-    label: "Product",
+    label: "Gamification",
     items: [
-      { href: "/admin/products", label: "All Products" },
-      { href: "/admin/orders", label: "All Order" },
-      { href: "/admin/orders", label: "Manage Orders" },
-      manageAIPrompts,
-    ],
+      { href: "/admin/gamification/xp-rules", label: "XP Rules" },
+      { href: "/admin/gamification/points", label: "Points" },
+      { href: "/admin/gamification/badges", label: "Badges" },
+      { href: "/admin/gamification/streaks", label: "Streaks" },
+      { href: "/admin/gamification/leaderboard", label: "Leaderboard" }
+    ]
   },
   {
-    label: "Newsletter",
+    label: "Quiz",
     items: [
-      { href: "/admin/newsletter/subscribers", label: "Subscriber" },
-      { href: "/admin/newsletters", label: "Newsletter" },
-      { href: "/admin/emailtemplate", label: "Email template" },
-      { href: "/admin/newsletter/settings", label: "Newsletter Setting" },
-      manageAIPrompts,
-    ],
+      { href: "/admin/quiz", label: "Placement Quiz" },
+      { href: "/admin/quiz/attempts", label: "Quiz Attempts" },
+      { href: "/admin/quiz/rules", label: "Result Rules" }
+    ]
   },
   {
-    label: "Setting",
+    label: "Communication",
     items: [
-      { href: "/admin/settings", label: "Company Setting" },
-      { href: "/admin/progression", label: "Progression" },
-      { href: "/admin/social/prepare", label: "Prepare for Social" },
-      { href: "/admin/analytics", label: "Analytics" },
-      { href: "/admin/ai-logs", label: "AI History" },
-      manageAIPrompts,
-    ],
+      { href: "/admin/newsletter/subscribers", label: "Newsletter" },
+      { href: "/admin/newsletter/notifications", label: "Notifications" },
+      { href: "/admin/emailtemplate", label: "Email Templates" }
+    ]
   },
+  {
+    label: "AI Tools",
+    items: [
+      { href: "/admin/prompts", label: "AI Prompts" },
+      { href: "/admin/ai/content-generator", label: "Content Generator" },
+      { href: "/admin/ai/listening-generator", label: "Listening Generator" },
+      { href: "/admin/listening-generator", label: "Listening Maker Panel" },
+      { href: "/admin/grammar-drills", label: "Practice Drills Panel" }
+    ]
+  },
+  {
+    label: "Analytics",
+    items: [
+      { href: "/admin/analytics/users", label: "User Analytics" },
+      { href: "/admin/analytics/learning", label: "Learning Analytics" },
+      { href: "/admin/analytics/revenue", label: "Revenue Analytics" },
+      { href: "/admin/analytics/cohorts", label: "Cohorts" }
+    ]
+  },
+  {
+    label: "Settings",
+    items: [
+      { href: "/admin/settings", label: "Site Settings" },
+      { href: "/admin/settings/access-rules", label: "Access Rules" },
+      { href: "/admin/settings/payments", label: "Payment Settings" },
+      { href: "/admin/settings/seo", label: "SEO Settings" }
+    ]
+  }
 ];
 
 function NavLink({ href, label }: { href: string; label: string }) {
@@ -83,8 +118,11 @@ function NavLink({ href, label }: { href: string; label: string }) {
   return (
     <Link
       href={href}
-      className={`block py-2 px-3 rounded-bento text-sm transition ${isActive ? "bg-primary/10 text-primary font-medium japanese-shoji-border" : "text-secondary hover:text-primary hover:bg-base"
-        }`}
+      className={`block py-1.5 px-3 text-xs transition border-l-2 ${
+        isActive
+          ? "bg-[#FFF7F7] text-primary border-l-primary font-semibold"
+          : "text-secondary border-l-transparent hover:text-primary hover:bg-[var(--base)]"
+      }`}
     >
       {label}
     </Link>

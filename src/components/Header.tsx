@@ -14,7 +14,6 @@ const accountMenuItems = [
 
 const topNavLinks = [
   { href: "/", label: "Home" },
-  { href: "/store", label: "Store" },
   { href: "/blog", label: "Blog" },
   { href: "/contact", label: "Contact" },
 ];
@@ -30,7 +29,7 @@ const LESSONS_NAV_ITEMS = [
 ];
 
 
-const SALES_NAV_HREFS = new Set(["/store", "/library"]);
+const SALES_NAV_HREFS = new Set(["/library"]);
 
 export function Header({ isAdmin = false }: { isAdmin?: boolean }) {
   const pathname = usePathname();
@@ -39,20 +38,14 @@ export function Header({ isAdmin = false }: { isAdmin?: boolean }) {
   const [learnOpen, setLearnOpen] = useState(false);
   const [learnMobileExpanded, setLearnMobileExpanded] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
-  const [libraryOpen, setLibraryOpen] = useState(false);
   const [sessionEmail, setSessionEmail] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState<string | null>(null);
+  const [isPremium, setIsPremium] = useState(false);
   const learnRef = useRef<HTMLDivElement>(null);
   const accountRef = useRef<HTMLDivElement>(null);
-  const libraryRef = useRef<HTMLDivElement>(null);
 
-  const visibleTopNavLinks = isAdmin
-    ? topNavLinks
-    : topNavLinks.filter((l) => !SALES_NAV_HREFS.has(l.href));
-
-  const visibleAccountMenuItems = isAdmin
-    ? accountMenuItems
-    : accountMenuItems.filter((item) => !SALES_NAV_HREFS.has(item.href));
+  const visibleTopNavLinks = topNavLinks;
 
   useEffect(() => {
     fetch("/api/auth/session")
@@ -64,12 +57,24 @@ export function Header({ isAdmin = false }: { isAdmin?: boolean }) {
   useEffect(() => {
     if (!sessionEmail) {
       setAvatarUrl(null);
+      setDisplayName(null);
+      setIsPremium(false);
       return;
     }
     fetch("/api/profile")
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => setAvatarUrl(d?.profile?.avatar_url ?? null))
-      .catch(() => setAvatarUrl(null));
+      .then((d) => {
+        setAvatarUrl(d?.profile?.avatar_url ?? null);
+        setDisplayName(d?.profile?.display_name || d?.profile?.email?.split("@")[0] || null);
+        const now = new Date();
+        const premium = d?.profile?.is_lifetime || (d?.profile?.premium_until && new Date(d.profile.premium_until) > now);
+        setIsPremium(Boolean(premium));
+      })
+      .catch(() => {
+        setAvatarUrl(null);
+        setDisplayName(null);
+        setIsPremium(false);
+      });
   }, [sessionEmail]);
 
   useEffect(() => {
@@ -82,7 +87,6 @@ export function Header({ isAdmin = false }: { isAdmin?: boolean }) {
     const handleClickOutside = (e: MouseEvent) => {
       if (learnRef.current && !learnRef.current.contains(e.target as Node)) setLearnOpen(false);
       if (accountRef.current && !accountRef.current.contains(e.target as Node)) setAccountOpen(false);
-      if (libraryRef.current && !libraryRef.current.contains(e.target as Node)) setLibraryOpen(false);
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -242,10 +246,10 @@ export function Header({ isAdmin = false }: { isAdmin?: boolean }) {
                     <img src={avatarUrl} alt="" className="w-6 h-6 rounded-full object-cover bg-primary/80" />
                   ) : (
                     <span className="w-6 h-6 rounded-full bg-primary/80 flex items-center justify-center text-white text-xs font-bold">
-                      {sessionEmail.charAt(0).toUpperCase()}
+                      {displayName ? displayName.charAt(0).toUpperCase() : sessionEmail.charAt(0).toUpperCase()}
                     </span>
                   )}
-                  <span className="text-[13px] font-semibold">My Library</span>
+                  <span className="text-[13px] font-semibold truncate max-w-[80px]">{displayName || "My Profile"}</span>
                   <svg className={`w-4 h-4 transition-transform ${accountOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
@@ -253,30 +257,62 @@ export function Header({ isAdmin = false }: { isAdmin?: boolean }) {
                 {accountOpen && (
                   <div id="account-menu" className="absolute top-full right-0 mt-2 w-52 py-2 bg-white border border-[var(--divider)] rounded-xl shadow-card-hover z-50">
                     <Link
-                      href="/account"
+                      href="/learn/dashboard"
                       className="block px-4 py-2 text-[#555] hover:bg-[#FAF8F5] hover:text-primary text-sm font-medium transition-colors"
                       onClick={() => setAccountOpen(false)}
                     >
-                      Edit profile
+                      Dashboard
                     </Link>
-                    {visibleAccountMenuItems.map((item) => (
+                    <Link
+                      href="/scoreboard"
+                      className="block px-4 py-2 text-[#555] hover:bg-[#FAF8F5] hover:text-primary text-sm font-medium transition-colors"
+                      onClick={() => setAccountOpen(false)}
+                    >
+                      My Progress
+                    </Link>
+                    <Link
+                      href="/library"
+                      className="block px-4 py-2 text-[#555] hover:bg-[#FAF8F5] hover:text-primary text-sm font-medium transition-colors"
+                      onClick={() => setAccountOpen(false)}
+                    >
+                      My Library
+                    </Link>
+                    <Link
+                      href="/learn/curriculum"
+                      className="block px-4 py-2 text-[#555] hover:bg-[#FAF8F5] hover:text-primary text-sm font-medium transition-colors"
+                      onClick={() => setAccountOpen(false)}
+                    >
+                      Curriculum
+                    </Link>
+                    <Link
+                      href="/scoreboard"
+                      className="block px-4 py-2 text-[#555] hover:bg-[#FAF8F5] hover:text-primary text-sm font-medium transition-colors"
+                      onClick={() => setAccountOpen(false)}
+                    >
+                      Badges
+                    </Link>
+                    <Link
+                      href="/pricing"
+                      className="block px-4 py-2 text-[#555] hover:bg-[#FAF8F5] hover:text-primary text-sm font-medium transition-colors"
+                      onClick={() => setAccountOpen(false)}
+                    >
+                      Subscription
+                    </Link>
+                    <Link
+                      href="/account"
+                      className="block px-4 py-2 text-[#555] hover:bg-[#FAF8F5] hover:text-primary text-sm font-medium transition-colors border-b border-[var(--divider)] pb-2 mb-1"
+                      onClick={() => setAccountOpen(false)}
+                    >
+                      Settings
+                    </Link>
+                    {!isPremium && (
                       <Link
-                        key={item.href + item.label}
-                        href={item.href}
-                        className="block px-4 py-2 text-[#555] hover:bg-[#FAF8F5] hover:text-primary text-sm font-medium transition-colors"
+                        href="/pricing"
+                        className="block px-4 py-2 text-[#D0021B] hover:bg-[#FFF7F7] text-sm font-bold transition-colors"
                         onClick={() => setAccountOpen(false)}
                       >
-                        {item.label}
+                        Upgrade to Premium ★
                       </Link>
-                    ))}
-                    {avatarUrl && (
-                      <button
-                        type="button"
-                        onClick={() => { handleRemovePhoto(); setAccountOpen(false); }}
-                        className="w-full text-left px-4 py-2 text-[#555] hover:bg-[#FAF8F5] hover:text-primary text-sm font-medium transition-colors"
-                      >
-                        Remove photo
-                      </button>
                     )}
                     <button
                       type="button"
@@ -289,32 +325,19 @@ export function Header({ isAdmin = false }: { isAdmin?: boolean }) {
                 )}
               </div>
             ) : (
-              /* Logged out: My Library outline button (shows login dropdown) + Quiz CTA */
+              /* Logged out: Sign In link + Take the Quiz button */
               <>
-                <div className="relative" ref={libraryRef}>
-                  <button
-                    type="button"
-                    onClick={() => setLibraryOpen((o) => !o)}
-                    className="font-semibold text-[13px] text-[#1A1A1A] border border-[var(--divider)] rounded-lg px-4 py-2 hover:border-primary hover:text-primary transition-colors"
-                    onKeyDown={(e) => { if (e.key === "Escape") setLibraryOpen(false); }}
-                  >
-                    My Library
-                  </button>
-                  {libraryOpen && (
-                    <div className="absolute top-full right-0 mt-2 w-56 py-3 px-4 bg-white border border-[var(--divider)] rounded-xl shadow-card-hover z-50">
-                      <p className="text-[12px] text-[#888] mb-3">Sign in to access your Library and purchased bundles.</p>
-                      <Link
-                        href="/login"
-                        className="block w-full text-center bg-primary text-white font-bold py-2 px-4 rounded-lg hover:bg-primary/90 transition-colors text-sm"
-                        onClick={() => setLibraryOpen(false)}
-                      >
-                        Sign in →
-                      </Link>
-                    </div>
-                  )}
-                </div>
-                <Link href="/quiz" className="btn-primary !h-9 !py-0 !px-4 !text-sm">
-                  Take the Quiz →
+                <Link
+                  href="/login"
+                  className="font-semibold text-sm text-[#1A1A1A] hover:text-primary transition-colors px-3 py-2"
+                >
+                  Sign In
+                </Link>
+                <Link
+                  href="/quiz"
+                  className="btn-primary !h-9 !py-0 !px-4 !text-sm flex items-center justify-center font-bold"
+                >
+                  Take the Quiz
                 </Link>
               </>
             )}

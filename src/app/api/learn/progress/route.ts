@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
+import { canAccessLesson, recordLessonAccess, checkAndAwardBadges } from "@/lib/auth/access";
 
 export async function GET() {
   const session = await getSession();
@@ -16,14 +17,21 @@ export async function GET() {
     });
   }
   try {
-    let profile: { email: string; recommended_level: string | null; display_name: string | null; current_streak?: number; longest_streak?: number } | null = null;
+    let profile: { email: string; recommended_level: string | null; display_name: string | null; current_streak?: number; longest_streak?: number; xp?: number; points?: number; streak_freezes?: number; premium_until?: string | null; is_lifetime?: boolean; subscription_status?: string | null; trial_ends_at?: string | null } | null = null;
     try {
       const profileRows = await sql`
-        SELECT email, recommended_level, display_name, current_streak, longest_streak
-        FROM profiles WHERE email = ${session.email} LIMIT 1
-      ` as { email: string; recommended_level: string | null; display_name: string | null; current_streak?: number; longest_streak?: number }[];
+        SELECT
+          p.email, p.recommended_level, p.display_name, p.current_streak, p.longest_streak, p.xp, p.points, p.streak_freezes,
+          p.premium_until::text as premium_until, p.is_lifetime,
+          us.status as subscription_status, us.trial_ends_at::text as trial_ends_at
+        FROM profiles p
+        LEFT JOIN user_subscriptions us ON us.user_email = p.email AND us.status = 'trialing'
+        WHERE p.email = ${session.email}
+        LIMIT 1
+      ` as { email: string; recommended_level: string | null; display_name: string | null; current_streak?: number; longest_streak?: number; xp?: number; points?: number; streak_freezes?: number; premium_until?: string | null; is_lifetime?: boolean; subscription_status?: string | null; trial_ends_at?: string | null }[];
       profile = profileRows[0] ?? null;
-    } catch {
+    } catch (e) {
+      console.error("progress profile load error:", e);
       const profileRows = await sql`
         SELECT email, recommended_level, display_name FROM profiles WHERE email = ${session.email} LIMIT 1
       ` as { email: string; recommended_level: string | null; display_name: string | null }[];
@@ -96,8 +104,21 @@ export async function GET() {
     }
 
     return NextResponse.json({
-      profile: profile ? { email: profile.email, recommended_level: profile.recommended_level, display_name: profile.display_name } : null,
-      stats: { learnedCount, dueCount, rewardCount, currentStreak: profile?.current_streak ?? 0, longestStreak: profile?.longest_streak ?? 0, totalPoints, pointsToday, lessonsCompleted },
+      profile: profile ? {
+        email: profile.email,
+        recommended_level: profile.recommended_level,
+        display_name: profile.display_name,
+        current_streak: profile.current_streak,
+        longest_streak: profile.longest_streak,
+        xp: profile.xp,
+        points: profile.points,
+        streak_freezes: profile.streak_freezes,
+        premium_until: profile.premium_until,
+        is_lifetime: profile.is_lifetime,
+        subscription_status: profile.subscription_status,
+        trial_ends_at: profile.trial_ends_at
+      } : null,
+      stats: { learnedCount, dueCount, rewardCount, currentStreak: profile?.current_streak ?? 0, longestStreak: profile?.longest_streak ?? 0, totalPoints: profile?.points ?? totalPoints, pointsToday, lessonsCompleted },
       curriculum: { nextLesson, lessonsCompleted },
       dailyRoutine,
     });
@@ -126,11 +147,47 @@ export async function POST(req: Request) {
 
     // Curriculum lesson completion
     if (lessonId && typeof lessonId === "string") {
+      // 1. Check daily access guard rules
+      const access = await canAccessLesson(session.email, lessonId);
+      if (!access.allowed) {
+        return NextResponse.json(
+          { error: "Access Denied", reason: access.reason, resetAt: (access as any).resetAt },
+          { status: 403 }
+        );
+      }
+
+      // 2. Mark lesson as completed
       await sql`
         INSERT INTO user_lesson_progress (user_email, lesson_id, status, completed_at, updated_at)
         VALUES (${session.email}, ${lessonId}, 'completed', NOW(), NOW())
         ON CONFLICT (user_email, lesson_id) DO UPDATE SET status = 'completed', completed_at = NOW(), updated_at = NOW()
       `;
+
+      // 3. Record lesson access limit count
+      await recordLessonAccess(session.email, lessonId);
+
+      // 4. Award XP (10) and Points (5)
+      await sql`
+        INSERT INTO xp_transactions (user_email, event_type, xp_amount, related_entity_type, related_entity_id)
+        VALUES (${session.email}, 'lesson_completed', 10, 'lesson', ${lessonId}::uuid)
+      `;
+      await sql`
+        INSERT INTO points_transactions (user_email, type, points, reason, related_entity_type, related_entity_id)
+        VALUES (${session.email}, 'earned', 5, 'Lesson completed', 'lesson', ${lessonId}::uuid)
+      `;
+      await sql`
+        UPDATE profiles
+        SET xp = COALESCE(xp, 0) + 10,
+            points = COALESCE(points, 0) + 5,
+            updated_at = NOW()
+        WHERE email = ${session.email}
+      `;
+
+      // 5. Check and award automatic badges
+      const profileRows = await sql`SELECT target_level FROM profiles WHERE email = ${session.email} LIMIT 1` as { target_level: string | null }[];
+      const targetLevel = profileRows[0]?.target_level || "N5";
+      const newBadges = await checkAndAwardBadges(session.email, targetLevel);
+
       // Award first_lesson achievement if this is their first completed lesson
       const countRows = await sql`
         SELECT COUNT(*)::int AS c FROM user_lesson_progress WHERE user_email = ${session.email} AND status = 'completed'
@@ -155,7 +212,7 @@ export async function POST(req: Request) {
           }
         }
       }
-      return NextResponse.json({ success: true });
+      return NextResponse.json({ success: true, newBadges });
     }
 
     if (!slug || typeof slug !== "string") {

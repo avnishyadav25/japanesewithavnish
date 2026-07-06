@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
+import { hasActivePremium, getISTDateKey, getISTNextMidnight } from "@/lib/auth/access";
 
 type LevelRow = { id: string; code: string; name: string; sort_order: number; feature_image_url: string | null };
 type ModuleRow = { id: string; level_id: string; code: string; title: string; sort_order: number; feature_image_url: string | null };
@@ -13,6 +14,20 @@ type LessonRow = {
   sort_order: number;
   estimated_minutes: number | null;
   feature_image_url: string | null;
+  description: string | null;
+  access_type: string;
+  content_type: string | null;
+  slug: string;
+};
+
+type PracticeRow = {
+  id: string;
+  lesson_id: string;
+  title: string;
+  description: string | null;
+  practice_type: string | null;
+  sort_order: number;
+  estimated_minutes: number | null;
 };
 
 export type PathStep =
@@ -22,6 +37,7 @@ export type PathStep =
   | {
       type: "lesson";
       id: string;
+      slug: string;
       code: string;
       title: string;
       levelCode: string;
@@ -53,8 +69,21 @@ export async function GET(req: Request) {
       SELECT id, module_id, code, title, sort_order, feature_image_url FROM curriculum_submodules ORDER BY sort_order, code
     `) as SubmoduleRow[];
     const lessons = (await sql`
-      SELECT id, submodule_id, code, title, sort_order, estimated_minutes, feature_image_url FROM curriculum_lessons ORDER BY sort_order, code
+      SELECT id, submodule_id, code, title, sort_order, estimated_minutes,
+             feature_image_url, description, access_type, content_type, slug
+      FROM curriculum_lessons ORDER BY sort_order, code
     `) as LessonRow[];
+
+    const practiceRows = (await sql`
+      SELECT id, lesson_id, title, description, practice_type, sort_order, estimated_minutes
+      FROM curriculum_practices
+      ORDER BY lesson_id, sort_order
+    `) as PracticeRow[];
+    const practicesByLessonId: Record<string, PracticeRow[]> = {};
+    for (const p of practiceRows) {
+      if (!practicesByLessonId[p.lesson_id]) practicesByLessonId[p.lesson_id] = [];
+      practicesByLessonId[p.lesson_id].push(p);
+    }
 
     const lessonContent = (await sql`
       SELECT lesson_id, id, content_slug, post_id, content_role, sort_order, title
@@ -75,13 +104,33 @@ export async function GET(req: Request) {
     }
 
     let currentLevelCode: string = "N5";
+    let isPremium = false;
+    let lessonsConsumed = 0;
+    let lessonsAllowed = 2;
+    const resetAt = getISTNextMidnight().toISOString();
+
     if (session?.email) {
       const profileRows = (await sql`
-        SELECT recommended_level, current_level FROM profiles WHERE email = ${session.email} LIMIT 1
-      `) as { recommended_level: string | null; current_level: string | null }[];
+        SELECT recommended_level, current_level, premium_until, is_lifetime FROM profiles WHERE email = ${session.email} LIMIT 1
+      `) as { recommended_level: string | null; current_level: string | null; premium_until: string | null; is_lifetime: boolean }[];
       const p = profileRows[0];
-      if (p?.current_level) currentLevelCode = p.current_level;
-      else if (p?.recommended_level) currentLevelCode = p.recommended_level;
+      if (p) {
+        if (p.current_level) currentLevelCode = p.current_level;
+        else if (p.recommended_level) currentLevelCode = p.recommended_level;
+        isPremium = hasActivePremium(p);
+      }
+
+      if (!isPremium) {
+        const dateKey = getISTDateKey();
+        const dailyRows = await sql`
+          SELECT lessons_consumed, lessons_allowed FROM daily_lesson_access
+          WHERE user_email = ${session.email} AND date_key = ${dateKey} LIMIT 1
+        ` as { lessons_consumed: number; lessons_allowed: number }[];
+        if (dailyRows[0]) {
+          lessonsConsumed = dailyRows[0].lessons_consumed;
+          lessonsAllowed = dailyRows[0].lessons_allowed;
+        }
+      }
     }
 
     let completedLessonIds: string[] = [];
@@ -120,10 +169,22 @@ export async function GET(req: Request) {
                   id: l.id,
                   code: l.code,
                   title: l.title,
+                  description: l.description ?? null,
+                  access_type: l.access_type ?? "premium",
+                  content_type: l.content_type ?? null,
                   sort_order: l.sort_order,
+                  slug: l.slug,
                   ...(l.estimated_minutes != null && { estimated_minutes: l.estimated_minutes }),
                   ...(l.feature_image_url && { feature_image_url: l.feature_image_url }),
                   exercises: exercisesByLessonId[l.id] ?? [],
+                  practices: (practicesByLessonId[l.id] ?? []).map((p) => ({
+                    id: p.id,
+                    title: p.title,
+                    description: p.description ?? null,
+                    practice_type: p.practice_type ?? null,
+                    sort_order: p.sort_order,
+                    ...(p.estimated_minutes != null && { estimated_minutes: p.estimated_minutes }),
+                  })),
                 })),
             })),
         })),
@@ -171,6 +232,7 @@ export async function GET(req: Request) {
               pathSteps.push({
                 type: "lesson",
                 id: l.id,
+                slug: l.slug,
                 code: l.code,
                 title: l.title,
                 levelCode: lv.code,
@@ -226,7 +288,7 @@ export async function GET(req: Request) {
           currentLevelCode,
           isLoggedIn,
           completedLessonIds: isLoggedIn ? (completedLessonIds || []) : undefined,
-          ...(isLoggedIn && { dueReviewsCount, advanceBlocked, advanceBlockReason }),
+          ...(isLoggedIn && { dueReviewsCount, advanceBlocked, advanceBlockReason, isPremium, lessonsConsumed, lessonsAllowed, resetAt }),
         }
       : {
           levels: tree,
@@ -235,7 +297,7 @@ export async function GET(req: Request) {
           pathProgressPercent,
           currentLevelCode,
           isLoggedIn,
-          ...(isLoggedIn && { dueReviewsCount, advanceBlocked, advanceBlockReason }),
+          ...(isLoggedIn && { dueReviewsCount, advanceBlocked, advanceBlockReason, isPremium, lessonsConsumed, lessonsAllowed, resetAt }),
         };
 
     const res = NextResponse.json(payload);

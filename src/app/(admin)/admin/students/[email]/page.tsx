@@ -35,6 +35,11 @@ export default async function AdminStudentDetailPage({
         p.last_activity_date::text,
         p.created_at::text,
         p.updated_at::text,
+        p.role,
+        p.premium_until::text,
+        p.is_lifetime,
+        p.xp,
+        p.points,
         (SELECT COUNT(*)::int FROM user_learning_progress u WHERE u.user_email = p.email AND u.status = 'learned') AS learned_count,
         (SELECT COUNT(*)::int FROM review_schedule r WHERE r.user_email = p.email AND r.next_review_at <= NOW()) AS due_count,
         (SELECT COALESCE(SUM(e.points), 0)::int FROM reward_events e WHERE e.user_email = p.email) AS total_points
@@ -73,6 +78,8 @@ export default async function AdminStudentDetailPage({
             <dd className="text-charcoal">{(row.last_name as string) || "—"}</dd>
             <dt className="text-secondary">Display name</dt>
             <dd className="text-charcoal">{(row.display_name as string) || "—"}</dd>
+            <dt className="text-secondary">Role</dt>
+            <dd className="text-charcoal font-semibold text-primary capitalize">{(row.role as string) || "student"}</dd>
             <dt className="text-secondary">Active</dt>
             <dd className="text-charcoal">{(row.is_active as boolean) !== false ? "Yes" : "No"}</dd>
             <dt className="text-secondary">Last login</dt>
@@ -81,12 +88,24 @@ export default async function AdminStudentDetailPage({
             <dd className="text-charcoal">{(row.recommended_level as string) || "—"}</dd>
             <dt className="text-secondary">Streak</dt>
             <dd className="text-charcoal">{Number(row.current_streak)} (best: {Number(row.longest_streak)})</dd>
+            <dt className="text-secondary">XP / Points</dt>
+            <dd className="text-charcoal">{Number(row.xp ?? 0)} XP / {Number(row.points ?? 0)} Points</dd>
+            <dt className="text-secondary">Premium Pass</dt>
+            <dd className="text-charcoal font-semibold">
+              {row.is_lifetime ? (
+                <span className="text-green-600">♾️ Lifetime Access</span>
+              ) : row.premium_until ? (
+                <span className={new Date(row.premium_until as string) > new Date() ? "text-green-600" : "text-secondary"}>
+                  Expires {new Date(row.premium_until as string).toLocaleDateString()}
+                </span>
+              ) : (
+                <span className="text-secondary">Free Tier</span>
+              )}
+            </dd>
             <dt className="text-secondary">Learned</dt>
             <dd className="text-charcoal">{Number(row.learned_count)}</dd>
             <dt className="text-secondary">Due</dt>
             <dd className="text-charcoal">{Number(row.due_count)}</dd>
-            <dt className="text-secondary">Points</dt>
-            <dd className="text-charcoal">{Number(row.total_points)}</dd>
           </dl>
         </AdminCard>
         <AdminCard>

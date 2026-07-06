@@ -3,7 +3,7 @@ import { sql } from "@/lib/db";
 
 export async function POST(req: NextRequest) {
   try {
-    const { code, productId } = await req.json();
+    const { code, productId, isPlan } = await req.json();
     if (!code || !productId) {
       return NextResponse.json({ error: "Code and productId required" }, { status: 400 });
     }
@@ -19,9 +19,18 @@ export async function POST(req: NextRequest) {
     ` as { id: string; discount_type: string; discount_value: number; product_ids: string[] | null; max_uses: number | null; used_count: number; expires_at: string | null }[];
     const coupon = couponRows[0] ?? null;
     let pricePaise = 0;
+    let resolvedId = productId;
+
     if (coupon) {
-      const prodRows = await sql`SELECT price_paise FROM products WHERE id = ${productId} LIMIT 1` as { price_paise: number }[];
-      pricePaise = Number(prodRows[0]?.price_paise ?? 0);
+      if (isPlan) {
+        const planRows = await sql`SELECT id, price_inr FROM subscription_plans WHERE id::text = ${productId} OR slug = ${productId} LIMIT 1` as { id: string; price_inr: number }[];
+        pricePaise = Number(planRows[0]?.price_inr ?? 0);
+        resolvedId = planRows[0]?.id || productId;
+      } else {
+        const prodRows = await sql`SELECT price_paise FROM products WHERE id = ${productId} LIMIT 1` as { price_paise: number }[];
+        pricePaise = Number(prodRows[0]?.price_paise ?? 0);
+        resolvedId = productId;
+      }
     }
 
     if (!coupon) {
@@ -37,8 +46,8 @@ export async function POST(req: NextRequest) {
     }
 
     const productIds = coupon.product_ids;
-    if (productIds && productIds.length > 0 && !productIds.includes(productId)) {
-      return NextResponse.json({ valid: false, error: "Coupon not valid for this product" });
+    if (productIds && productIds.length > 0 && !productIds.includes(resolvedId)) {
+      return NextResponse.json({ valid: false, error: "Coupon not valid for this item" });
     }
     let discountPaise = 0;
     if (coupon.discount_type === "percent") {

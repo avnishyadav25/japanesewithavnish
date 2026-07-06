@@ -56,15 +56,16 @@ export async function GET(req: Request) {
       let meaning: string | null = null;
       let onyomi: string[] | null = null;
       let kunyomi: string[] | null = null;
+      let strokePaths: any = null;
       let found = false;
 
       if (sql) {
         const rows = await sql`
-          SELECT character, stroke_count, meaning, onyomi, kunyomi
+          SELECT character, stroke_count, meaning, onyomi, kunyomi, stroke_data
           FROM kanji
           WHERE character = ${char}
           LIMIT 1
-        ` as { character: string; stroke_count: number | null; meaning: string | null; onyomi: string[] | null; kunyomi: string[] | null }[];
+        ` as { character: string; stroke_count: number | null; meaning: string | null; onyomi: string[] | null; kunyomi: string[] | null; stroke_data: any }[];
         
         if (rows[0]) {
           const row = rows[0];
@@ -73,6 +74,7 @@ export async function GET(req: Request) {
           kunyomi = row.kunyomi;
           reading = [...(row.onyomi || []), ...(row.kunyomi || [])].slice(0, 3).join(", ") || null;
           meaning = row.meaning;
+          strokePaths = row.stroke_data;
           found = true;
         }
       }
@@ -104,6 +106,7 @@ export async function GET(req: Request) {
         meaning,
         onyomi,
         kunyomi,
+        strokePaths: strokePaths || null,
         examples,
       });
     }
@@ -111,20 +114,22 @@ export async function GET(req: Request) {
     // Hiragana or Katakana
     let strokeCount: number | null = null;
     let reading: string | null = null;
+    let strokePaths: any = null;
     let found = false;
 
     if (sql) {
       const kanaType = type === "hiragana" ? "hiragana" : "katakana";
       const rows = await sql`
-        SELECT character, stroke_count, romaji
+        SELECT character, stroke_count, romaji, stroke_data
         FROM kana
         WHERE character = ${char} AND type = ${kanaType}
         LIMIT 1
-      ` as { character: string; stroke_count: number | null; romaji: string }[];
+      ` as { character: string; stroke_count: number | null; romaji: string; stroke_data: any }[];
       
       if (rows[0]) {
         strokeCount = rows[0].stroke_count;
         reading = rows[0].romaji;
+        strokePaths = rows[0].stroke_data;
         found = true;
       }
     }
@@ -138,6 +143,7 @@ export async function GET(req: Request) {
       character: char,
       strokeCount,
       reading,
+      strokePaths: strokePaths || null,
       examples,
     });
   } catch (e) {

@@ -73,10 +73,15 @@ export async function PATCH(
   const facebook_url = typeof body.facebook_url === "string" ? body.facebook_url.trim() || null : undefined;
   const twitter_url = typeof body.twitter_url === "string" ? body.twitter_url.trim() || null : undefined;
   const website = typeof body.website === "string" ? body.website.trim() || null : undefined;
+  const role = typeof body.role === "string" ? body.role.trim() : undefined;
+  const premium_until = typeof body.premium_until === "string" ? body.premium_until || null : (body.premium_until === null ? null : undefined);
+  const is_lifetime = typeof body.is_lifetime === "boolean" ? body.is_lifetime : undefined;
+  const xp = typeof body.xp === "number" ? body.xp : undefined;
+  const points = typeof body.points === "number" ? body.points : undefined;
 
   const rows = await sql`
     SELECT first_name, last_name, display_name, is_active, recommended_level, avatar_url, address, phone,
-           linkedin_url, instagram_url, facebook_url, twitter_url, website
+           linkedin_url, instagram_url, facebook_url, twitter_url, website, role, premium_until, is_lifetime, xp, points
     FROM profiles WHERE email = ${email} LIMIT 1
   ` as Record<string, unknown>[];
   const current = rows?.[0];
@@ -95,6 +100,11 @@ export async function PATCH(
   const fb = facebook_url !== undefined ? facebook_url : (current.facebook_url as string | null);
   const tw = twitter_url !== undefined ? twitter_url : (current.twitter_url as string | null);
   const web = website !== undefined ? website : (current.website as string | null);
+  const r = role !== undefined ? role : (current.role as string | null);
+  const pu = premium_until !== undefined ? premium_until : (current.premium_until as string | null);
+  const il = is_lifetime !== undefined ? is_lifetime : (current.is_lifetime as boolean | null);
+  const x = xp !== undefined ? xp : (current.xp as number | null);
+  const pts = points !== undefined ? points : (current.points as number | null);
 
   await sql`
     UPDATE profiles SET
@@ -111,8 +121,34 @@ export async function PATCH(
       facebook_url = ${fb},
       twitter_url = ${tw},
       website = ${web},
+      role = ${r},
+      premium_until = ${pu ? new Date(pu).toISOString() : null},
+      is_lifetime = ${il},
+      xp = ${x},
+      points = ${pts},
       updated_at = NOW()
     WHERE email = ${email}
   `;
+
+  if (body.reset_progress === true) {
+    await sql`DELETE FROM user_learning_progress WHERE user_email = ${email}`;
+    await sql`DELETE FROM review_schedule WHERE user_email = ${email}`;
+    await sql`DELETE FROM xp_transactions WHERE user_email = ${email}`;
+    await sql`DELETE FROM points_transactions WHERE user_email = ${email}`;
+    await sql`DELETE FROM user_badges WHERE user_email = ${email}`;
+    await sql`UPDATE profiles SET xp = 0, points = 0, current_streak = 0, longest_streak = 0 WHERE email = ${email}`;
+  }
+
+  if (typeof body.award_badge_slug === "string" && body.award_badge_slug.trim()) {
+    const badgeRows = await sql`SELECT id FROM badges WHERE slug = ${body.award_badge_slug.trim()} LIMIT 1` as { id: string }[];
+    if (badgeRows[0]) {
+      await sql`
+        INSERT INTO user_badges (user_email, badge_id, awarded_by_admin_email, reason)
+        VALUES (${email}, ${badgeRows[0].id}, ${admin.email}, 'Awarded manually by admin')
+        ON CONFLICT (user_email, badge_id) DO NOTHING
+      `;
+    }
+  }
+
   return NextResponse.json({ success: true });
 }

@@ -30,6 +30,43 @@ export function WritingCanvas({
   const [isDrawing, setIsDrawing] = useState(false);
   const [result, setResult] = useState<{ correct: boolean; feedback: string } | null>(null);
   const [verifying, setVerifying] = useState(false);
+  const [strokePaths, setStrokePaths] = useState<string[] | null>(null);
+  const [strokesCountVal, setStrokesCountVal] = useState<number | null>(expectedStrokeCount ?? null);
+
+  useEffect(() => {
+    let active = true;
+    async function fetchPaths() {
+      try {
+        const res = await fetch(
+          `/api/learn/writing/character?char=${encodeURIComponent(character)}&type=${characterType}`
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        if (active) {
+          if (Array.isArray(data.strokePaths)) {
+            setStrokePaths(data.strokePaths);
+          } else {
+            setStrokePaths(null);
+          }
+          if (data.strokeCount != null) {
+            setStrokesCountVal(data.strokeCount);
+          }
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    fetchPaths();
+    return () => {
+      active = false;
+    };
+  }, [character, characterType]);
+
+  useEffect(() => {
+    setStrokes([]);
+    setCurrentStroke([]);
+    setResult(null);
+  }, [character]);
 
   const getPoint = useCallback((e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>): Point | null => {
     const canvas = canvasRef.current;
@@ -47,7 +84,7 @@ export function WritingCanvas({
 
   const drawStrokes = useCallback((ctx: CanvasRenderingContext2D, strokesToDraw: Stroke[], current: Point[]) => {
     ctx.strokeStyle = "var(--charcoal, #1a1a1a)";
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 4;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     for (const stroke of strokesToDraw) {
@@ -74,9 +111,42 @@ export function WritingCanvas({
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+    
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // 1. Draw dashed grid background guidelines
+    ctx.strokeStyle = "rgba(220, 220, 220, 0.4)";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(canvas.width / 2, 0);
+    ctx.lineTo(canvas.width / 2, canvas.height);
+    ctx.moveTo(0, canvas.height / 2);
+    ctx.lineTo(canvas.width, canvas.height / 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // 2. Draw light background SVG stroke guidelines if available
+    if (strokePaths && Array.isArray(strokePaths)) {
+      ctx.save();
+      // Standard KanjiVG paths are designed for 109x109 grid. Scale them up to our canvas size (280x280).
+      ctx.scale(280 / 109, 280 / 109);
+      ctx.strokeStyle = "rgba(200, 200, 200, 0.35)";
+      ctx.lineWidth = 6;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      for (const pathStr of strokePaths) {
+        if (typeof pathStr === "string") {
+          const p = new Path2D(pathStr);
+          ctx.stroke(p);
+        }
+      }
+      ctx.restore();
+    }
+
+    // 3. Draw user strokes
     drawStrokes(ctx, strokes, currentStroke);
-  }, [strokes, currentStroke, drawStrokes]);
+  }, [strokes, currentStroke, strokePaths, drawStrokes]);
 
   const handleStart = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
@@ -208,8 +278,8 @@ export function WritingCanvas({
           {result.feedback}
         </p>
       )}
-      {expectedStrokeCount != null && (
-        <p className="text-xs text-secondary">Expected strokes: {expectedStrokeCount}</p>
+      {strokesCountVal != null && (
+        <p className="text-xs text-secondary">Expected strokes: {strokesCountVal}</p>
       )}
     </div>
   );

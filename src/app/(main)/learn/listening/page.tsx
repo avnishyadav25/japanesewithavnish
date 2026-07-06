@@ -1,32 +1,50 @@
-import Link from "next/link";
-import { getSession } from "@/lib/auth/session";
-import { ListeningComprehensionClient } from "./ListeningComprehensionClient";
+import { getLearnCatalog } from "@/lib/learn/getLearnCatalog";
+import { getDirectoryItems } from "@/lib/learn/getDirectoryItems";
+import { normalizeLearnLevel } from "@/lib/learn-filters";
+import { LearnContent } from "@/components/learn/LearnContent";
 
-export default async function LearnListeningPage() {
-  const session = await getSession();
+export const revalidate = 60;
+
+export default async function LearnListeningPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ level?: string; search?: string; sort?: string; page?: string }>;
+}) {
+  const sp = await searchParams;
+  const level = normalizeLearnLevel(sp.level || "n5");
+  const search = (sp.search || "").trim();
+  const sort = sp.sort === "recommended" ? ("recommended" as const) : ("newest" as const);
+  const page = Math.max(1, parseInt(sp.page || "1", 10));
+
+  const catalog = await getLearnCatalog({
+    contentType: "listening",
+    level,
+    category: "listening",
+    search,
+    sort,
+    page,
+    respectCuratedLevel: false,
+  });
+
+  const directoryItems = level !== "all"
+    ? await getDirectoryItems("listening", level)
+    : [];
+
   return (
-    <div className="min-h-screen bg-[var(--base)]">
-      <div className="max-w-[1200px] mx-auto px-4 py-8">
-        <nav className="text-sm text-secondary mb-4">
-          <Link href="/learn/dashboard" className="hover:text-primary">Dashboard</Link>
-          <span className="mx-2">/</span>
-          <span className="text-charcoal">Listening</span>
-        </nav>
-        <h1 className="font-heading text-3xl font-bold text-charcoal mb-2">Listening comprehension</h1>
-        <p className="text-secondary mb-6">
-          JLPT-style: listen to the audio, then answer multiple-choice questions. Use playback speed and reveal the transcript after submitting.
-        </p>
-        {session?.email ? (
-          <ListeningComprehensionClient />
-        ) : (
-          <p className="text-secondary text-sm">
-            <Link href={`/login?redirect=/learn/listening`} className="text-primary hover:underline">Sign in</Link> to practice and save your attempts.
-          </p>
-        )}
-        <div className="mt-8 pt-6 border-t border-[var(--divider)] flex flex-wrap gap-4">
-          <Link href="/learn/dashboard" className="text-primary text-sm font-medium hover:underline">← Dashboard</Link>
-        </div>
-      </div>
-    </div>
+    <LearnContent
+      level={level}
+      category="listening"
+      sort={sort}
+      recommended={catalog.recommendedItems}
+      items={catalog.paginatedItems}
+      totalCount={catalog.totalCount}
+      currentPage={catalog.currentPage}
+      basePath="/learn/listening"
+      lockCategory="listening"
+      heroTitle="Listening Comprehension"
+      heroSubtext="Practice JLPT-style listening with audio, questions, and transcripts."
+      directoryItems={directoryItems}
+    />
   );
 }
+export const dynamic = "force-dynamic";

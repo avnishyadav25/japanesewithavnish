@@ -11,8 +11,8 @@ export async function fulfillOrder(orderId: string): Promise<void> {
   if (!sql) throw new Error("Database not configured");
 
   const orderRows = await sql`
-    SELECT id, user_email, user_name, status FROM orders WHERE id = ${orderId} LIMIT 1
-  ` as { id: string; user_email: string; user_name: string; status: string }[];
+    SELECT id, user_email, user_name, status, plan_id, total_amount_paise, provider FROM orders WHERE id = ${orderId} LIMIT 1
+  ` as { id: string; user_email: string; user_name: string; status: string; plan_id: string | null; total_amount_paise: number; provider: string | null }[];
   const order = orderRows[0];
   if (!order) throw new Error("Order not found");
   if (order.status === "paid") return;
@@ -20,10 +20,75 @@ export async function fulfillOrder(orderId: string): Promise<void> {
   await sql`UPDATE payments SET status = 'paid' WHERE order_id = ${orderId}`;
   await sql`UPDATE orders SET status = 'paid' WHERE id = ${orderId}`;
 
-  const items = await sql`SELECT product_id FROM order_items WHERE order_id = ${orderId}` as { product_id: string }[];
   const userEmail = order.user_email;
 
+  // Handle Subscription Plan Fulfillment
+  if (order.plan_id) {
+    const planRows = await sql`
+      SELECT id, slug, name, billing_type FROM subscription_plans WHERE id = ${order.plan_id} LIMIT 1
+    ` as { id: string; slug: string; name: string; billing_type: string }[];
+    const plan = planRows[0];
+    if (plan) {
+      const startsAt = new Date();
+      let endsAt: Date | null = null;
+      let isLifetime = false;
+      let subStatus = "active";
+
+      if (plan.billing_type === "monthly") {
+        endsAt = new Date();
+        endsAt.setDate(endsAt.getDate() + 30);
+      } else if (plan.billing_type === "yearly") {
+        endsAt = new Date();
+        endsAt.setDate(endsAt.getDate() + 365);
+      } else if (plan.billing_type === "lifetime") {
+        isLifetime = true;
+        subStatus = "lifetime";
+      }
+
+      // Insert subscription record
+      const subRows = await sql`
+        INSERT INTO user_subscriptions (user_email, plan_id, status, provider, started_at, current_period_start, current_period_end)
+        VALUES (${userEmail}, ${plan.id}, ${subStatus}, ${order.provider || 'razorpay'}, ${startsAt.toISOString()}, ${startsAt.toISOString()}, ${endsAt ? endsAt.toISOString() : null})
+        RETURNING id
+      ` as { id: string }[];
+      const subId = subRows[0]?.id;
+
+      // Log subscription payment
+      await sql`
+        INSERT INTO subscription_payments (user_email, subscription_id, plan_id, provider, provider_payment_id, amount, status, paid_at)
+        VALUES (${userEmail}, ${subId}, ${plan.id}, ${order.provider || 'razorpay'}, ${orderId}, ${order.total_amount_paise || 0}, 'paid', NOW())
+      `;
+
+      // Update student profile with subscription cache
+      if (isLifetime) {
+        await sql`
+          UPDATE profiles
+          SET is_lifetime = true,
+              role = 'premium_student',
+              current_plan = ${plan.slug},
+              subscription_status = ${subStatus},
+              updated_at = NOW()
+          WHERE email = ${userEmail}
+        `;
+      } else {
+        const daysToAdd = plan.billing_type === "monthly" ? 30 : 365;
+        await sql`
+          UPDATE profiles
+          SET premium_until = GREATEST(COALESCE(premium_until, NOW()), NOW()) + ${daysToAdd} * INTERVAL '1 day',
+              role = 'premium_student',
+              current_plan = ${plan.slug},
+              subscription_status = ${subStatus},
+              updated_at = NOW()
+          WHERE email = ${userEmail}
+        `;
+      }
+    }
+  }
+
+  const items = await sql`SELECT product_id FROM order_items WHERE order_id = ${orderId}` as { product_id: string | null }[];
+
   for (const item of items) {
+    if (!item.product_id) continue;
     await sql`
       INSERT INTO entitlements (user_email, product_id, order_id, active)
       VALUES (${userEmail}, ${item.product_id}, ${orderId}, true)

@@ -19,9 +19,9 @@ export default async function AdminLayout({
   }
 
   return (
-    <div className="min-h-screen bg-base">
+    <div className="min-h-screen bg-[#FAF8F5]">
       <AdminSidebar />
-      <main className="md:ml-[240px] min-h-screen japanese-wave-bg pt-14 md:pt-0">
+      <main className="md:ml-[240px] min-h-screen pt-14 md:pt-0">
         <div className="p-6 max-w-[1200px] mx-auto">{children}</div>
       </main>
     </div>

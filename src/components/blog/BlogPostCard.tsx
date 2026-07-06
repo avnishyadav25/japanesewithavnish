@@ -34,6 +34,13 @@ export function BlogPostCard({ post, size = "small" }: BlogPostCardProps) {
   const isFeatured = size === "featured";
   const isMedium = size === "medium";
 
+  const imageUrl = post.og_image_url || null;
+  const placeholderText = post.content_type
+    ? post.content_type.charAt(0).toUpperCase() + post.content_type.slice(1)
+    : jlptTags[0]
+    ? `${jlptTags[0]} Notes`
+    : "JLPT Study Notes";
+
   return (
     <Link
       href={href}
@@ -41,19 +48,24 @@ export function BlogPostCard({ post, size = "small" }: BlogPostCardProps) {
         isFeatured ? "bento-span-4 bento-row-2" : isMedium ? "bento-span-2 bento-row-2" : ""
       }`}
     >
-      {post.og_image_url && (
-        <div
-          className={`overflow-hidden rounded-t-[10px] -mx-6 -mt-6 ${
-            isFeatured || isMedium ? "aspect-video mb-4" : "aspect-video mb-3"
-          }`}
-        >
+      <div
+        className={`overflow-hidden rounded-t-[10px] -mx-6 -mt-6 ${
+          isFeatured || isMedium ? "aspect-video mb-4" : "aspect-video mb-3"
+        }`}
+      >
+        {imageUrl ? (
           <img
-            src={post.og_image_url}
+            src={imageUrl}
             alt=""
             className="w-full h-full object-cover object-top group-hover:scale-[1.02] transition-transform duration-300"
           />
-        </div>
-      )}
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-[#D0021B] to-[#ff6b6b] flex flex-col items-center justify-center p-4 text-center group-hover:opacity-95 transition-opacity min-h-[140px]">
+            <span className="text-white/45 text-[9px] font-black uppercase tracking-widest">Japanese with Avnish</span>
+            <span className="text-white font-heading text-sm font-bold mt-1 tracking-tight drop-shadow-sm">{placeholderText}</span>
+          </div>
+        )}
+      </div>
       <h2
         className={`font-heading font-bold text-charcoal mb-2 group-hover:text-primary transition-colors ${
           isFeatured ? "text-xl sm:text-2xl" : isMedium ? "text-lg" : "text-base"

@@ -9,11 +9,11 @@ export async function GET() {
   if (!sql) return NextResponse.json({ milestones: [] });
   try {
     const rows = await sql`
-      SELECT ad.code, ad.name, ad.description, ad.points, ua.earned_at
-      FROM user_achievements ua
-      JOIN achievement_definitions ad ON ad.id = ua.achievement_id
-      WHERE ua.user_email = ${session.email}
-      ORDER BY ua.earned_at DESC
+      SELECT b.slug as code, b.name, b.description, b.points_reward as points, ub.awarded_at::text as earned_at
+      FROM user_badges ub
+      JOIN badges b ON b.id = ub.badge_id
+      WHERE ub.user_email = ${session.email}
+      ORDER BY ub.awarded_at DESC
     ` as { code: string; name: string; description: string | null; points: number; earned_at: string }[];
     const milestones = (rows ?? []).map((r) => ({
       code: r.code,

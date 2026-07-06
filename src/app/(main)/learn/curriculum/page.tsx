@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { CurriculumBrowserClient } from "./CurriculumBrowserClient";
 
 export const metadata = {
@@ -15,7 +16,14 @@ export default function LearnCurriculumPage() {
           Browse all levels and lessons. Your next lesson is on your{" "}
           <Link href="/learn/dashboard" className="text-primary hover:underline">dashboard</Link>.
         </p>
-        <CurriculumBrowserClient />
+        <Suspense fallback={
+          <div className="py-12 flex flex-col items-center justify-center">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mb-4" />
+            <p className="text-secondary text-sm">Loading curriculum path...</p>
+          </div>
+        }>
+          <CurriculumBrowserClient />
+        </Suspense>
         <div className="mt-8 flex gap-4">
           <Link href="/learn/dashboard" className="text-primary font-medium text-sm hover:underline">
             My progress →

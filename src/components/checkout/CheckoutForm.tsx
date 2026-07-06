@@ -24,9 +24,11 @@ export type CheckoutProduct = {
 type CheckoutFormProps = {
   product: CheckoutProduct;
   compact?: boolean;
+  isPlan?: boolean;
+  currency?: "INR" | "USD";
 };
 
-export function CheckoutForm({ product, compact = false }: CheckoutFormProps) {
+export function CheckoutForm({ product, compact = false, isPlan = false, currency = "INR" }: CheckoutFormProps) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState({ name: "", email: "", phone: "", couponCode: "" });
@@ -35,13 +37,14 @@ export function CheckoutForm({ product, compact = false }: CheckoutFormProps) {
   const scriptLoaded = useRef(false);
 
   useEffect(() => {
+    if (currency === "USD") return; // Stripe handles its own checkout hosted UI script
     if (scriptLoaded.current) return;
     const script = document.createElement("script");
     script.src = "https://checkout.razorpay.com/v1/checkout.js";
     script.async = true;
     document.body.appendChild(script);
     scriptLoaded.current = true;
-  }, []);
+  }, [currency]);
 
   async function handleApplyCoupon() {
     if (!form.couponCode.trim()) return;
@@ -51,7 +54,7 @@ export function CheckoutForm({ product, compact = false }: CheckoutFormProps) {
       const res = await fetch("/api/coupons/validate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: form.couponCode, productId: product.id }),
+        body: JSON.stringify({ code: form.couponCode, productId: product.id, isPlan }),
       });
       const data = await res.json();
       if (data.valid) {
@@ -70,11 +73,33 @@ export function CheckoutForm({ product, compact = false }: CheckoutFormProps) {
     setSubmitting(true);
     setError("");
     try {
+      if (currency === "USD") {
+        const res = await fetch("/api/checkout/stripe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            planId: product.id,
+            name: form.name,
+            email: form.email,
+            phone: form.phone,
+            couponCode: form.couponCode.trim() || undefined,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed");
+        if (data.sessionUrl) {
+          window.location.href = data.sessionUrl;
+          return;
+        }
+        throw new Error("Invalid session url returned");
+      }
+
       const res = await fetch("/api/checkout/create-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          productId: product.id,
+          productId: isPlan ? undefined : product.id,
+          planId: isPlan ? product.id : undefined,
           name: form.name,
           email: form.email,
           phone: form.phone,
@@ -127,18 +152,24 @@ export function CheckoutForm({ product, compact = false }: CheckoutFormProps) {
             {product.name} —{" "}
             {discountInfo ? (
               <>
-                <span className="line-through text-secondary">₹{product.price_paise / 100}</span>{" "}
-                <span className="font-bold text-primary">₹{discountInfo.final_paise / 100}</span>
+                <span className="line-through text-secondary">
+                  {currency === "USD" ? `$${(product.price_paise / 100).toFixed(2)}` : `₹${product.price_paise / 100}`}
+                </span>{" "}
+                <span className="font-bold text-primary">
+                  {currency === "USD" ? `$${(discountInfo.final_paise / 100).toFixed(2)}` : `₹${discountInfo.final_paise / 100}`}
+                </span>
               </>
             ) : (
-              <span className="font-bold text-primary">₹{product.price_paise / 100}</span>
+              <span className="font-bold text-primary">
+                {currency === "USD" ? `$${(product.price_paise / 100).toFixed(2)}` : `₹${product.price_paise / 100}`}
+              </span>
             )}
           </p>
         </>
       )}
       {compact && (
         <p className="text-secondary text-sm mb-2">
-          {product.name} — <span className="font-bold text-primary">₹{displayPrice / 100}</span>
+          {product.name} — <span className="font-bold text-primary">{currency === "USD" ? `$${(displayPrice / 100).toFixed(2)}` : `₹${displayPrice / 100}`}</span>
         </p>
       )}
       <form onSubmit={handleSubmit} className="space-y-4">

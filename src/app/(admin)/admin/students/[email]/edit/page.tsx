@@ -20,6 +20,11 @@ type Profile = {
   facebook_url?: string | null;
   twitter_url?: string | null;
   website?: string | null;
+  role?: string | null;
+  premium_until?: string | null;
+  is_lifetime?: boolean | null;
+  xp?: number | null;
+  points?: number | null;
 };
 
 export default function AdminStudentEditPage() {
@@ -87,6 +92,11 @@ export default function AdminStudentEditPage() {
       facebook_url: (form.querySelector("[name=facebook_url]") as HTMLInputElement)?.value?.trim() || null,
       twitter_url: (form.querySelector("[name=twitter_url]") as HTMLInputElement)?.value?.trim() || null,
       website: (form.querySelector("[name=website]") as HTMLInputElement)?.value?.trim() || null,
+      role: (form.querySelector("[name=role]") as HTMLSelectElement)?.value || "student",
+      premium_until: (form.querySelector("[name=premium_until]") as HTMLInputElement)?.value || null,
+      is_lifetime: (form.querySelector("[name=is_lifetime]") as HTMLInputElement)?.checked ?? false,
+      xp: parseInt((form.querySelector("[name=xp]") as HTMLInputElement)?.value) || 0,
+      points: parseInt((form.querySelector("[name=points]") as HTMLInputElement)?.value) || 0,
     };
     fetch(`/api/admin/students/${encodeURIComponent(email)}`, {
       method: "PATCH",
@@ -143,17 +153,29 @@ export default function AdminStudentEditPage() {
             <input name="is_active" type="checkbox" defaultChecked={profile.is_active !== false} className="rounded" />
             <span className="text-sm text-charcoal">Active</span>
           </label>
-          <label className="block">
-            <span className="text-secondary text-sm">Recommended level</span>
-            <select name="recommended_level" defaultValue={profile.recommended_level ?? ""} className="w-full px-3 py-2 border border-[var(--divider)] rounded-bento text-sm">
-              <option value="">—</option>
-              <option value="N5">N5</option>
-              <option value="N4">N4</option>
-              <option value="N3">N3</option>
-              <option value="N2">N2</option>
-              <option value="N1">N1</option>
-            </select>
-          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="text-secondary text-sm">Role</span>
+              <select name="role" defaultValue={profile.role ?? "student"} className="w-full px-3 py-2 border border-[var(--divider)] rounded-bento text-sm">
+                <option value="student">Student</option>
+                <option value="premium_student">Premium Student</option>
+                <option value="admin">Admin</option>
+                <option value="editor">Editor</option>
+                <option value="support">Support</option>
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-secondary text-sm">Recommended level</span>
+              <select name="recommended_level" defaultValue={profile.recommended_level ?? ""} className="w-full px-3 py-2 border border-[var(--divider)] rounded-bento text-sm">
+                <option value="">—</option>
+                <option value="N5">N5</option>
+                <option value="N4">N4</option>
+                <option value="N3">N3</option>
+                <option value="N2">N2</option>
+                <option value="N1">N1</option>
+              </select>
+            </label>
+          </div>
           <label className="block">
             <span className="text-secondary text-sm">Profile picture</span>
             <div className="flex flex-wrap items-center gap-2 mt-1">
@@ -166,6 +188,31 @@ export default function AdminStudentEditPage() {
             {avatarUrl && <img src={avatarUrl} alt="" className="mt-2 w-12 h-12 rounded-full object-cover border border-[var(--divider)]" />}
           </label>
         </div>
+
+        <div className="card p-6 space-y-4">
+          <h2 className="font-heading font-semibold text-charcoal">Subscription & Gamification</h2>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="text-secondary text-sm">XP</span>
+              <input name="xp" type="number" defaultValue={profile.xp ?? 0} className="w-full px-3 py-2 border border-[var(--divider)] rounded-bento text-sm" />
+            </label>
+            <label className="block">
+              <span className="text-secondary text-sm">Points</span>
+              <input name="points" type="number" defaultValue={profile.points ?? 0} className="w-full px-3 py-2 border border-[var(--divider)] rounded-bento text-sm" />
+            </label>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="text-secondary text-sm">Premium Expires</span>
+              <input name="premium_until" type="date" defaultValue={profile.premium_until ? profile.premium_until.substring(0, 10) : ""} className="w-full px-3 py-2 border border-[var(--divider)] rounded-bento text-sm" />
+            </label>
+            <label className="flex items-center gap-2 mt-6">
+              <input name="is_lifetime" type="checkbox" defaultChecked={!!profile.is_lifetime} className="rounded" />
+              <span className="text-sm text-charcoal">Lifetime Access</span>
+            </label>
+          </div>
+        </div>
+
         <div className="card p-6 space-y-4">
           <h2 className="font-heading font-semibold text-charcoal">Contact & links</h2>
           <label className="block">

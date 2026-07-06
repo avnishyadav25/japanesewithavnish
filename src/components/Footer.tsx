@@ -28,7 +28,6 @@ const quickLinks = [
   { href: "/learn", label: "Learn" },
   { href: "/tutor", label: "Nihongo Navi" },
   { href: "/quiz", label: "Quiz" },
-  { href: "/store", label: "Store" },
   { href: "/blog", label: "Blog" },
   { href: "/contact", label: "Contact" },
 ];

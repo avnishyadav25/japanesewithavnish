@@ -8,6 +8,18 @@ type Module = { id: string; level_id: string; code: string; title: string; sort_
 type Submodule = { id: string; module_id: string; code: string; title: string; sort_order: number };
 type Lesson = { id: string; submodule_id: string; code: string; title: string; goal: string | null; introduction: string | null; sort_order: number };
 
+type LevelStats = {
+  level: string;
+  modules: number;
+  submodules: number;
+  lessons: number;
+  lessonsWithDescription: number;
+  totalPractices: number;
+  freeLessons: number;
+  premiumLessons: number;
+  descriptionCoverage: number;
+};
+
 // Tree shape (from /api/learn/curriculum?path=1) for list view
 type TreeExercise = { id: string; content_slug: string; post_id: string | null; sort_order: number; title?: string | null };
 type TreeLesson = { id: string; code: string; title: string; sort_order: number; estimated_minutes?: number; feature_image_url?: string; exercises: TreeExercise[] };
@@ -63,6 +75,7 @@ export function CurriculumAdminClient() {
   const [collapsedModuleIds, setCollapsedModuleIds] = useState<Set<string>>(new Set());
   const [collapsedSubmoduleIds, setCollapsedSubmoduleIds] = useState<Set<string>>(new Set());
   const [collapsedLessonIds, setCollapsedLessonIds] = useState<Set<string>>(new Set());
+  const [stats, setStats] = useState<LevelStats[]>([]);
 
   const loadLevels = useCallback(async () => {
     const data = await fetchJson<Level[]>("/api/admin/curriculum/levels");
@@ -70,7 +83,10 @@ export function CurriculumAdminClient() {
   }, []);
 
   useEffect(() => {
-    loadLevels().catch((e) => setError(e.message)).finally(() => setLoading(false));
+    Promise.all([
+      loadLevels(),
+      fetchJson<LevelStats[]>("/api/admin/curriculum/stats").then(setStats).catch(() => {})
+    ]).catch((e) => setError(e.message)).finally(() => setLoading(false));
   }, [loadLevels]);
 
   useEffect(() => {
@@ -244,6 +260,29 @@ export function CurriculumAdminClient() {
 
   return (
     <div className="space-y-4 w-full">
+      {stats.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-4">
+          {stats.map((s) => (
+            <div key={s.level} className="p-4 bg-white rounded-bento border border-[var(--divider)] shadow-xs flex flex-col justify-between">
+              <div>
+                <span className="text-[10px] font-semibold text-primary uppercase tracking-wide">{s.level} Course</span>
+                <h3 className="font-heading font-bold text-lg text-charcoal mt-0.5">{s.lessons} Lessons</h3>
+                <p className="text-[11px] text-secondary mt-1">
+                  📄 {s.lessonsWithDescription} descriptions ({s.descriptionCoverage}%)
+                </p>
+                <p className="text-[11px] text-secondary mt-0.5">
+                  🎯 {s.totalPractices} practices total
+                </p>
+              </div>
+              <div className="mt-3 pt-2 border-t border-[var(--divider)]/40 flex items-center justify-between text-[10px] font-semibold text-secondary">
+                <span className="text-green-700">🆓 {s.freeLessons} Free</span>
+                <span className="text-amber-700">🔒 {s.premiumLessons} Prem</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="flex items-center gap-2">
         <button
           type="button"

@@ -16,12 +16,14 @@ export async function POST(req: Request) {
 
   try {
     const profileRows = await sql`
-      SELECT last_activity_date, current_streak, longest_streak
+      SELECT last_activity_date, current_streak, longest_streak, streak_freezes
       FROM profiles WHERE email = ${session.email} LIMIT 1
-    ` as { last_activity_date: string | null; current_streak: number; longest_streak: number }[];
+    ` as { last_activity_date: string | null; current_streak: number; longest_streak: number; streak_freezes: number }[];
 
     const prev = profileRows[0];
     let newStreak = 1;
+    let updatedFreezes = prev?.streak_freezes ?? 0;
+
     if (prev?.last_activity_date) {
       const last = prev.last_activity_date.slice(0, 10);
       if (last === today) {
@@ -30,18 +32,27 @@ export async function POST(req: Request) {
         const lastDate = new Date(last);
         const todayDate = new Date(today);
         const diffDays = Math.round((todayDate.getTime() - lastDate.getTime()) / (24 * 60 * 60 * 1000));
-        if (diffDays === 1) newStreak = (prev.current_streak ?? 0) + 1;
+        if (diffDays === 1) {
+          newStreak = (prev.current_streak ?? 0) + 1;
+        } else if (diffDays > 1) {
+          if (updatedFreezes > 0) {
+            newStreak = prev.current_streak ?? 1;
+            updatedFreezes -= 1;
+            console.log(`[Streak Freeze] Consumed 1 freeze for ${session.email}. Streak kept at ${newStreak}.`);
+          }
+        }
       }
     }
     const longest = Math.max(newStreak, prev?.longest_streak ?? 0);
 
     await sql`
-      INSERT INTO profiles (email, last_activity_date, current_streak, longest_streak, updated_at)
-      VALUES (${session.email}, ${today}::date, ${newStreak}, ${longest}, NOW())
+      INSERT INTO profiles (email, last_activity_date, current_streak, longest_streak, streak_freezes, updated_at)
+      VALUES (${session.email}, ${today}::date, ${newStreak}, ${longest}, ${updatedFreezes}, NOW())
       ON CONFLICT (email) DO UPDATE SET
         last_activity_date = ${today}::date,
         current_streak = ${newStreak},
         longest_streak = ${longest},
+        streak_freezes = ${updatedFreezes},
         updated_at = NOW()
     `;
 

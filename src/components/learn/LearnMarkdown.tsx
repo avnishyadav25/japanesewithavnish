@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
@@ -268,11 +268,94 @@ export function LearnMarkdown({
               </li>
             );
           },
-          blockquote: ({ children, ...props }) => (
-            <blockquote className="border-l-4 border-primary pl-4 italic my-4 text-secondary" {...props}>
-              {children}
-            </blockquote>
-          ),
+          blockquote: ({ children, ...props }) => {
+            const rawText = flattenText(children).trim();
+            
+            let type: "info" | "example" | "warning" | "practice" | "summary" | null = null;
+            let title = "";
+
+            if (rawText.startsWith("[!NOTE]") || rawText.startsWith("[!INFO]")) {
+              type = "info";
+              title = "Info Box";
+            } else if (rawText.startsWith("[!TIP]") || rawText.startsWith("[!EXAMPLE]")) {
+              type = "example";
+              title = "Example Box";
+            } else if (rawText.startsWith("[!WARNING]") || rawText.startsWith("[!MISTAKE]") || rawText.startsWith("[!CAUTION]")) {
+              type = "warning";
+              title = "Common Mistake";
+            } else if (rawText.startsWith("[!PRACTICE]") || rawText.startsWith("[!DRILL]")) {
+              type = "practice";
+              title = "Practice Box";
+            } else if (rawText.startsWith("[!SUMMARY]")) {
+              type = "summary";
+              title = "Summary Box";
+            }
+
+            if (type) {
+              const configs = {
+                info: {
+                  bg: "bg-blue-50/70 border-blue-500 text-blue-900",
+                  titleColor: "text-blue-800",
+                  emoji: "ℹ️"
+                },
+                example: {
+                  bg: "bg-green-50/70 border-green-600 text-green-900",
+                  titleColor: "text-green-800",
+                  emoji: "💡"
+                },
+                warning: {
+                  bg: "bg-[#FFF7F7] border-[#D0021B] text-[#80010E]",
+                  titleColor: "text-[#D0021B]",
+                  emoji: "⚠️"
+                },
+                practice: {
+                  bg: "bg-purple-50/70 border-purple-600 text-purple-900",
+                  titleColor: "text-purple-800",
+                  emoji: "📝"
+                },
+                summary: {
+                  bg: "bg-gray-50/70 border-gray-600 text-gray-900",
+                  titleColor: "text-gray-800",
+                  emoji: "📋"
+                }
+              }[type];
+
+              // Strip the alert tag from the children nodes
+              const stripAlertTag = (node: React.ReactNode): React.ReactNode => {
+                if (typeof node === "string") {
+                  return node.replace(/^\[!(NOTE|INFO|TIP|EXAMPLE|WARNING|MISTAKE|CAUTION|PRACTICE|DRILL|SUMMARY)\]\s*/i, "");
+                }
+                if (Array.isArray(node)) {
+                  return node.map((child, idx) => (idx === 0 ? stripAlertTag(child) : child));
+                }
+                if (node && typeof node === "object" && "props" in node) {
+                  const el = node as React.ReactElement;
+                  if (el.props?.children) {
+                    return React.cloneElement(el, {}, stripAlertTag(el.props.children));
+                  }
+                }
+                return node;
+              };
+
+              return (
+                <div className={`my-5 p-4 rounded-r-xl border-l-4 border-y border-r border-black/5 ${configs.bg}`}>
+                  <div className={`flex items-center gap-1.5 font-bold text-xs uppercase tracking-wider mb-2 ${configs.titleColor}`}>
+                    <span>{configs.emoji}</span>
+                    <span>{title}</span>
+                  </div>
+                  <div className="prose-sm leading-relaxed [&_p]:my-1">
+                    {stripAlertTag(children)}
+                  </div>
+                </div>
+              );
+            }
+
+            return (
+              <blockquote className="border-l-4 border-primary pl-4 italic my-4 text-secondary" {...props}>
+                {children}
+              </blockquote>
+            );
+          },
         }}
       >
         {content}

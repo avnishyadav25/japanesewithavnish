@@ -4,12 +4,14 @@ import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { LessonEditForm } from "./LessonEditForm";
 import { LessonBodySection } from "./LessonBodySection";
 import { LessonLinksSection } from "./LessonLinksSection";
+import { LessonPracticesSection } from "./LessonPracticesSection";
 
 export default async function AdminCurriculumLessonPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!sql) notFound();
   const rows = await sql`
     SELECT l.id, l.submodule_id, l.code, l.title, l.goal, l.introduction, l.sort_order, l.feature_image_url,
+           l.description, l.access_type, l.content_type, l.estimated_minutes,
            sm.title AS submodule_title, m.title AS module_title, m.level_id, lv.code AS level_code
     FROM curriculum_lessons l
     JOIN curriculum_submodules sm ON sm.id = l.submodule_id
@@ -17,7 +19,13 @@ export default async function AdminCurriculumLessonPage({ params }: { params: Pr
     JOIN curriculum_levels lv ON lv.id = m.level_id
     WHERE l.id = ${id} LIMIT 1
   `;
-  const row = (rows as { id: string; submodule_id: string; code: string; title: string; goal: string | null; introduction: string | null; sort_order: number; feature_image_url: string | null; submodule_title: string; module_title: string; level_id: string; level_code: string }[])[0];
+  const row = (rows as {
+    id: string; submodule_id: string; code: string; title: string; goal: string | null;
+    introduction: string | null; sort_order: number; feature_image_url: string | null;
+    description: string | null; access_type: string; content_type: string | null;
+    estimated_minutes: number | null; submodule_title: string; module_title: string;
+    level_id: string; level_code: string;
+  }[])[0];
   if (!row) notFound();
 
   return (
@@ -37,8 +45,20 @@ export default async function AdminCurriculumLessonPage({ params }: { params: Pr
           <LessonEditForm
             lessonId={row.id}
             levelCode={row.level_code}
-            initial={{ code: row.code, title: row.title, goal: row.goal ?? "", introduction: row.introduction ?? "", sort_order: row.sort_order, feature_image_url: row.feature_image_url ?? "" }}
+            initial={{
+              code: row.code,
+              title: row.title,
+              goal: row.goal ?? "",
+              introduction: row.introduction ?? "",
+              description: row.description ?? "",
+              access_type: row.access_type ?? "premium",
+              content_type: row.content_type ?? "",
+              estimated_minutes: row.estimated_minutes ?? 0,
+              sort_order: row.sort_order,
+              feature_image_url: row.feature_image_url ?? ""
+            }}
           />
+          <LessonPracticesSection lessonId={row.id} />
           <LessonBodySection lessonId={row.id} lessonTitle={row.title} levelCode={row.level_code} />
         </div>
         <div className="md:col-span-1">

@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { AnnouncementBar } from "@/components/AnnouncementBar";
@@ -15,6 +16,10 @@ export default async function MainLayout({
 }) {
   const session = await getAdminSession();
   const isAdmin = !!session;
+  
+  const headersList = await headers();
+  const pathname = headersList.get("x-pathname") || "";
+  const isTutorRoute = pathname === "/tutor";
 
   return (
     <div className="min-h-screen flex flex-col bg-base">
@@ -25,7 +30,7 @@ export default async function MainLayout({
         </>
       )}
       <main className="flex-1">{children}</main>
-      {!isComingSoon && (
+      {!isComingSoon && !isTutorRoute && (
         <>
           <Footer />
           <ChatPanel />

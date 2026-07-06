@@ -10,8 +10,8 @@ function stripForRazorpay(s: string): string {
 
 export async function POST(req: Request) {
   try {
-    const { productId, name, email, phone, couponCode } = await req.json();
-    if (!productId || !name || !email || !phone) {
+    const { productId, planId, name, email, phone, couponCode } = await req.json();
+    if ((!productId && !planId) || !name || !email || !phone) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     }
 
@@ -19,13 +19,34 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Checkout unavailable" }, { status: 503 });
     }
 
-    const productRows = await sql`SELECT id, name, price_paise FROM products WHERE id = ${productId} LIMIT 1`;
-    const product = productRows[0];
-    if (!product) {
-      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    let amountPaise = 0;
+    let displayName = "Premium Purchase";
+    let dbPlanId: string | null = null;
+    let dbProductId: string | null = null;
+
+    if (planId) {
+      const planRows = await sql`
+        SELECT id, name, price_inr FROM subscription_plans
+        WHERE id::text = ${planId} OR slug = ${planId} LIMIT 1
+      ` as { id: string; name: string; price_inr: number }[];
+      const plan = planRows[0];
+      if (!plan) {
+        return NextResponse.json({ error: "Subscription plan not found" }, { status: 404 });
+      }
+      amountPaise = Number(plan.price_inr);
+      displayName = plan.name;
+      dbPlanId = plan.id;
+    } else if (productId) {
+      const productRows = await sql`SELECT id, name, price_paise FROM products WHERE id = ${productId} LIMIT 1`;
+      const product = productRows[0];
+      if (!product) {
+        return NextResponse.json({ error: "Product not found" }, { status: 404 });
+      }
+      amountPaise = Number(product.price_paise);
+      displayName = product.name;
+      dbProductId = product.id;
     }
 
-    let amountPaise = Number(product.price_paise);
     let discountPaise = 0;
     let appliedCoupon: string | null = null;
 
@@ -40,10 +61,13 @@ export async function POST(req: Request) {
         const expired = coupon.expires_at && new Date(coupon.expires_at as string) < new Date();
         const limitReached =
           coupon.max_uses != null && Number(coupon.used_count ?? 0) >= Number(coupon.max_uses);
+        
         const productIds = coupon.product_ids as string[] | null;
-        const validProduct = !productIds || productIds.length === 0 || productIds.includes(productId);
+        const validItem = !productIds || productIds.length === 0 || 
+                            (dbProductId && productIds.includes(dbProductId)) ||
+                            (dbPlanId && productIds.includes(dbPlanId));
 
-        if (!expired && !limitReached && validProduct) {
+        if (!expired && !limitReached && validItem) {
           const discountValue = Number(coupon.discount_value);
           if (coupon.discount_type === "percent") {
             discountPaise = Math.round((amountPaise * discountValue) / 100);
@@ -65,8 +89,8 @@ export async function POST(req: Request) {
     const useRazorpay = Boolean(keyId && keySecret);
 
     const orderRows = await sql`
-      INSERT INTO orders (user_email, user_name, user_phone, status, provider, total_amount_paise, coupon_code, discount_paise)
-      VALUES (${email}, ${name}, ${phone}, 'pending_payment', ${useRazorpay ? "razorpay" : "manual"}, ${amountPaise}, ${appliedCoupon}, ${discountPaise})
+      INSERT INTO orders (user_email, user_name, user_phone, status, provider, total_amount_paise, coupon_code, discount_paise, plan_id)
+      VALUES (${email}, ${name}, ${phone}, 'pending_payment', ${useRazorpay ? "razorpay" : "manual"}, ${amountPaise}, ${appliedCoupon}, ${discountPaise}, ${dbPlanId})
       RETURNING id
     `;
     const order = orderRows[0];
@@ -75,10 +99,10 @@ export async function POST(req: Request) {
     }
     const orderId = order.id as string;
 
-    const finalPricePaise = Number(product.price_paise) - discountPaise;
+    const finalPricePaise = amountPaise;
     await sql`
       INSERT INTO order_items (order_id, product_id, quantity, price_paise)
-      VALUES (${orderId}, ${productId}, 1, ${finalPricePaise})
+      VALUES (${orderId}, ${dbProductId}, 1, ${finalPricePaise})
     `;
 
     if (appliedCoupon) {
@@ -97,7 +121,7 @@ export async function POST(req: Request) {
         paymentMethod: "manual",
         amountPaise,
         name: "Japanese with Avnish",
-        description: String(product.name),
+        description: displayName,
       });
     }
 
@@ -120,7 +144,7 @@ export async function POST(req: Request) {
       key: keyId,
       amount: amountPaise,
       name: "Japanese with Avnish",
-      description: stripForRazorpay(String(product.name)),
+      description: stripForRazorpay(displayName),
       redirectUrl: `${siteUrl}/thank-you?order=${orderId}`,
     });
   } catch (e) {

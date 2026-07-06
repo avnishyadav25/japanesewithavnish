@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
-type Tab = "signin" | "signup" | "magic" | "forgot";
+type Tab = "magic" | "signin" | "signup" | "forgot";
 
 export default function LoginPage() {
   const searchParams = useSearchParams();
@@ -12,12 +12,12 @@ export default function LoginPage() {
   const safeRedirect = redirect.startsWith("/") ? redirect : "/learn/dashboard";
   const showForgot = searchParams?.get("forgot") === "1";
 
-  const [tab, setTab] = useState<Tab>(showForgot ? "forgot" : "signin");
+  const [tab, setTab] = useState<Tab>(showForgot ? "forgot" : "magic");
   const [email, setEmail] = useState("");
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
+  const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [targetLevel, setTargetLevel] = useState("N5");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [forgotSuccessMessage, setForgotSuccessMessage] = useState("");
@@ -36,9 +36,9 @@ export default function LoginPage() {
       if (!res.ok) throw new Error(data.error || "Failed");
       setStatus("success");
       window.location.href = data.redirect || safeRedirect;
-    } catch (e) {
+    } catch (err) {
       setStatus("error");
-      setErrorMsg(e instanceof Error ? e.message : "Invalid email or password.");
+      setErrorMsg(err instanceof Error ? err.message : "Invalid email or password.");
     }
   }
 
@@ -51,21 +51,26 @@ export default function LoginPage() {
     }
     setStatus("loading");
     setErrorMsg("");
+
+    const spaceIdx = name.trim().indexOf(" ");
+    const firstName = spaceIdx !== -1 ? name.trim().substring(0, spaceIdx) : name.trim();
+    const lastName = spaceIdx !== -1 ? name.trim().substring(spaceIdx + 1) : "";
+
     try {
       const res = await fetch("/api/auth/sign-up", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({
+          email,
+          password,
+          first_name: firstName,
+          last_name: lastName,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
-      setStatus("success");
-      setTab("signin");
-      setPassword("");
-      setConfirmPassword("");
-      setErrorMsg("");
-      setStatus("idle");
-      // Option: auto sign in here by calling sign-in then redirect
+
+      // Auto Sign-in
       const signInRes = await fetch("/api/auth/sign-in", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -73,12 +78,26 @@ export default function LoginPage() {
       });
       const signInData = await signInRes.json();
       if (signInRes.ok && signInData.redirect) {
-        window.location.href = signInData.redirect;
+        // Update Target Level
+        if (targetLevel) {
+          await fetch("/api/profile", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ target_level: targetLevel, onboarding_completed: true }),
+          }).catch(() => {});
+        }
+        window.location.href = "/learn/dashboard";
         return;
       }
-    } catch (e) {
+      setStatus("success");
+      setTab("signin");
+      setPassword("");
+      setConfirmPassword("");
+      setErrorMsg("");
+      setStatus("idle");
+    } catch (err) {
       setStatus("error");
-      setErrorMsg(e instanceof Error ? e.message : "Something went wrong. Try again.");
+      setErrorMsg(err instanceof Error ? err.message : "Something went wrong. Try again.");
     }
   }
 
@@ -97,9 +116,9 @@ export default function LoginPage() {
       setForgotSuccessMessage(typeof data.message === "string" ? data.message : "Check your email.");
       setStatus("success");
       setErrorMsg("");
-    } catch (e) {
+    } catch (err) {
       setStatus("error");
-      setErrorMsg(e instanceof Error ? e.message : "Something went wrong. Try again.");
+      setErrorMsg(err instanceof Error ? err.message : "Something went wrong. Try again.");
     }
   }
 
@@ -117,213 +136,296 @@ export default function LoginPage() {
       if (!res.ok) throw new Error(data.error || "Failed");
       setStatus("success");
       setErrorMsg("");
-    } catch (e) {
+    } catch (err) {
       setStatus("error");
-      setErrorMsg(e instanceof Error ? e.message : "Something went wrong. Try again.");
+      setErrorMsg(err instanceof Error ? err.message : "Something went wrong. Try again.");
     }
   }
 
   const isMagicSent = tab === "magic" && status === "success";
 
   return (
-    <div className="py-12 sm:py-20 px-4 sm:px-6">
-      <div className="max-w-[1200px] mx-auto">
-        <div className="bento-grid">
-          <div className="bento-span-4 bento-row-2 card flex flex-col justify-center">
-            <h1 className="font-heading text-2xl font-bold text-charcoal mb-2">Sign in</h1>
-            <p className="text-secondary text-sm mb-6">
-              Use your email and password, or get a magic link.
-            </p>
+    <div className="py-12 sm:py-20 px-4 sm:px-6 bg-[var(--base)] min-h-[85vh] flex items-center">
+      <div className="max-w-[1000px] mx-auto w-full">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-stretch">
+          
+          {/* Left Form Card */}
+          <div className="md:col-span-7 bg-white rounded-3xl p-8 border border-[var(--divider)] shadow-card flex flex-col justify-between min-h-[500px]">
+            {isMagicSent ? (
+              <div className="space-y-6 my-auto text-center py-8">
+                <span className="text-5xl" role="img" aria-label="email">✉️</span>
+                <h2 className="font-heading text-2xl font-black text-charcoal">Check your email</h2>
+                <p className="text-secondary text-sm max-w-sm mx-auto leading-relaxed">
+                  We sent a secure, passwordless sign-in link to: <br />
+                  <strong className="text-charcoal font-semibold">{email}</strong>
+                </p>
+                <p className="text-secondary text-xs">Open the link to continue learning.</p>
+                <div className="flex gap-4 justify-center pt-4">
+                  <button
+                    type="button"
+                    onClick={handleMagicLink}
+                    className="text-xs font-bold text-primary hover:underline"
+                  >
+                    Resend Link
+                  </button>
+                  <span className="text-[var(--divider)]">|</span>
+                  <button
+                    type="button"
+                    onClick={() => { setTab("magic"); setStatus("idle"); }}
+                    className="text-xs font-bold text-secondary hover:underline"
+                  >
+                    Use Different Email
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div className="mb-6">
+                  <h1 className="font-heading text-3xl font-black text-charcoal mb-2">Welcome back</h1>
+                  <p className="text-secondary text-sm">
+                    Sign in to continue your Japanese learning, track progress, and access your lessons.
+                  </p>
+                </div>
 
-            <div className="flex gap-2 mb-6 border-b border-[var(--divider)]">
-              <button
-                type="button"
-                onClick={() => { setTab("signin"); setStatus("idle"); setErrorMsg(""); }}
-                className={`pb-2 px-1 text-sm font-medium border-b-2 -mb-[2px] transition ${tab === "signin" ? "border-primary text-primary" : "border-transparent text-secondary hover:text-charcoal"}`}
-              >
-                Sign in
-              </button>
-              <button
-                type="button"
-                onClick={() => { setTab("signup"); setStatus("idle"); setErrorMsg(""); }}
-                className={`pb-2 px-1 text-sm font-medium border-b-2 -mb-[2px] transition ${tab === "signup" ? "border-primary text-primary" : "border-transparent text-secondary hover:text-charcoal"}`}
-              >
-                Sign up
-              </button>
-              <button
-                type="button"
-                onClick={() => { setTab("magic"); setStatus("idle"); setErrorMsg(""); }}
-                className={`pb-2 px-1 text-sm font-medium border-b-2 -mb-[2px] transition ${tab === "magic" ? "border-primary text-primary" : "border-transparent text-secondary hover:text-charcoal"}`}
-              >
-                Magic link
-              </button>
-              <button
-                type="button"
-                onClick={() => { setTab("forgot"); setStatus("idle"); setErrorMsg(""); setForgotSuccessMessage(""); }}
-                className={`pb-2 px-1 text-sm font-medium border-b-2 -mb-[2px] transition ${tab === "forgot" ? "border-primary text-primary" : "border-transparent text-secondary hover:text-charcoal"}`}
-              >
-                Forgot password
-              </button>
+                {/* Tabs */}
+                <div className="flex gap-4 mb-6 border-b border-[var(--divider)]">
+                  {(["magic", "signin", "signup"] as const).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => {
+                        setTab(t);
+                        setStatus("idle");
+                        setErrorMsg("");
+                      }}
+                      className={`pb-2.5 px-1 text-sm font-semibold border-b-2 -mb-[2px] transition capitalize ${
+                        tab === t
+                          ? "border-primary text-primary"
+                          : "border-transparent text-secondary hover:text-charcoal"
+                      }`}
+                    >
+                      {t === "magic" ? "Magic Link" : t === "signin" ? "Sign In" : "Sign Up"}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Form fields depending on Tab */}
+                {tab === "magic" && (
+                  <form onSubmit={handleMagicLink} className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold uppercase text-charcoal mb-1">Email Address</label>
+                      <input
+                        type="email"
+                        placeholder="your@email.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        className="w-full h-12 px-4 border border-[var(--divider)] rounded-xl text-charcoal focus:border-primary focus:outline-none text-sm transition"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={status === "loading"}
+                      className="w-full h-12 rounded-xl bg-primary text-white font-bold text-sm hover:bg-primary/95 transition disabled:opacity-50"
+                    >
+                      {status === "loading" ? "Sending..." : "Send Magic Link"}
+                    </button>
+                    <p className="text-xs text-secondary text-center">
+                      No password needed. We&apos;ll email you a secure sign-in link.
+                    </p>
+                  </form>
+                )}
+
+                {tab === "signin" && (
+                  <form onSubmit={handleSignIn} className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold uppercase text-charcoal mb-1">Email Address</label>
+                      <input
+                        type="email"
+                        placeholder="your@email.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        className="w-full h-12 px-4 border border-[var(--divider)] rounded-xl text-charcoal focus:border-primary focus:outline-none text-sm transition"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="block text-xs font-bold uppercase text-charcoal">Password</label>
+                        <button
+                          type="button"
+                          onClick={() => { setTab("forgot"); setStatus("idle"); setErrorMsg(""); }}
+                          className="text-xs text-primary hover:underline"
+                        >
+                          Forgot password?
+                        </button>
+                      </div>
+                      <input
+                        type="password"
+                        placeholder="Password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        className="w-full h-12 px-4 border border-[var(--divider)] rounded-xl text-charcoal focus:border-primary focus:outline-none text-sm transition"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={status === "loading"}
+                      className="w-full h-12 rounded-xl bg-primary text-white font-bold text-sm hover:bg-primary/95 transition disabled:opacity-50"
+                    >
+                      {status === "loading" ? "Signing in..." : "Sign In"}
+                    </button>
+                  </form>
+                )}
+
+                {tab === "signup" && (
+                  <form onSubmit={handleSignUp} className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold uppercase text-charcoal mb-1">Full Name</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Taro Yamada"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        required
+                        className="w-full h-12 px-4 border border-[var(--divider)] rounded-xl text-charcoal focus:border-primary focus:outline-none text-sm transition"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold uppercase text-charcoal mb-1">Email Address</label>
+                      <input
+                        type="email"
+                        placeholder="your@email.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        className="w-full h-12 px-4 border border-[var(--divider)] rounded-xl text-charcoal focus:border-primary focus:outline-none text-sm transition"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold uppercase text-charcoal mb-1">Password</label>
+                        <input
+                          type="password"
+                          placeholder="Min 8 characters"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          required
+                          minLength={8}
+                          className="w-full h-12 px-4 border border-[var(--divider)] rounded-xl text-charcoal focus:border-primary focus:outline-none text-sm transition"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold uppercase text-charcoal mb-1">Confirm Password</label>
+                        <input
+                          type="password"
+                          placeholder="Repeat password"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          required
+                          minLength={8}
+                          className="w-full h-12 px-4 border border-[var(--divider)] rounded-xl text-charcoal focus:border-primary focus:outline-none text-sm transition"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold uppercase text-charcoal mb-1">Target JLPT Level</label>
+                      <select
+                        value={targetLevel}
+                        onChange={(e) => setTargetLevel(e.target.value)}
+                        className="w-full h-12 px-4 border border-[var(--divider)] rounded-xl text-charcoal focus:border-primary focus:outline-none text-sm bg-white"
+                      >
+                        <option value="N5">N5 (Beginner)</option>
+                        <option value="N4">N4 (Elementary)</option>
+                        <option value="N3">N3 (Intermediate)</option>
+                        <option value="N2">N2 (Upper Intermediate)</option>
+                        <option value="N1">N1 (Advanced)</option>
+                        <option value="Not Sure">Not sure yet</option>
+                      </select>
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={status === "loading"}
+                      className="w-full h-12 rounded-xl bg-primary text-white font-bold text-sm hover:bg-primary/95 transition disabled:opacity-50"
+                    >
+                      {status === "loading" ? "Creating account..." : "Create Free Account"}
+                    </button>
+                    <p className="text-[11px] text-secondary text-center">
+                      Free users can study 2 lessons daily. Upgrade anytime for unlimited access.
+                    </p>
+                  </form>
+                )}
+
+                {tab === "forgot" && (
+                  <form onSubmit={handleForgotPassword} className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold uppercase text-charcoal mb-1">Email Address</label>
+                      <input
+                        type="email"
+                        placeholder="your@email.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        className="w-full h-12 px-4 border border-[var(--divider)] rounded-xl text-charcoal focus:border-primary focus:outline-none text-sm transition"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={status === "loading"}
+                      className="w-full h-12 rounded-xl bg-primary text-white font-bold text-sm hover:bg-primary/95 transition disabled:opacity-50"
+                    >
+                      {status === "loading" ? "Sending link..." : "Send Reset Link"}
+                    </button>
+                    {status === "success" && (
+                      <p className="text-xs text-primary font-semibold text-center">{forgotSuccessMessage}</p>
+                    )}
+                  </form>
+                )}
+
+                {status === "error" && (
+                  <div className="mt-4 p-3 bg-[#FFF7F7] border border-primary/10 rounded-xl text-xs text-primary font-medium">
+                    {errorMsg}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="pt-6 border-t border-[var(--divider)] mt-8">
+              <Link href="/" className="text-xs font-bold text-secondary hover:text-charcoal flex items-center gap-1.5">
+                ← Back to home
+              </Link>
+            </div>
+          </div>
+
+          {/* Right Benefits Card */}
+          <div className="md:col-span-5 bg-white rounded-3xl p-8 border border-[var(--divider)] border-l-[3px] border-l-primary shadow-card flex flex-col justify-between">
+            <div className="space-y-6">
+              <h2 className="font-heading text-xl font-black text-charcoal">Your learning stays with you</h2>
+              <ul className="space-y-3">
+                {[
+                  "Continue where you left off",
+                  "Track your JLPT progress",
+                  "Earn XP, points, and badges",
+                  "Build your daily streak",
+                  "Access premium lessons if upgraded"
+                ].map((b, i) => (
+                  <li key={i} className="flex items-start gap-2.5 text-sm text-charcoal">
+                    <span className="text-primary font-bold">✓</span>
+                    <span>{b}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
 
-            {tab === "signin" && (
-              <>
-                {status === "success" ? (
-                  <p className="text-primary font-medium">Redirecting...</p>
-                ) : (
-                  <form onSubmit={handleSignIn} className="space-y-4">
-                    <input
-                      type="email"
-                      placeholder="your@email.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      className="w-full px-4 py-3 border-2 border-[var(--divider)] rounded-bento text-charcoal focus:border-primary focus:outline-none transition"
-                    />
-                    <input
-                      type="password"
-                      placeholder="Password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      className="w-full px-4 py-3 border-2 border-[var(--divider)] rounded-bento text-charcoal focus:border-primary focus:outline-none transition"
-                    />
-                    <p className="text-sm">
-                      <button
-                        type="button"
-                        onClick={() => { setTab("forgot"); setStatus("idle"); setErrorMsg(""); setForgotSuccessMessage(""); }}
-                        className="text-primary hover:underline"
-                      >
-                        Forgot password?
-                      </button>
-                    </p>
-                    <button type="submit" className="btn-primary w-full" disabled={status === "loading"}>
-                      {status === "loading" ? "Signing in..." : "Sign in"}
-                    </button>
-                    {status === "error" && (
-                      <p className="text-primary text-sm">{errorMsg}</p>
-                    )}
-                  </form>
-                )}
-              </>
-            )}
-
-            {tab === "signup" && (
-              <form onSubmit={handleSignUp} className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <input
-                    type="text"
-                    placeholder="First name"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-[var(--divider)] rounded-bento text-charcoal focus:border-primary focus:outline-none transition"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Last name"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-[var(--divider)] rounded-bento text-charcoal focus:border-primary focus:outline-none transition"
-                  />
-                </div>
-                <input
-                  type="email"
-                  placeholder="your@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="w-full px-4 py-3 border-2 border-[var(--divider)] rounded-bento text-charcoal focus:border-primary focus:outline-none transition"
-                />
-                <input
-                  type="password"
-                  placeholder="Password (min 8 characters)"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  minLength={8}
-                  className="w-full px-4 py-3 border-2 border-[var(--divider)] rounded-bento text-charcoal focus:border-primary focus:outline-none transition"
-                />
-                <input
-                  type="password"
-                  placeholder="Confirm password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                  minLength={8}
-                  className="w-full px-4 py-3 border-2 border-[var(--divider)] rounded-bento text-charcoal focus:border-primary focus:outline-none transition"
-                />
-                <button type="submit" className="btn-primary w-full" disabled={status === "loading"}>
-                  {status === "loading" ? "Creating account..." : "Sign up"}
-                </button>
-                {status === "error" && (
-                  <p className="text-primary text-sm">{errorMsg}</p>
-                )}
-              </form>
-            )}
-
-            {tab === "forgot" && (
-              <>
-                {status === "success" ? (
-                  <p className="text-primary font-medium">
-                    {forgotSuccessMessage}
-                  </p>
-                ) : (
-                  <form onSubmit={handleForgotPassword} className="space-y-4">
-                    <input
-                      type="email"
-                      placeholder="your@email.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      className="w-full px-4 py-3 border-2 border-[var(--divider)] rounded-bento text-charcoal focus:border-primary focus:outline-none transition"
-                    />
-                    <button type="submit" className="btn-primary w-full" disabled={status === "loading"}>
-                      {status === "loading" ? "Sending..." : "Send reset link"}
-                    </button>
-                    {status === "error" && (
-                      <p className="text-primary text-sm">{errorMsg}</p>
-                    )}
-                  </form>
-                )}
-              </>
-            )}
-
-            {tab === "magic" && (
-              <>
-                {isMagicSent ? (
-                  <p className="text-primary font-medium">
-                    Check your email for the login link. It expires in 1 hour.
-                  </p>
-                ) : (
-                  <form onSubmit={handleMagicLink} className="space-y-4">
-                    <input
-                      type="email"
-                      placeholder="your@email.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      className="w-full px-4 py-3 border-2 border-[var(--divider)] rounded-bento text-charcoal focus:border-primary focus:outline-none transition"
-                    />
-                    <button type="submit" className="btn-primary w-full" disabled={status === "loading"}>
-                      {status === "loading" ? "Sending..." : "Send magic link"}
-                    </button>
-                    {status === "error" && (
-                      <p className="text-primary text-sm">{errorMsg}</p>
-                    )}
-                  </form>
-                )}
-              </>
-            )}
-
-            <p className="text-secondary text-sm mt-8">
-              <Link href="/" className="hover:text-primary">← Back to home</Link>
-            </p>
+            <div className="pt-6 border-t border-[var(--divider)] mt-8">
+              <p className="text-xs text-secondary mb-1">Not sure your level?</p>
+              <Link href="/quiz" className="text-sm font-bold text-primary hover:underline flex items-center gap-1">
+                Take the placement quiz →
+              </Link>
+            </div>
           </div>
-          <div className="bento-span-2 bento-row-2 card flex flex-col justify-center bg-base border-[var(--divider)]">
-            <p className="text-secondary text-sm">
-              Sign in to access your progress, rewards, library, and more.
-            </p>
-          </div>
+
         </div>
       </div>
     </div>

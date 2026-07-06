@@ -49,10 +49,10 @@ export async function GET(req: NextRequest) {
           p.avatar_url,
           p.recommended_level,
           COALESCE(p.current_streak, 0)::int AS streak,
-          (SELECT COALESCE(SUM(e.points), 0)::int FROM reward_events e WHERE e.user_email = p.email) AS points
+          COALESCE(p.points, 0)::int AS points
         FROM profiles p
         WHERE p.show_on_scoreboard = TRUE
-          AND (COALESCE(p.current_streak, 0) > 0 OR (SELECT COALESCE(SUM(e.points), 0) FROM reward_events e WHERE e.user_email = p.email) > 0)
+          AND (COALESCE(p.current_streak, 0) > 0 OR COALESCE(p.points, 0) > 0)
         ORDER BY streak DESC, points DESC
         LIMIT ${limit}
       ` as Row[];
@@ -67,10 +67,10 @@ export async function GET(req: NextRequest) {
           p.avatar_url,
           p.recommended_level,
           COALESCE(p.current_streak, 0)::int AS streak,
-          (SELECT COALESCE(SUM(e.points), 0)::int FROM reward_events e WHERE e.user_email = p.email) AS points
+          COALESCE(p.points, 0)::int AS points
         FROM profiles p
         WHERE p.show_on_scoreboard = TRUE
-          AND (COALESCE(p.current_streak, 0) > 0 OR (SELECT COALESCE(SUM(e.points), 0) FROM reward_events e WHERE e.user_email = p.email) > 0)
+          AND (COALESCE(p.current_streak, 0) > 0 OR COALESCE(p.points, 0) > 0)
         ORDER BY points DESC, streak DESC
         LIMIT ${limit}
       ` as Row[];
