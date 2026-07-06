@@ -7,6 +7,7 @@ export function FeedbackWidget() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
+  const [website, setWebsite] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [error, setError] = useState("");
 
@@ -19,7 +20,7 @@ export function FeedbackWidget() {
       const res = await fetch("/api/feedback", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), email: email.trim(), message: message.trim() }),
+        body: JSON.stringify({ name: name.trim(), email: email.trim(), message: message.trim(), website }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -89,6 +90,16 @@ export function FeedbackWidget() {
                 placeholder="Email (optional)"
                 className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm text-charcoal placeholder-[#aaa] focus:outline-none focus:border-primary"
               />
+              {/* Honeypot field (visually hidden) */}
+              <div className="hidden" aria-hidden="true">
+                <input
+                  type="text"
+                  value={website}
+                  onChange={(e) => setWebsite(e.target.value)}
+                  tabIndex={-1}
+                  autoComplete="off"
+                />
+              </div>
               {error && <p className="text-red-500 text-xs">{error}</p>}
               <button
                 type="submit"

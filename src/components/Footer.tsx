@@ -34,8 +34,9 @@ const quickLinks = [
 
 const policyLinks = [
   { href: "/policies/privacy", label: "Privacy Policy" },
-  { href: "/policies/terms", label: "Terms" },
-  { href: "/policies/refunds", label: "Refund Policy" },
+  { href: "/policies/terms", label: "Terms of Service" },
+  { href: "/policies/refunds", label: "Cancellation & Refunds" },
+  { href: "/policies/cookies", label: "Cookie Policy" },
 ];
 
 export async function Footer() {
@@ -76,7 +77,7 @@ export async function Footer() {
               <span className="text-[15px]">Japanese with Avnish</span>
             </Link>
             <p className="text-white/60 text-[14px] leading-relaxed mb-5 max-w-[260px]">
-              Clean JLPT mastery system from N5 to N1. Bundles, AI tutor, placement quiz.
+              Clean JLPT mastery system from N5 to N1. Subscription plans, AI tutor, placement quiz.
             </p>
             <p className="text-white/50 text-[12px] mb-2">JLPT tips + updates. No spam.</p>
             <NewsletterForm variant="dark" />

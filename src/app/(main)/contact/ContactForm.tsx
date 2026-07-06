@@ -6,6 +6,8 @@ export function ContactForm() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
+  const [website, setWebsite] = useState("");
+  const [topic, setTopic] = useState("Billing & Subscriptions");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
@@ -18,7 +20,7 @@ export function ContactForm() {
       const res = await fetch("/api/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, message }),
+        body: JSON.stringify({ name, email, message: `[Topic: ${topic}] ${message}`, website }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -80,6 +82,24 @@ export function ContactForm() {
         />
       </div>
       <div>
+        <label htmlFor="contact-topic" className="block text-sm font-medium text-charcoal mb-1">
+          Inquiry Topic
+        </label>
+        <select
+          id="contact-topic"
+          value={topic}
+          onChange={(e) => setTopic(e.target.value)}
+          className="w-full px-4 py-2.5 border border-[var(--divider)] rounded-bento text-charcoal bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 text-sm"
+        >
+          <option value="Billing & Subscriptions">Billing &amp; Subscriptions</option>
+          <option value="Technical Issue">Technical Support</option>
+          <option value="Course Content / JLPT">Course Content &amp; JLPT</option>
+          <option value="Account Access">Account Access</option>
+          <option value="Partnership / Business">Partnership &amp; Business</option>
+          <option value="Other">Other / General Inquiry</option>
+        </select>
+      </div>
+      <div>
         <label htmlFor="contact-message" className="block text-sm font-medium text-charcoal mb-1">
           Message
         </label>
@@ -92,6 +112,19 @@ export function ContactForm() {
           rows={5}
           className="w-full px-4 py-2.5 border border-[var(--divider)] rounded-bento text-charcoal bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 resize-y"
           placeholder="Your message..."
+        />
+      </div>
+
+      {/* Honeypot field for anti-spam (visually hidden) */}
+      <div className="hidden" aria-hidden="true">
+        <label htmlFor="contact-website">Leave this field blank</label>
+        <input
+          id="contact-website"
+          type="text"
+          value={website}
+          onChange={(e) => setWebsite(e.target.value)}
+          tabIndex={-1}
+          autoComplete="off"
         />
       </div>
       {error && (

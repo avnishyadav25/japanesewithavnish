@@ -34,6 +34,7 @@ export function CheckoutForm({ product, compact = false, isPlan = false, currenc
   const [form, setForm] = useState({ name: "", email: "", phone: "", couponCode: "" });
   const [couponStatus, setCouponStatus] = useState<"idle" | "valid" | "invalid" | "checking">("idle");
   const [discountInfo, setDiscountInfo] = useState<{ discount_paise: number; final_paise: number } | null>(null);
+  const [agreedTerms, setAgreedTerms] = useState(false);
   const scriptLoaded = useRef(false);
 
   useEffect(() => {
@@ -70,6 +71,10 @@ export function CheckoutForm({ product, compact = false, isPlan = false, currenc
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!agreedTerms) {
+      setError("Please agree to the Terms of Service, Privacy Policy, and Refund Policy.");
+      return;
+    }
     setSubmitting(true);
     setError("");
     try {
@@ -229,11 +234,27 @@ export function CheckoutForm({ product, compact = false, isPlan = false, currenc
           />
           <p className="text-xs text-secondary mt-1">Required for payment.</p>
         </div>
-        <button type="submit" className="btn-primary w-full" disabled={submitting}>
+        <label className="flex items-start gap-2.5 cursor-pointer py-1">
+          <input
+            type="checkbox"
+            checked={agreedTerms}
+            onChange={(e) => setAgreedTerms(e.target.checked)}
+            className="mt-0.5 w-4 h-4 accent-primary rounded border-[var(--divider)] shrink-0"
+            required
+          />
+          <span className="text-[11px] text-secondary leading-relaxed">
+            I agree to the{" "}
+            <a href="/policies/terms" target="_blank" className="text-primary hover:underline font-semibold">Terms of Service</a>,{" "}
+            <a href="/policies/privacy" target="_blank" className="text-primary hover:underline font-semibold">Privacy Policy</a>,{" "}
+            and{" "}
+            <a href="/policies/refunds" target="_blank" className="text-primary hover:underline font-semibold">Refund Policy</a>.
+          </span>
+        </label>
+        <button type="submit" className="btn-primary w-full" disabled={submitting || !agreedTerms}>
           {submitting ? "..." : "Continue to payment"}
         </button>
         <p className="text-xs text-secondary mt-2">
-          By paying, you agree to our Terms &amp; Refund Policy (no refunds for digital products).
+          Payments are secure and encrypted. Recurring billing plans can be cancelled anytime.
         </p>
         {error && <p className="text-primary text-sm mt-2">{error}</p>}
       </form>

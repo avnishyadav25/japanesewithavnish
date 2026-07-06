@@ -18,6 +18,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [targetLevel, setTargetLevel] = useState("N5");
+  const [agreedTerms, setAgreedTerms] = useState(false);
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [forgotSuccessMessage, setForgotSuccessMessage] = useState("");
@@ -44,6 +45,11 @@ export default function LoginPage() {
 
   async function handleSignUp(e: React.FormEvent) {
     e.preventDefault();
+    if (!agreedTerms) {
+      setErrorMsg("Please agree to the Terms of Service and Privacy Policy.");
+      setStatus("error");
+      return;
+    }
     if (password !== confirmPassword) {
       setErrorMsg("Passwords do not match.");
       setStatus("error");
@@ -344,9 +350,23 @@ export default function LoginPage() {
                         <option value="Not Sure">Not sure yet</option>
                       </select>
                     </div>
+                    <label className="flex items-start gap-2.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={agreedTerms}
+                        onChange={(e) => setAgreedTerms(e.target.checked)}
+                        className="mt-0.5 w-4 h-4 accent-primary rounded border-[var(--divider)] shrink-0"
+                      />
+                      <span className="text-[11px] text-secondary leading-relaxed">
+                        I agree to the{" "}
+                        <a href="/policies/terms" target="_blank" className="text-primary hover:underline font-medium">Terms of Service</a>{" "}
+                        and{" "}
+                        <a href="/policies/privacy" target="_blank" className="text-primary hover:underline font-medium">Privacy Policy</a>
+                      </span>
+                    </label>
                     <button
                       type="submit"
-                      disabled={status === "loading"}
+                      disabled={status === "loading" || !agreedTerms}
                       className="w-full h-12 rounded-xl bg-primary text-white font-bold text-sm hover:bg-primary/95 transition disabled:opacity-50"
                     >
                       {status === "loading" ? "Creating account..." : "Create Free Account"}
