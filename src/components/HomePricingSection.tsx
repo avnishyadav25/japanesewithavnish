@@ -79,9 +79,9 @@ export function HomePricingSection({ plans, defaultCurrency = "INR" }: { plans: 
 
             const periodLabel =
               plan.billing_type === "monthly"
-                ? "/ month"
+                ? " 30-day access"
                 : plan.billing_type === "yearly"
-                ? "/ year"
+                ? " 365-day access"
                 : " lifetime access";
 
             return (
@@ -140,12 +140,12 @@ export function HomePricingSection({ plans, defaultCurrency = "INR" }: { plans: 
           })}
         </div>
 
-        {/* 7-Day Guarantee prop bar */}
+        {/* Fixed-duration access prop bar */}
         <div className="bg-white border border-[var(--divider)] rounded-3xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="text-center sm:text-left space-y-1">
-            <h4 className="font-heading text-xs font-bold text-charcoal">7-Day Free Trial Protection</h4>
+            <h4 className="font-heading text-xs font-bold text-charcoal">One-Time Fixed-Duration Access</h4>
             <p className="text-secondary text-[11px]">
-              Monthly and Yearly subscription passes include a 7-day free trial. Try all tools and lessons completely risk-free.
+              Monthly and Yearly passes are one-time purchases for 30-day and 365-day access. No automatic renewal.
             </p>
           </div>
           <div className="flex flex-col gap-0.5 items-center shrink-0">

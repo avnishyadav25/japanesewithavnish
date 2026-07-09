@@ -4,7 +4,7 @@ import { ContactForm } from "./ContactForm";
 
 export const metadata = {
   title: "Support Center | Japanese with Avnish",
-  description: "Need help with premium subscriptions, billing, your account, or learning content? Visit our Support Center.",
+  description: "Need help with premium passes, billing, your account, or learning content? Visit our Support Center.",
 };
 
 async function getContactEmail() {
@@ -17,8 +17,8 @@ async function getContactEmail() {
 
 const FAQS = [
   {
-    question: "How do I cancel my premium subscription?",
-    answer: "You can cancel your premium membership at any time by going to your <strong>Learn Dashboard</strong>, clicking on your profile dropdown in the top-right corner, selecting <strong>Account Settings</strong>, and clicking <strong>Cancel Subscription</strong>. Your premium access will continue until the end of your current billing period.",
+    question: "Do premium passes renew automatically?",
+    answer: "No. Premium passes are fixed-duration one-time purchases. A 30-day pass gives 30 days of access, a 365-day pass gives 365 days of access, and a Lifetime pass gives lifetime access subject to continued operation of the Service.",
   },
   {
     question: "What is your refund policy?",

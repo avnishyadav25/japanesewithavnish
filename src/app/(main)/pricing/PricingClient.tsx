@@ -79,9 +79,9 @@ export function PricingClient({ plans, defaultCurrency = "INR" }: { plans: Plan[
 
             const periodLabel =
               plan.billing_type === "monthly"
-                ? "/ month"
+                ? " 30-day access"
                 : plan.billing_type === "yearly"
-                ? "/ year"
+                ? " 365-day access"
                 : " lifetime access";
 
             return (
@@ -143,9 +143,9 @@ export function PricingClient({ plans, defaultCurrency = "INR" }: { plans: Plan[
         {/* Value Prop banner */}
         <div className="bg-[#FAF8F5] border border-[var(--divider)] rounded-3xl p-8 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="space-y-2 text-center md:text-left">
-            <h4 className="font-heading text-lg font-bold text-charcoal">7-Day Free Trial Available</h4>
+            <h4 className="font-heading text-lg font-bold text-charcoal">One-Time Fixed-Duration Access</h4>
             <p className="text-secondary text-sm leading-relaxed max-w-xl">
-              Monthly and Yearly plans include a 7-day free trial. Try all tools and lessons complete with practice quizzes, streaks, and scoreboards risk-free.
+              Monthly and Yearly passes are one-time purchases for 30-day and 365-day access. No automatic renewal or cancellation workflow needed.
             </p>
           </div>
           <div className="flex flex-col gap-1 items-center shrink-0">

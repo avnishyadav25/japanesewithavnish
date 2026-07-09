@@ -180,17 +180,17 @@ const POLICIES: Record<string, PolicyDef> = {
         heading: "Free & Premium Access",
         body: `<h3>Free Tier</h3>
         <p>All registered users receive free access to limited daily lessons, basic quizzes, the JLPT placement quiz, and selected blog content. Free access may be subject to daily limits (e.g., lessons per day, AI tutor queries).</p>
-        <h3>Premium Pass (Subscription)</h3>
-        <p>Premium subscribers receive unlimited access to all lessons, mock exams, advanced AI tutoring, writing practice, and streak freeze purchases. Premium plans are available as monthly, yearly, or lifetime subscriptions.</p>
-        <p>Subscription details, pricing, and billing terms are displayed on our <a href="/pricing" class="text-primary hover:underline">Pricing page</a> at the time of purchase. By subscribing, you authorize recurring charges to your payment method until you cancel.</p>`,
+        <h3>Premium Pass</h3>
+        <p>Premium pass holders receive access to all lessons, mock exams, advanced AI tutoring, writing practice, and streak freeze purchases for the pass duration purchased. Premium passes are available as 30-day, 365-day, or lifetime access.</p>
+        <p>Pass details, pricing, and access terms are displayed on our <a href="/pricing" class="text-primary hover:underline">Pricing page</a> at the time of purchase. Monthly and yearly passes are one-time purchases and do not renew automatically.</p>`,
       },
       {
         id: "billing",
         heading: "Billing & Payments",
         body: `<ul>
-          <li><strong>Monthly Plans:</strong> Charged on the same date each month. Cancel anytime; access continues until the end of the current billing period.</li>
-          <li><strong>Yearly Plans:</strong> Charged once annually. Cancel anytime; access continues until the end of the current annual period.</li>
-          <li><strong>Lifetime Plans:</strong> One-time payment granting indefinite premium access, subject to the continued operation of the Service.</li>
+          <li><strong>30-Day Passes:</strong> One-time payment granting 30 days of premium access.</li>
+          <li><strong>365-Day Passes:</strong> One-time payment granting 365 days of premium access.</li>
+          <li><strong>Lifetime Passes:</strong> One-time payment granting indefinite premium access, subject to the continued operation of the Service.</li>
         </ul>
         <p>Payments are processed securely by <strong>Stripe</strong> (international) and <strong>Razorpay</strong> (India). We do not store your payment card details. All prices are inclusive of applicable taxes unless stated otherwise.</p>
         <p>For cancellation and refund terms, see our <a href="/policies/refunds" class="text-primary hover:underline">Cancellation & Refund Policy</a>.</p>`,
@@ -280,36 +280,36 @@ const POLICIES: Record<string, PolicyDef> = {
   refunds: {
     title: "Cancellation & Refund Policy",
     description:
-      "How to cancel your subscription and our refund policy for Japanese with Avnish premium plans.",
+      "Refund policy for Japanese with Avnish premium passes and digital products.",
     sections: [
       {
         id: "overview",
         heading: "Overview",
-        body: `<p>We want you to be satisfied with your Japanese with Avnish experience. This policy outlines our cancellation and refund procedures for premium subscriptions and any one-time purchases.</p>`,
+        body: `<p>We want you to be satisfied with your Japanese with Avnish experience. This policy outlines our refund procedures for premium passes and one-time digital purchases.</p>`,
       },
       {
         id: "subscription-cancellation",
-        heading: "Subscription Cancellation",
-        body: `<p>You can cancel your premium subscription at any time. Here's what happens when you cancel:</p>
+        heading: "Premium Pass Access",
+        body: `<p>Premium passes are fixed-duration one-time purchases and do not renew automatically:</p>
         <table>
-          <thead><tr><th>Plan Type</th><th>What Happens on Cancellation</th></tr></thead>
+          <thead><tr><th>Pass Type</th><th>Access Duration</th></tr></thead>
           <tbody>
-            <tr><td><strong>Monthly</strong></td><td>Your premium access continues until the end of the current billing month. No further charges will be made.</td></tr>
-            <tr><td><strong>Yearly</strong></td><td>Your premium access continues until the end of the current annual billing period. No further charges will be made.</td></tr>
-            <tr><td><strong>Lifetime</strong></td><td>Lifetime plans cannot be "cancelled" as they are one-time purchases. Access continues indefinitely.</td></tr>
+            <tr><td><strong>30-Day</strong></td><td>Your premium access continues for 30 days from purchase.</td></tr>
+            <tr><td><strong>365-Day</strong></td><td>Your premium access continues for 365 days from purchase.</td></tr>
+            <tr><td><strong>Lifetime</strong></td><td>Lifetime access continues indefinitely, subject to continued operation of the Service.</td></tr>
           </tbody>
         </table>
-        <p>To cancel, visit your <strong>Account Settings</strong> or contact us at <a href="/contact" class="text-primary hover:underline">our support page</a>.</p>`,
+        <p>Because these passes do not renew automatically, there is no cancellation workflow for 30-day or 365-day passes.</p>`,
       },
       {
         id: "refund-policy",
         heading: "Refund Policy",
-        body: `<h3>Monthly Plans</h3>
-        <p>Monthly subscriptions are <strong>non-refundable</strong>. When you cancel, your access continues until the end of your current billing period, after which no further charges are made.</p>
-        <h3>Yearly Plans</h3>
-        <p>If you cancel within the <strong>first 7 days</strong> of your yearly subscription and have not completed more than 5 lessons, you may request a full refund. After 7 days, yearly plans are non-refundable, but your access continues until the period ends.</p>
-        <h3>Lifetime Plans</h3>
-        <p>Lifetime plans include a <strong>7-day cooling-off period</strong>. If you request a refund within 7 days of purchase and have not completed more than 5 lessons, we will issue a full refund. After 7 days, lifetime purchases are final and non-refundable.</p>
+        body: `<h3>30-Day Passes</h3>
+        <p>30-day premium passes are <strong>non-refundable</strong> once access has been granted.</p>
+        <h3>365-Day Passes</h3>
+        <p>If you request a refund within the <strong>first 7 days</strong> of purchase and have not completed more than 5 lessons, you may request a full refund. After 7 days, 365-day passes are non-refundable, but your access continues until the pass expires.</p>
+        <h3>Lifetime Passes</h3>
+        <p>Lifetime passes include a <strong>7-day cooling-off period</strong>. If you request a refund within 7 days of purchase and have not completed more than 5 lessons, we will issue a full refund. After 7 days, lifetime purchases are final and non-refundable.</p>
         <h3>One-Time Bundle Purchases (Legacy)</h3>
         <p>Due to the nature of digital products, all one-time digital bundle purchases are <strong>final and non-refundable</strong> once access has been granted.</p>`,
       },

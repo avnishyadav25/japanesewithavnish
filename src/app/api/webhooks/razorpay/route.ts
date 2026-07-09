@@ -10,7 +10,9 @@ const WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET;
 function verifySignature(body: string, signature: string): boolean {
   if (!WEBHOOK_SECRET) return false;
   const expected = crypto.createHmac("sha256", WEBHOOK_SECRET).update(body).digest("hex");
-  return expected === signature;
+  const expectedBuffer = Buffer.from(expected, "hex");
+  const receivedBuffer = Buffer.from(signature, "hex");
+  return expectedBuffer.length === receivedBuffer.length && crypto.timingSafeEqual(expectedBuffer, receivedBuffer);
 }
 
 export async function POST(req: NextRequest) {
@@ -30,9 +32,21 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ received: true });
       }
       const razorpayOrderId = paymentEntity.order_id;
-      const payRows = await sql`SELECT order_id FROM payments WHERE provider_payment_id = ${razorpayOrderId} LIMIT 1` as { order_id: string }[];
+      const payRows = await sql`
+        SELECT order_id FROM payments
+        WHERE provider_order_id = ${razorpayOrderId} OR provider_payment_id = ${razorpayOrderId}
+        LIMIT 1
+      ` as { order_id: string }[];
       const orderId = payRows[0]?.order_id ?? null;
       if (!orderId) return NextResponse.json({ received: true });
+      await sql`
+        UPDATE payments
+        SET status = 'failed',
+            provider_payment_id = COALESCE(provider_payment_id, ${paymentEntity.id}),
+            provider_order_id = COALESCE(provider_order_id, ${razorpayOrderId}),
+            raw_event_ref = ${event.id}
+        WHERE order_id = ${orderId}
+      `;
       const orderRows = await sql`SELECT user_email, user_name FROM orders WHERE id = ${orderId} LIMIT 1` as { user_email: string; user_name: string }[];
       const order = orderRows[0];
       if (!order) return NextResponse.json({ received: true });
@@ -66,7 +80,11 @@ export async function POST(req: NextRequest) {
 
     let orderId: string | null = notesOrderId || null;
     if (!orderId && razorpayOrderId) {
-      const payRows = await sql`SELECT order_id FROM payments WHERE provider_payment_id = ${razorpayOrderId} LIMIT 1` as { order_id: string }[];
+      const payRows = await sql`
+        SELECT order_id FROM payments
+        WHERE provider_order_id = ${razorpayOrderId} OR provider_payment_id = ${razorpayOrderId}
+        LIMIT 1
+      ` as { order_id: string }[];
       orderId = payRows[0]?.order_id ?? null;
     }
     if (!orderId) {
@@ -80,8 +98,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ received: true, idempotent: true });
     }
 
-    await sql`UPDATE payments SET raw_event_ref = ${event.id} WHERE order_id = ${orderId}`;
-    await fulfillOrder(orderId);
+    await sql`
+      UPDATE payments
+      SET status = 'captured',
+          provider_payment_id = ${paymentEntity.id},
+          provider_order_id = ${razorpayOrderId},
+          raw_event_ref = ${event.id},
+          captured_at = COALESCE(captured_at, NOW())
+      WHERE order_id = ${orderId}
+    `;
+    await fulfillOrder(orderId, { providerPaymentId: paymentEntity.id, providerOrderId: razorpayOrderId });
 
     return NextResponse.json({ received: true });
   } catch (e) {

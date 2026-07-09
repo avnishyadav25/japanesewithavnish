@@ -104,10 +104,6 @@ export async function POST(req: Request) {
       cancel_url: `${siteUrl}/pricing`,
     });
 
-    if (appliedCoupon) {
-      await sql`UPDATE coupons SET used_count = COALESCE(used_count, 0) + 1 WHERE code = ${appliedCoupon}`;
-    }
-
     await sql`
       INSERT INTO payments (order_id, provider_payment_id, status)
       VALUES (${orderId}, ${session.id}, 'created')

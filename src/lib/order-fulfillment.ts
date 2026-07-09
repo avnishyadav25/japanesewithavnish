@@ -7,18 +7,71 @@ import { addToSubscribers } from "@/lib/subscribers";
  * Mark order as paid, grant entitlements, add to subscribers, and send confirmation email.
  * Idempotent: no-op if order is already paid.
  */
-export async function fulfillOrder(orderId: string): Promise<void> {
+export async function fulfillOrder(
+  orderId: string,
+  options: { providerPaymentId?: string | null; providerOrderId?: string | null } = {}
+): Promise<void> {
   if (!sql) throw new Error("Database not configured");
 
   const orderRows = await sql`
-    SELECT id, user_email, user_name, status, plan_id, total_amount_paise, provider FROM orders WHERE id = ${orderId} LIMIT 1
-  ` as { id: string; user_email: string; user_name: string; status: string; plan_id: string | null; total_amount_paise: number; provider: string | null }[];
+    SELECT
+      o.id,
+      o.user_email,
+      o.user_name,
+      o.status,
+      o.plan_id,
+      o.total_amount_paise,
+      o.provider,
+      o.coupon_code,
+      p.provider_payment_id,
+      p.provider_order_id
+    FROM orders o
+    LEFT JOIN payments p ON p.order_id = o.id
+    WHERE o.id = ${orderId}
+    LIMIT 1
+  ` as {
+    id: string;
+    user_email: string;
+    user_name: string;
+    status: string;
+    plan_id: string | null;
+    total_amount_paise: number;
+    provider: string | null;
+    coupon_code: string | null;
+    provider_payment_id: string | null;
+    provider_order_id: string | null;
+  }[];
   const order = orderRows[0];
   if (!order) throw new Error("Order not found");
-  if (order.status === "paid") return;
 
-  await sql`UPDATE payments SET status = 'paid' WHERE order_id = ${orderId}`;
-  await sql`UPDATE orders SET status = 'paid' WHERE id = ${orderId}`;
+  const paidRows = await sql`
+    UPDATE orders
+    SET status = 'paid', updated_at = NOW()
+    WHERE id = ${orderId} AND status <> 'paid'
+    RETURNING id
+  ` as { id: string }[];
+
+  if (paidRows.length === 0) return;
+
+  const providerPaymentId = options.providerPaymentId || order.provider_payment_id || orderId;
+  const providerOrderId = options.providerOrderId || order.provider_order_id || null;
+
+  await sql`
+    UPDATE payments
+    SET status = 'paid',
+        provider_payment_id = COALESCE(provider_payment_id, ${providerPaymentId}),
+        provider_order_id = COALESCE(provider_order_id, ${providerOrderId}),
+        captured_at = COALESCE(captured_at, NOW())
+    WHERE order_id = ${orderId}
+  `;
+
+  if (order.coupon_code) {
+    await sql`
+      UPDATE coupons
+      SET used_count = COALESCE(used_count, 0) + 1
+      WHERE code = ${order.coupon_code}
+    `;
+  }
 
   const userEmail = order.user_email;
 
@@ -55,8 +108,9 @@ export async function fulfillOrder(orderId: string): Promise<void> {
 
       // Log subscription payment
       await sql`
-        INSERT INTO subscription_payments (user_email, subscription_id, plan_id, provider, provider_payment_id, amount, status, paid_at)
-        VALUES (${userEmail}, ${subId}, ${plan.id}, ${order.provider || 'razorpay'}, ${orderId}, ${order.total_amount_paise || 0}, 'paid', NOW())
+        INSERT INTO subscription_payments (user_email, subscription_id, plan_id, provider, provider_payment_id, provider_order_id, amount, status, paid_at)
+        VALUES (${userEmail}, ${subId}, ${plan.id}, ${order.provider || 'razorpay'}, ${providerPaymentId}, ${providerOrderId}, ${order.total_amount_paise || 0}, 'paid', NOW())
+        ON CONFLICT (provider_payment_id) DO NOTHING
       `;
 
       // Update student profile with subscription cache
@@ -117,6 +171,5 @@ export async function fulfillOrder(orderId: string): Promise<void> {
     console.info("[Fulfillment] Order confirmation email sent to", userEmail, "orderId", orderId);
   } catch (e) {
     console.error("[Fulfillment] Order confirmation email failed:", e instanceof Error ? e.message : e);
-    throw e;
   }
 }

@@ -44,7 +44,7 @@ export default async function AdminPaymentsPage({
       }
 
       if (searchQuery) {
-        conditions.push(`(o.user_email ILIKE $${paramIdx} OR o.provider_payment_id ILIKE $${paramIdx} OR o.coupon_code ILIKE $${paramIdx})`);
+        conditions.push(`(o.user_email ILIKE $${paramIdx} OR p.provider_payment_id ILIKE $${paramIdx} OR p.provider_order_id ILIKE $${paramIdx} OR o.coupon_code ILIKE $${paramIdx})`);
         params.push(`%${searchQuery}%`);
         paramIdx++;
       }
@@ -56,17 +56,18 @@ export default async function AdminPaymentsPage({
           o.id,
           o.user_email,
           o.provider,
-          o.provider_payment_id,
-          o.amount,
-          o.currency,
+          COALESCE(p.provider_payment_id, p.provider_order_id) AS provider_payment_id,
+          o.total_amount_paise AS amount,
+          CASE WHEN o.provider = 'stripe' THEN 'USD' ELSE 'INR' END AS currency,
           o.status,
           o.coupon_code,
-          o.discount_amount,
-          o.paid_at::text,
-          o.failed_reason,
+          o.discount_paise AS discount_amount,
+          p.captured_at::text AS paid_at,
+          NULL::text AS failed_reason,
           o.created_at::text,
           sp.name AS plan_name
         FROM orders o
+        LEFT JOIN payments p ON p.order_id = o.id
         LEFT JOIN subscription_plans sp ON sp.id = o.plan_id
         ${whereClause}
         ORDER BY o.created_at DESC

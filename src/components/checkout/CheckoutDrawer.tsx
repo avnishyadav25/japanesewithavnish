@@ -63,7 +63,7 @@ export function CheckoutDrawer({ open, onClose, product, isPlan = false, currenc
               <ul className="text-secondary text-sm space-y-1">
                 {isPlan ? (
                   <>
-                    <li>Instant unlimited access to N5-N1 lessons.</li>
+                    <li>Instant fixed-duration access to N5-N1 lessons.</li>
                     <li>Unlock all submodules and daily routines.</li>
                     <li>Full dashboard tracking with streaks and badges.</li>
                   </>

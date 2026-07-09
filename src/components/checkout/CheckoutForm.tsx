@@ -4,14 +4,56 @@ import { useState, useEffect, useRef } from "react";
 
 declare global {
   interface Window {
-    Razorpay?: new (options: Record<string, unknown>) => { open: () => void };
+    Razorpay?: new (options: Record<string, unknown>) => { open: () => void; on: (event: string, cb: (response: unknown) => void) => void };
   }
 }
+
+type RazorpaySuccessResponse = {
+  razorpay_payment_id: string;
+  razorpay_order_id: string;
+  razorpay_signature: string;
+};
+
+const RAZORPAY_CHECKOUT_SRC = "https://checkout.razorpay.com/v1/checkout.js";
+const RAZORPAY_FAILURE_GUIDANCE =
+  "Try UPI or a supported domestic test card. International cards may be unavailable for this Razorpay account.";
 
 /** Razorpay returns 400 when payload contains emojis. */
 function sanitizeForRazorpay(s: string): string {
   const noEmoji = s.replace(/[\uD83C-\uDBFF][\uDC00-\uDFFF]|[\u2600-\u27BF\uFE00-\uFE0F]/g, "").trim();
   return noEmoji || "Order";
+}
+
+function normalizeIndianContact(phone: string): string {
+  const trimmed = phone.trim();
+  if (trimmed.startsWith("+")) return trimmed;
+
+  const digits = trimmed.replace(/\D/g, "");
+  if (digits.length === 10) return `+91${digits}`;
+  if (digits.length === 12 && digits.startsWith("91")) return `+${digits}`;
+  return trimmed;
+}
+
+function loadRazorpayCheckout(): Promise<boolean> {
+  if (typeof window === "undefined") return Promise.resolve(false);
+  if (window.Razorpay) return Promise.resolve(true);
+
+  const existing = document.querySelector<HTMLScriptElement>(`script[src="${RAZORPAY_CHECKOUT_SRC}"]`);
+  if (existing) {
+    return new Promise((resolve) => {
+      existing.addEventListener("load", () => resolve(true), { once: true });
+      existing.addEventListener("error", () => resolve(false), { once: true });
+    });
+  }
+
+  return new Promise((resolve) => {
+    const script = document.createElement("script");
+    script.src = RAZORPAY_CHECKOUT_SRC;
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
 }
 
 export type CheckoutProduct = {
@@ -35,16 +77,13 @@ export function CheckoutForm({ product, compact = false, isPlan = false, currenc
   const [couponStatus, setCouponStatus] = useState<"idle" | "valid" | "invalid" | "checking">("idle");
   const [discountInfo, setDiscountInfo] = useState<{ discount_paise: number; final_paise: number } | null>(null);
   const [agreedTerms, setAgreedTerms] = useState(false);
-  const scriptLoaded = useRef(false);
+  const scriptPromise = useRef<Promise<boolean> | null>(null);
 
   useEffect(() => {
     if (currency === "USD") return; // Stripe handles its own checkout hosted UI script
-    if (scriptLoaded.current) return;
-    const script = document.createElement("script");
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.async = true;
-    document.body.appendChild(script);
-    scriptLoaded.current = true;
+    if (!scriptPromise.current) {
+      scriptPromise.current = loadRazorpayCheckout();
+    }
   }, [currency]);
 
   async function handleApplyCoupon() {
@@ -99,6 +138,11 @@ export function CheckoutForm({ product, compact = false, isPlan = false, currenc
         throw new Error("Invalid session url returned");
       }
 
+      const checkoutLoaded = await (scriptPromise.current || loadRazorpayCheckout());
+      if (!checkoutLoaded || !window.Razorpay) {
+        throw new Error("Payment checkout could not load. Please refresh and try again.");
+      }
+
       const res = await fetch("/api/checkout/create-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -127,21 +171,48 @@ export function CheckoutForm({ product, compact = false, isPlan = false, currenc
         name: data.name ?? "Japanese with Avnish",
         description: sanitizeForRazorpay(String(data.description ?? "Order")),
         order_id: data.razorpayOrderId,
-        handler: function () {
+        handler: async function (response: RazorpaySuccessResponse) {
+          const verifyRes = await fetch("/api/verify-payment", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              orderId: data.orderId,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_signature: response.razorpay_signature,
+            }),
+          });
+          const verifyData = await verifyRes.json();
+          if (!verifyRes.ok || !verifyData.success) {
+            setError(verifyData.error || "Payment verification failed. Please contact support.");
+            setSubmitting(false);
+            return;
+          }
           window.location.href = `${siteUrl}/thank-you?order=${data.orderId}`;
+        },
+        modal: {
+          ondismiss: function () {
+            setError("Payment was cancelled. You can try again when ready.");
+            setSubmitting(false);
+          },
         },
         prefill: {
           name: sanitizeForRazorpay(form.name),
           email: form.email,
-          contact: form.phone,
+          contact: normalizeIndianContact(form.phone),
         },
       };
 
-      const rz = new (window as Window & { Razorpay: new (o: typeof options) => { open: () => void } }).Razorpay(options);
+      const rz = new window.Razorpay(options);
+      rz.on("payment.failed", function (response: unknown) {
+        const paymentError = response as { error?: { description?: string; reason?: string } };
+        const message = paymentError.error?.description || paymentError.error?.reason || "Payment failed. Please try again.";
+        setError(`${message} ${RAZORPAY_FAILURE_GUIDANCE}`);
+        setSubmitting(false);
+      });
       rz.open();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Checkout failed");
-    } finally {
       setSubmitting(false);
     }
   }
@@ -251,10 +322,10 @@ export function CheckoutForm({ product, compact = false, isPlan = false, currenc
           </span>
         </label>
         <button type="submit" className="btn-primary w-full" disabled={submitting || !agreedTerms}>
-          {submitting ? "..." : "Continue to payment"}
+          {submitting ? "Opening payment..." : "Continue to payment"}
         </button>
         <p className="text-xs text-secondary mt-2">
-          Payments are secure and encrypted. Recurring billing plans can be cancelled anytime.
+          Payments are secure and encrypted. Premium passes are one-time fixed-duration purchases.
         </p>
         {error && <p className="text-primary text-sm mt-2">{error}</p>}
       </form>

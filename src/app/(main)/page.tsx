@@ -119,7 +119,7 @@ async function FullHomeView() {
             </div>
 
             <div className="flex flex-wrap gap-5 text-[11px] font-medium text-white/50 pt-2">
-              {["7-Day Free Trial", "Structured Pathways", "Secure checkout"].map((t) => (
+              {["Fixed-duration passes", "Structured Pathways", "Secure checkout"].map((t) => (
                 <span key={t} className="flex items-center gap-1.5">
                   <span className="text-[#C8A35F]">✓</span> {t}
                 </span>
