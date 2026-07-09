@@ -1,16 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 
-const SALES_ROUTES = [
-  "/store",
-  "/product",
-  "/checkout",
-  "/order",
-  "/library",
-  "/thank-you",
-  "/payment-pending",
-  "/payment-failed",
-];
+// Bundle store stays hidden until the one-time-purchase flow relaunches.
+// Order/checkout/thank-you/payment routes must stay public — the
+// subscription checkout redirects buyers through them.
+const SALES_ROUTES = ["/store", "/product"];
 
 async function isAdminRequest(request: NextRequest): Promise<boolean> {
   const token = request.cookies.get("auth_session")?.value;

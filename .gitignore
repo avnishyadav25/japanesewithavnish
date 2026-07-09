@@ -41,6 +41,8 @@ supabase/.branches
 *.tsbuildinfo
 next-env.d.ts
 docs/
+google-cloud-sdk/
+google-cloud-cli-*.tar.gz
 
 # backups
 /backups

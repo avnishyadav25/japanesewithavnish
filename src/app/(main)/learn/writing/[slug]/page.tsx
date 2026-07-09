@@ -1,51 +1,19 @@
 import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
 import { WritingPracticeClient } from "../WritingPracticeClient";
+import { resolveWritingSet } from "@/lib/learn/writing-sets";
 
 interface Props {
   params: Promise<{ slug: string }>;
 }
 
-const SET_MAP: Record<string, { title: string; type: "hiragana" | "katakana" | "kanji"; chars: string[]; desc: string }> = {
-  "hiragana-a-row": {
-    title: "Hiragana A Row",
-    type: "hiragana",
-    chars: ["あ", "い", "う", "え", "お"],
-    desc: "Practice the foundational Hiragana vowel characters (A, I, U, E, O) with correct stroke order.",
-  },
-  "hiragana-k-row": {
-    title: "Hiragana K Row",
-    type: "hiragana",
-    chars: ["か", "き", "く", "け", "こ"],
-    desc: "Practice K-row Hiragana sounds (KA, KI, KU, KE, KO) with stroke order tracing guides.",
-  },
-  "hiragana-s-row": {
-    title: "Hiragana S Row",
-    type: "hiragana",
-    chars: ["さ", "し", "す", "せ", "そ"],
-    desc: "Practice S-row Hiragana sounds (SA, SHI, SU, SE, SO) with interactive guides.",
-  },
-  "katakana-basics": {
-    title: "Katakana Basics",
-    type: "katakana",
-    chars: ["ア", "イ", "ウ", "エ", "オ"],
-    desc: "Practice standard beginner Katakana sounds (A, I, U, E, O) with brush stroke tracing canvas.",
-  },
-  "basic-kanji-numbers": {
-    title: "Basic Kanji Numbers",
-    type: "kanji",
-    chars: ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"],
-    desc: "Learn and practice tracing basic numbers 1 through 10 in Kanji characters.",
-  },
-};
-
 export default async function WritingDetailPage({ params }: Props) {
   const { slug } = await params;
   const session = await getSession();
 
-  const activeSet = SET_MAP[slug] || {
+  const activeSet = (await resolveWritingSet(slug)) || {
     title: slug.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" "),
-    type: "kanji",
+    type: "kanji" as const,
     chars: [slug.charAt(0)],
     desc: `Practice tracing "${slug}" stroke sequences on drawing canvas.`,
   };

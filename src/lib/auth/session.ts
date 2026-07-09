@@ -1,7 +1,12 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 
-const SECRET = process.env.ACCESS_TOKEN_SECRET || "fallback-change-in-production";
+const SECRET = process.env.ACCESS_TOKEN_SECRET;
+if (!SECRET) {
+  throw new Error(
+    "ACCESS_TOKEN_SECRET is not set. Sessions cannot be signed without it."
+  );
+}
 const SECRET_KEY = new TextEncoder().encode(SECRET);
 const COOKIE_NAME = "auth_session";
 const EXPIRY_HOURS = 24 * 7; // 7 days

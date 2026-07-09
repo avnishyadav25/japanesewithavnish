@@ -1,48 +1,6 @@
 import Link from "next/link";
 import { LearnBundleCta } from "@/components/learn/LearnBundleCta";
-
-const SETS = [
-  {
-    slug: "hiragana-a-row",
-    title: "Hiragana A Row",
-    level: "N5",
-    charsCount: 5,
-    desc: "Practice stroke order guides for vowels (あ, い, う, え, お).",
-    label: "characters",
-  },
-  {
-    slug: "hiragana-k-row",
-    title: "Hiragana K Row",
-    level: "N5",
-    charsCount: 5,
-    desc: "Practice KA, KI, KU, KE, KO character sequences.",
-    label: "characters",
-  },
-  {
-    slug: "hiragana-s-row",
-    title: "Hiragana S Row",
-    level: "N5",
-    charsCount: 5,
-    desc: "Practice SA, SHI, SU, SE, SO character sequences.",
-    label: "characters",
-  },
-  {
-    slug: "katakana-basics",
-    title: "Katakana Basics",
-    level: "N5",
-    charsCount: 5,
-    desc: "Brush stroke practices for vowels (ア, イ, ウ, エ, オ).",
-    label: "characters",
-  },
-  {
-    slug: "basic-kanji-numbers",
-    title: "Basic Kanji Numbers",
-    level: "N5",
-    charsCount: 10,
-    desc: "Learn tracing number characters (一 through 十).",
-    label: "kanji",
-  },
-];
+import { getWritingSetsForLevel } from "@/lib/learn/writing-sets";
 
 export const metadata = {
   title: "Writing Practice | Japanese with Avnish",
@@ -58,13 +16,12 @@ export default async function LearnWritingPage({
   const level = (sp?.level || "n5").toLowerCase();
   const search = (sp?.search || "").toLowerCase().trim();
 
-  // Filter sets by level & search query
-  const filteredSets = SETS.filter((s) => {
-    const matchesLevel = s.level.toLowerCase() === level;
-    const matchesSearch =
-      !search || s.title.toLowerCase().includes(search) || s.desc.toLowerCase().includes(search);
-    return matchesLevel && matchesSearch;
-  });
+  // Kana rows + DB-driven kanji sets for the selected level
+  const levelSets = await getWritingSetsForLevel(level);
+  const filteredSets = levelSets.filter(
+    (s) =>
+      !search || s.title.toLowerCase().includes(search) || s.desc.toLowerCase().includes(search)
+  );
 
   const levelsInfo = [
     { code: "n5", title: "N5", label: "Beginner" },
@@ -142,7 +99,7 @@ export default async function LearnWritingPage({
           <div className="space-y-4">
             <h2 className="font-heading text-xl font-bold text-charcoal">Recommended writing practice</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {SETS.slice(0, 3).map((item) => (
+              {levelSets.slice(0, 3).map((item) => (
                 <Link
                   key={item.slug}
                   href={`/learn/writing/${item.slug}`}
@@ -150,7 +107,7 @@ export default async function LearnWritingPage({
                 >
                   <div>
                     <span className="text-[10px] font-bold text-primary bg-[#FFF7F7] border border-primary/15 px-2.5 py-0.5 rounded-full uppercase">
-                      {item.level} • Writing • {item.charsCount} {item.label}
+                      {item.level} • Writing • {item.chars.length} {item.type === "kanji" ? "kanji" : "characters"}
                     </span>
                     <h3 className="font-heading text-base font-bold text-charcoal mt-3 group-hover:text-primary transition">{item.title}</h3>
                     <p className="text-secondary text-xs mt-1 leading-relaxed line-clamp-2">{item.desc}</p>
@@ -180,7 +137,7 @@ export default async function LearnWritingPage({
                 >
                   <div>
                     <span className="text-[10px] font-bold text-secondary bg-base border border-[var(--divider)] px-2.5 py-0.5 rounded-full uppercase">
-                      {item.level} • Writing • {item.charsCount} {item.label}
+                      {item.level} • Writing • {item.chars.length} {item.type === "kanji" ? "kanji" : "characters"}
                     </span>
                     <h3 className="font-heading text-base font-bold text-charcoal mt-3 group-hover:text-primary transition">{item.title}</h3>
                     <p className="text-secondary text-xs mt-1 leading-relaxed line-clamp-2">{item.desc}</p>

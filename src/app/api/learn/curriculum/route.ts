@@ -276,7 +276,8 @@ export async function GET(req: Request) {
       }
     }
 
-    const isLocalTest = process.env.LOCALTEST === "true";
+    const isLocalTest =
+      process.env.NODE_ENV !== "production" && process.env.LOCALTEST === "true";
     const isLoggedIn = isLocalTest || !!session?.email;
 
     const payload = pathOnly
