@@ -37,8 +37,40 @@ export function PricingClient({ plans, defaultCurrency = "INR" }: { plans: Plan[
             Unlock Unlimited Japanese Learning
           </h1>
           <p className="text-secondary text-base sm:text-lg leading-relaxed">
-            Choose a premium pass to bypass daily lesson limits, access advanced mock exams, and build your daily routine tools.
+            Start free for life with 2 modules daily. Each module includes multiple chapters and lessons, so you can keep learning Japanese every day within the free access limit.
           </p>
+        </div>
+
+        <div className="bg-white border border-[var(--divider)] rounded-3xl p-6 sm:p-8 shadow-card">
+          <div className="grid gap-5 md:grid-cols-[1.2fr_0.8fr] md:items-center">
+            <div className="space-y-2">
+              <p className="text-xs font-black uppercase tracking-widest text-[#D0021B]">
+                Free for life
+              </p>
+              <h2 className="font-heading text-2xl font-black text-charcoal">
+                Learn Japanese every day without paying
+              </h2>
+              <p className="text-secondary text-sm leading-relaxed font-black">
+                Free users can access 2 modules daily, and every module contains multiple chapters and lessons. Premium Pass is only for learners who want unlimited daily lesson access.
+              </p>
+            </div>
+            <div className="rounded-2xl bg-[#FFF7F7] border border-[#D0021B]/15 p-5">
+              <ul className="space-y-3 text-sm text-secondary">
+                <li className="flex gap-2">
+                  <span className="font-bold text-[#D0021B]">✓</span>
+                  <span>2 free modules every day</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="font-bold text-[#D0021B]">✓</span>
+                  <span>Multiple chapters and lessons inside each module</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="font-bold text-[#D0021B]">✓</span>
+                  <span>Premium unlocks unlimited daily lesson access</span>
+                </li>
+              </ul>
+            </div>
+          </div>
         </div>
 
         {/* Currency Toggle Switcher */}

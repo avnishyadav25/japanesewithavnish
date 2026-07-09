@@ -539,7 +539,7 @@ export function CurriculumBrowserClient() {
                                       href={`/learn/curriculum/lesson/${les.slug || les.id}`}
                                       className="px-4 py-2 bg-[#D0021B] hover:bg-[#D0021B]/95 text-white text-xs font-bold rounded-xl transition duration-150 text-center shadow-xs shrink-0"
                                     >
-                                      Study Lesson
+                                      {completed ? "Study Again" : "Study Lesson"}
                                     </Link>
                                   </div>
 

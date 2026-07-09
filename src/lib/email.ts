@@ -50,6 +50,14 @@ async function sendMail(to: string, subject: string, html: string): Promise<{ id
   }
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 export async function getProductsForEmail(): Promise<EmailProduct[]> {
   try {
     if (!sql) return [];
@@ -74,17 +82,32 @@ export async function sendMagicLink(email: string, magicLinkUrl: string) {
 }
 
 export async function sendPasswordResetEmail(email: string, resetLink: string) {
+  const content = `
+    <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">Hi there,</p>
+    <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">We received a request to reset the password for your Japanese with Avnish account.</p>
+    <p style="margin:0 0 20px;"><a href="${resetLink}" style="background:#D0021B;color:white;padding:12px 26px;text-decoration:none;border-radius:8px;display:inline-block;font-weight:700;">Reset your password</a></p>
+    <p style="font-size:14px;line-height:1.6;margin:0 0 12px;color:#555;">This secure link expires in 1 hour.</p>
+    <p style="font-size:14px;line-height:1.6;margin:0;color:#555;">If you did not request this, you can ignore this email. Your password will not change.</p>
+    <p style="font-size:14px;line-height:1.6;margin:18px 0 0;">— Japanese with Avnish</p>
+  `;
   return sendMail(
     email,
     "Reset your password — Japanese with Avnish",
-    `
-      <p>We received a request to reset your password.</p>
-      <p><a href="${resetLink}" style="color:#D0021B;font-weight:600;">Reset your password</a></p>
-      <p>This link expires in 1 hour.</p>
-      <p>If you didn't request this, you can ignore this email. Your password will not change.</p>
-      <p style="margin-top:16px;">— Japanese with Avnish</p>
-    `
+    emailWrapper(content, "")
   );
+}
+
+export async function sendEmailVerificationEmail(email: string, verifyLink: string, name?: string | null) {
+  const displayName = escapeHtml(name?.trim() || "there");
+  const content = `
+    <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">Hi ${displayName},</p>
+    <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">Welcome to Japanese with Avnish. Please verify your email so we know where to send account and learning updates.</p>
+    <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">Your free account includes 2 lessons daily. Premium passes unlock unlimited lessons whenever you are ready.</p>
+    <p style="margin:0 0 20px;"><a href="${verifyLink}" style="background:#D0021B;color:white;padding:12px 26px;text-decoration:none;border-radius:8px;display:inline-block;font-weight:700;">Verify email address</a></p>
+    <p style="font-size:14px;line-height:1.6;margin:0;color:#555;">This link expires in 24 hours. If you did not create this account, you can ignore this email.</p>
+    <p style="font-size:14px;line-height:1.6;margin:18px 0 0;">— Japanese with Avnish</p>
+  `;
+  return sendMail(email, "Verify your email — Japanese with Avnish", emailWrapper(content, ""));
 }
 
 export type OrderConfirmationOptions = {

@@ -8,12 +8,14 @@ import { usePathname } from "next/navigation";
 const accountMenuItems = [
   { href: "/learn/dashboard", label: "My progress" },
   { href: "/scoreboard", label: "Scoreboard" },
-  { href: "/library", label: "My Order" },
-  { href: "/account", label: "My Settings" },
+  { href: "/badge", label: "Badges" },
+  { href: "/library", label: "My Library" },
+  { href: "/account", label: "Edit Profile" },
 ];
 
 const topNavLinks = [
   { href: "/", label: "Home" },
+  { href: "/pricing", label: "Pricing" },
   { href: "/blog", label: "Blog" },
   { href: "/contact", label: "Contact" },
 ];
@@ -264,7 +266,7 @@ export function Header({ isAdmin = false }: { isAdmin?: boolean }) {
                       Dashboard
                     </Link>
                     <Link
-                      href="/scoreboard"
+                      href="/learn/dashboard"
                       className="block px-4 py-2 text-[#555] hover:bg-[#FAF8F5] hover:text-primary text-sm font-medium transition-colors"
                       onClick={() => setAccountOpen(false)}
                     >
@@ -285,7 +287,7 @@ export function Header({ isAdmin = false }: { isAdmin?: boolean }) {
                       Curriculum
                     </Link>
                     <Link
-                      href="/scoreboard"
+                      href="/badge"
                       className="block px-4 py-2 text-[#555] hover:bg-[#FAF8F5] hover:text-primary text-sm font-medium transition-colors"
                       onClick={() => setAccountOpen(false)}
                     >
@@ -303,7 +305,7 @@ export function Header({ isAdmin = false }: { isAdmin?: boolean }) {
                       className="block px-4 py-2 text-[#555] hover:bg-[#FAF8F5] hover:text-primary text-sm font-medium transition-colors border-b border-[var(--divider)] pb-2 mb-1"
                       onClick={() => setAccountOpen(false)}
                     >
-                      Settings
+                      Edit Profile
                     </Link>
                     {!isPremium && (
                       <Link
@@ -445,7 +447,7 @@ export function Header({ isAdmin = false }: { isAdmin?: boolean }) {
                   Edit profile
                 </Link>
                 {
-                  accountMenuItems.filter(i => i.href !== "/library").map((item) => (
+                  accountMenuItems.filter(i => i.href !== "/library" && i.href !== "/account").map((item) => (
                     <Link
                       key={item.href + item.label}
                       href={item.href}

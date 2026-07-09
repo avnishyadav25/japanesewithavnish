@@ -17,18 +17,20 @@ export async function GET() {
     });
   }
   try {
-    let profile: { email: string; recommended_level: string | null; display_name: string | null; current_streak?: number; longest_streak?: number; xp?: number; points?: number; streak_freezes?: number; premium_until?: string | null; is_lifetime?: boolean; subscription_status?: string | null; trial_ends_at?: string | null } | null = null;
+    let profile: { email: string; recommended_level: string | null; display_name: string | null; current_streak?: number; longest_streak?: number; xp?: number; points?: number; streak_freezes?: number; premium_until?: string | null; is_lifetime?: boolean; subscription_status?: string | null; trial_ends_at?: string | null; email_verified_at?: string | null; verification_sent_at?: string | null } | null = null;
     try {
       const profileRows = await sql`
         SELECT
           p.email, p.recommended_level, p.display_name, p.current_streak, p.longest_streak, p.xp, p.points, p.streak_freezes,
           p.premium_until::text as premium_until, p.is_lifetime,
-          us.status as subscription_status, us.trial_ends_at::text as trial_ends_at
+          us.status as subscription_status, us.trial_ends_at::text as trial_ends_at,
+          ua.email_verified_at::text as email_verified_at, ua.verification_sent_at::text as verification_sent_at
         FROM profiles p
         LEFT JOIN user_subscriptions us ON us.user_email = p.email AND us.status = 'trialing'
+        LEFT JOIN user_auth ua ON ua.email = p.email
         WHERE p.email = ${session.email}
         LIMIT 1
-      ` as { email: string; recommended_level: string | null; display_name: string | null; current_streak?: number; longest_streak?: number; xp?: number; points?: number; streak_freezes?: number; premium_until?: string | null; is_lifetime?: boolean; subscription_status?: string | null; trial_ends_at?: string | null }[];
+      ` as { email: string; recommended_level: string | null; display_name: string | null; current_streak?: number; longest_streak?: number; xp?: number; points?: number; streak_freezes?: number; premium_until?: string | null; is_lifetime?: boolean; subscription_status?: string | null; trial_ends_at?: string | null; email_verified_at?: string | null; verification_sent_at?: string | null }[];
       profile = profileRows[0] ?? null;
     } catch (e) {
       console.error("progress profile load error:", e);
@@ -116,7 +118,9 @@ export async function GET() {
         premium_until: profile.premium_until,
         is_lifetime: profile.is_lifetime,
         subscription_status: profile.subscription_status,
-        trial_ends_at: profile.trial_ends_at
+        trial_ends_at: profile.trial_ends_at,
+        email_verified_at: profile.email_verified_at,
+        verification_sent_at: profile.verification_sent_at
       } : null,
       stats: { learnedCount, dueCount, rewardCount, currentStreak: profile?.current_streak ?? 0, longestStreak: profile?.longest_streak ?? 0, totalPoints: profile?.points ?? totalPoints, pointsToday, lessonsCompleted },
       curriculum: { nextLesson, lessonsCompleted },

@@ -27,38 +27,31 @@ export default async function LibraryPage() {
           <div className="bento-grid">
             <div className="bento-span-4 bento-row-2 card flex flex-col justify-center">
               <h1 className="font-heading text-3xl sm:text-4xl font-bold text-charcoal mb-2">
-                Access Store
+                My Library
               </h1>
               <p className="text-secondary mb-6">
-                Enter your email to receive a magic link. No password needed.
+                Please log in to see completed lessons, review queue, and purchases.
               </p>
               <p className="text-secondary text-sm mb-4">
-                We&apos;ll send a secure one-time link to log you in and open
-                your purchases.
+                Your library is built from lessons you study and items you add for review.
               </p>
               <p className="text-secondary text-sm">
                 <Link
                   href="/login?redirect=/library"
                   className="btn-primary inline-block mt-4"
                 >
-                  Send Magic Link
+                  Log in
                 </Link>
-              </p>
-              <p className="text-secondary text-xs mt-4">
-                Purchased but used a different email? Use that email on the
-                magic link screen. If payment failed, check the payment
-                confirmation or contact support.
               </p>
             </div>
             <div className="bento-span-2 bento-row-2 card flex flex-col justify-center bg-base border-[var(--divider)]">
               <h2 className="font-heading text-lg font-semibold text-charcoal mb-2">
-                How library access works
+                What shows here
               </h2>
               <ul className="text-secondary text-sm space-y-1">
-                <li>Secure magic link login (no passwords stored).</li>
-                <li>Lifetime access to your purchased bundles.</li>
-                <li>Re-download PDFs and audio anytime.</li>
-                <li>Need help? Use the support email on the site.</li>
+                <li>Completed lessons for study again.</li>
+                <li>Items added to your review queue.</li>
+                <li>Purchased bundles and downloads.</li>
               </ul>
             </div>
           </div>
@@ -66,10 +59,10 @@ export default async function LibraryPage() {
           <>
             <div className="mb-10">
               <h1 className="font-heading text-3xl sm:text-4xl font-bold text-charcoal mb-2">
-                Store
+                My Library
               </h1>
               <p className="text-secondary">
-                Your purchased bundles and downloads.
+                Completed lessons, review queue, and purchases.
               </p>
             </div>
             <LibraryContent userEmail={email} />

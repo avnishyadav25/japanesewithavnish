@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { getSession } from "@/lib/auth/session";
 
-const DEFAULT_LIMIT = 20;
+const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 50;
 
 export type ScoreboardEntry = {
@@ -36,10 +37,13 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const limit = Math.min(MAX_LIMIT, Math.max(1, parseInt(searchParams.get("limit") || String(DEFAULT_LIMIT), 10)));
   const type = searchParams.get("type") || "both";
+  const session = await getSession();
 
   try {
     let byStreak: ScoreboardEntry[] = [];
     let byPoints: ScoreboardEntry[] = [];
+    let myStreakRank: ScoreboardEntry | null = null;
+    let myPointsRank: ScoreboardEntry | null = null;
 
     if (type === "streaks" || type === "both") {
       const rows = await sql`
@@ -77,9 +81,56 @@ export async function GET(req: NextRequest) {
       byPoints = toEntries(rows ?? []);
     }
 
+    if (session?.email) {
+      const myRows = await sql`
+        SELECT
+          p.email,
+          p.display_name,
+          p.avatar_url,
+          p.recommended_level,
+          COALESCE(p.current_streak, 0)::int AS streak,
+          COALESCE(p.points, 0)::int AS points,
+          (
+            SELECT COUNT(*)::int + 1
+            FROM profiles other
+            WHERE other.show_on_scoreboard = TRUE
+              AND (COALESCE(other.current_streak, 0), COALESCE(other.points, 0), other.email)
+                > (COALESCE(p.current_streak, 0), COALESCE(p.points, 0), p.email)
+          ) AS streak_rank,
+          (
+            SELECT COUNT(*)::int + 1
+            FROM profiles other
+            WHERE other.show_on_scoreboard = TRUE
+              AND (COALESCE(other.points, 0), COALESCE(other.current_streak, 0), other.email)
+                > (COALESCE(p.points, 0), COALESCE(p.current_streak, 0), p.email)
+          ) AS points_rank
+        FROM profiles p
+        WHERE p.email = ${session.email}
+        LIMIT 1
+      ` as (Row & { streak_rank: number; points_rank: number })[];
+
+      const mine = myRows[0];
+      if (mine) {
+        const base = {
+          email: mine.email,
+          displayName: mine.display_name?.trim() ? mine.display_name : "You",
+          avatarUrl: mine.avatar_url?.trim() || null,
+          level: mine.recommended_level,
+          streak: mine.streak,
+          points: mine.points,
+        };
+        myStreakRank = { ...base, rank: mine.streak_rank };
+        myPointsRank = { ...base, rank: mine.points_rank };
+      }
+    }
+
     const res = NextResponse.json({
       byStreak: type === "points" ? [] : byStreak,
       byPoints: type === "streaks" ? [] : byPoints,
+      me: {
+        byStreak: type === "points" ? null : myStreakRank,
+        byPoints: type === "streaks" ? null : myPointsRank,
+      },
     });
     res.headers.set("Cache-Control", "public, s-maxage=300, stale-while-revalidate=120");
     return res;
@@ -88,4 +139,3 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ byStreak: [], byPoints: [] });
   }
 }
-

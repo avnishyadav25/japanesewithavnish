@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { hashPassword } from "@/lib/auth/password";
+import { createEmailVerificationToken } from "@/lib/auth/session";
+import { sendEmailVerificationEmail } from "@/lib/email";
 import { logError } from "@/lib/error-log";
 
 const MIN_PASSWORD_LENGTH = 8;
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://japanesewithavnish.com";
 
 function trimStr(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
@@ -69,7 +72,21 @@ export async function POST(req: Request) {
       // continue; user is created in user_auth
     }
 
-    return NextResponse.json({ success: true });
+    let verificationEmailSent = false;
+    try {
+      const token = await createEmailVerificationToken(trimmed);
+      const verifyLink = `${SITE_URL.replace(/\/$/, "")}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
+      await sendEmailVerificationEmail(trimmed, verifyLink, displayName);
+      await sql`UPDATE user_auth SET verification_sent_at = NOW(), updated_at = NOW() WHERE email = ${trimmed}`;
+      verificationEmailSent = true;
+    } catch (emailErr) {
+      await logError("sign-up", "Verification email send failed", {
+        email: trimmed,
+        err: emailErr instanceof Error ? emailErr.message : String(emailErr),
+      });
+    }
+
+    return NextResponse.json({ success: true, verificationEmailSent });
   } catch (e) {
     console.error("Sign-up:", e);
     await logError("sign-up", e instanceof Error ? e.message : "Failed to sign up", { err: String(e) });

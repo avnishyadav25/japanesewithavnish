@@ -78,6 +78,7 @@ export function CheckoutForm({ product, compact = false, isPlan = false, currenc
   const [discountInfo, setDiscountInfo] = useState<{ discount_paise: number; final_paise: number } | null>(null);
   const [agreedTerms, setAgreedTerms] = useState(false);
   const scriptPromise = useRef<Promise<boolean> | null>(null);
+  const prefilledFromProfile = useRef(false);
 
   useEffect(() => {
     if (currency === "USD") return; // Stripe handles its own checkout hosted UI script
@@ -85,6 +86,33 @@ export function CheckoutForm({ product, compact = false, isPlan = false, currenc
       scriptPromise.current = loadRazorpayCheckout();
     }
   }, [currency]);
+
+  useEffect(() => {
+    if (prefilledFromProfile.current) return;
+    prefilledFromProfile.current = true;
+
+    fetch("/api/profile")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        const profile = data?.profile;
+        if (!profile) return;
+
+        const fullName =
+          profile.display_name ||
+          [profile.first_name, profile.last_name].filter(Boolean).join(" ") ||
+          "";
+
+        setForm((current) => ({
+          ...current,
+          name: current.name || fullName,
+          email: current.email || profile.email || "",
+          phone: current.phone || profile.phone || "",
+        }));
+      })
+      .catch(() => {
+        // Logged-out checkout should stay empty.
+      });
+  }, []);
 
   async function handleApplyCoupon() {
     if (!form.couponCode.trim()) return;

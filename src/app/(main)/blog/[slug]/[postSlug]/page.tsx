@@ -247,7 +247,7 @@ export default async function BlogLearnDetailPage({
                 <LearnCommentForm contentType={normalized} slug={slug} />
               </div>
             </section>
-
+            {/*
             {bundlesToShow.length > 0 && (
               <section className="mt-12 pt-10 border-t border-[var(--divider)]">
                 <h2 className="font-heading text-2xl sm:text-3xl font-bold text-charcoal mb-2 text-center">
@@ -284,7 +284,7 @@ export default async function BlogLearnDetailPage({
                   </Link>
                 </div>
               </section>
-            )}
+            )}*/}
           </div>
 
           <aside>

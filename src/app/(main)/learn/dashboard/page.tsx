@@ -15,6 +15,8 @@ type ProgressData = {
     is_lifetime?: boolean;
     subscription_status?: string | null;
     trial_ends_at?: string | null;
+    email_verified_at?: string | null;
+    verification_sent_at?: string | null;
   } | null;
   stats: {
     learnedCount: number;
@@ -38,6 +40,11 @@ type ProgressData = {
   } | null;
 };
 
+type CurriculumTreeLesson = { id: string; slug: string; code: string; title: string };
+type CurriculumTreeSubmodule = { id: string; code: string; title: string; lessons: CurriculumTreeLesson[] };
+type CurriculumTreeModule = { id: string; code: string; title: string; submodules: CurriculumTreeSubmodule[] };
+type CurriculumTreeLevel = { id: string; code: string; name: string; modules: CurriculumTreeModule[] };
+
 export default function LearnDashboardPage() {
   const [data, setData] = useState<ProgressData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -48,16 +55,22 @@ export default function LearnDashboardPage() {
   const [points, setPoints] = useState(0);
   const [streakFreezes, setStreakFreezes] = useState(0);
   const [badges, setBadges] = useState<{ slug: string; name: string; iconEmoji: string | null; isEarned: boolean }[]>([]);
+  const [curriculumTree, setCurriculumTree] = useState<CurriculumTreeLevel[]>([]);
+  const [completedLessonIds, setCompletedLessonIds] = useState<Set<string>>(new Set());
   const [purchasing, setPurchasing] = useState(false);
   const [rewardsOpen, setRewardsOpen] = useState(false);
   const [countdownText, setCountdownText] = useState("");
+  const [verificationMessage, setVerificationMessage] = useState("");
+  const [verificationError, setVerificationError] = useState("");
+  const [resendingVerification, setResendingVerification] = useState(false);
 
   const fetchDashboardData = () => {
     Promise.all([
       fetch("/api/learn/progress").then((r) => r.json()),
       fetch("/api/learn/badges").then((r) => r.json()).catch(() => ({ badges: [] })),
+      fetch("/api/learn/curriculum?path=1").then((r) => r.json()).catch(() => ({ levels: [], completedLessonIds: [] })),
     ])
-      .then(([d, bData]) => {
+      .then(([d, bData, cData]) => {
         if (d.error && d.profile === undefined) {
           setError(d.error);
           setData(null);
@@ -72,6 +85,8 @@ export default function LearnDashboardPage() {
           setPoints(d.profile?.points ?? d.stats?.totalPoints ?? 0);
           setStreakFreezes(d.profile?.streak_freezes ?? 0);
           setBadges(bData.badges ?? []);
+          setCurriculumTree(cData.levels ?? []);
+          setCompletedLessonIds(new Set(cData.completedLessonIds ?? []));
         }
       })
       .catch(() => setError("Failed to load"))
@@ -127,6 +142,28 @@ export default function LearnDashboardPage() {
     }
   }
 
+  async function handleResendVerification() {
+    if (resendingVerification) return;
+    setResendingVerification(true);
+    setVerificationMessage("");
+    setVerificationError("");
+    try {
+      const res = await fetch("/api/auth/resend-verification", { method: "POST" });
+      const resData = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(resData.error || "Could not send verification email.");
+      if (resData.alreadyVerified) {
+        setVerificationMessage("Your email is already verified.");
+        fetchDashboardData();
+      } else {
+        setVerificationMessage("Verification link sent. Please check your inbox.");
+      }
+    } catch (err) {
+      setVerificationError(err instanceof Error ? err.message : "Could not send verification email.");
+    } finally {
+      setResendingVerification(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[var(--base)] flex items-center justify-center">
@@ -139,7 +176,7 @@ export default function LearnDashboardPage() {
     return (
       <div className="min-h-screen bg-[var(--base)] flex flex-col items-center justify-center px-4">
         <h1 className="font-heading text-2xl font-bold text-charcoal mb-2">My Learning Dashboard</h1>
-        <p className="text-secondary text-center mb-6">Sign in to see your roadmap, streaks, and badges.</p>
+        <p className="text-secondary text-center mb-6">Please log in to get your free daily Japanese lessons.</p>
         <Link href="/login?redirect=/learn/dashboard" className="btn-primary">
           Log in
         </Link>
@@ -155,6 +192,7 @@ export default function LearnDashboardPage() {
   const isPremium = Boolean(profile?.is_lifetime || (profile?.premium_until && new Date(profile.premium_until) > now));
   const isTrial = !isPremium && Boolean(profile?.subscription_status === "trialing" && profile?.trial_ends_at && new Date(profile.trial_ends_at) > now);
   const isExpired = !isPremium && !isTrial && Boolean(profile?.premium_until && new Date(profile.premium_until) < now);
+  const isEmailVerified = profile ? profile.email_verified_at !== null : true;
 
   const trialDaysRemaining = isTrial && profile?.trial_ends_at
     ? Math.max(Math.ceil((new Date(profile.trial_ends_at).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)), 1)
@@ -234,6 +272,27 @@ export default function LearnDashboardPage() {
           </div>
         </div>
 
+        {!isEmailVerified && (
+          <div className="bg-white border border-primary/20 rounded-3xl p-5 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h2 className="font-heading text-lg font-black text-charcoal">Verify your email</h2>
+              <p className="text-secondary text-sm mt-1">
+                You can keep learning now. Please verify your email so account and lesson updates reach you.
+              </p>
+              {verificationMessage && <p className="text-xs font-semibold text-green-700 mt-2">{verificationMessage}</p>}
+              {verificationError && <p className="text-xs font-semibold text-primary mt-2">{verificationError}</p>}
+            </div>
+            <button
+              type="button"
+              onClick={handleResendVerification}
+              disabled={resendingVerification}
+              className="btn-primary text-sm px-5 py-2.5 rounded-xl font-bold shrink-0 disabled:opacity-60"
+            >
+              {resendingVerification ? "Sending..." : "Resend link"}
+            </button>
+          </div>
+        )}
+
         {/* Free Plan Upgrade Card Promotion */}
         {!isPremium && !isTrial && (
           <div className="bg-gradient-to-r from-[#FFF7F7] to-white border border-[#D0021B]/15 rounded-3xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-sm">
@@ -292,9 +351,98 @@ export default function LearnDashboardPage() {
               <p className="text-xl font-black text-primary">{points} pts</p>
               <p className="text-xs text-secondary mt-1">XP earned: {profile?.xp ?? 0}</p>
             </div>
-            <Link href="/scoreboard" className="text-xs text-primary font-bold hover:underline mt-4 block">
+            <Link href="/badge" className="text-xs text-primary font-bold hover:underline mt-4 block">
               View badges →
             </Link>
+          </div>
+        </div>
+
+        {/* Section 3b: Progress Tree */}
+        <div className="bg-white border border-[var(--divider)] rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
+          <div className="flex justify-between items-center border-b border-[var(--divider)] pb-4">
+            <div>
+              <h2 className="font-heading text-lg font-black text-charcoal">My Progress Tree</h2>
+              <p className="text-secondary text-xs mt-0.5">Curriculum-style view of your levels, modules, and lessons.</p>
+            </div>
+            <Link href="/learn/curriculum" className="text-xs font-bold text-primary hover:underline">
+              Full curriculum →
+            </Link>
+          </div>
+
+          <div className="space-y-6">
+            {curriculumTree.slice(0, 5).map((level) => (
+              <section key={level.id} className="rounded-2xl border border-[var(--divider)] bg-[var(--base)] p-4 sm:p-5">
+                <div className="flex items-center justify-between gap-4 mb-4">
+                  <div>
+                    <h3 className="font-heading font-black text-charcoal text-sm">{level.code} · {level.name}</h3>
+                    <p className="text-[11px] text-secondary mt-0.5">{level.modules.length} curriculum modules</p>
+                  </div>
+                  <span className="text-[10px] font-bold text-primary bg-white border border-primary/10 rounded-full px-2 py-1">
+                    {level.modules.reduce((sum, module) => sum + module.submodules.flatMap((s) => s.lessons).filter((lesson) => completedLessonIds.has(lesson.id)).length, 0)}
+                    {" / "}
+                    {level.modules.reduce((sum, module) => sum + module.submodules.flatMap((s) => s.lessons).length, 0)}
+                  </span>
+                </div>
+
+                <div className="space-y-4">
+                  {level.modules.map((module) => {
+                    const lessons = module.submodules.flatMap((s) => s.lessons);
+                    const done = lessons.filter((lesson) => completedLessonIds.has(lesson.id)).length;
+                    const pct = lessons.length ? Math.round((done / lessons.length) * 100) : 0;
+                    return (
+                      <details key={module.id} className="rounded-2xl bg-white border border-[var(--divider)] overflow-hidden" open={level.code === currentLvl}>
+                        <summary className="cursor-pointer list-none p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                          <div className="min-w-0">
+                            <span className="text-[10px] font-bold text-secondary uppercase tracking-wider">Module {module.code}</span>
+                            <h4 className="font-heading font-bold text-charcoal text-sm truncate">{module.title}</h4>
+                          </div>
+                          <div className="sm:w-44 shrink-0">
+                            <div className="flex items-center justify-between text-[10px] font-bold mb-1">
+                              <span className="text-secondary">{done}/{lessons.length} lessons</span>
+                              <span className="text-primary">{pct}%</span>
+                            </div>
+                            <div className="h-1.5 bg-[var(--divider)] rounded-full overflow-hidden">
+                              <div className="h-full bg-primary rounded-full" style={{ width: `${pct}%` }} />
+                            </div>
+                          </div>
+                        </summary>
+                        <div className="px-4 pb-4 pt-1 space-y-3">
+                          {module.submodules.map((submodule) => (
+                            <div key={submodule.id} className="rounded-xl border border-[var(--divider)] bg-[#FAF8F5] p-3">
+                              <div className="flex items-center justify-between gap-3 mb-2">
+                                <p className="text-[11px] font-bold text-charcoal">{submodule.code}: {submodule.title}</p>
+                                <span className="text-[10px] text-secondary font-semibold">
+                                  {submodule.lessons.filter((lesson) => completedLessonIds.has(lesson.id)).length}/{submodule.lessons.length}
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                {submodule.lessons.map((lesson) => {
+                                  const completed = completedLessonIds.has(lesson.id);
+                                  return (
+                                    <Link
+                                      key={lesson.id}
+                                      href={`/learn/curriculum/lesson/${lesson.slug || lesson.id}`}
+                                      className={`rounded-lg px-3 py-2 text-[11px] font-semibold border transition flex items-center justify-between gap-2 ${
+                                        completed
+                                          ? "bg-green-50 border-green-200 text-green-800"
+                                          : "bg-white border-[var(--divider)] text-charcoal hover:border-primary"
+                                      }`}
+                                    >
+                                      <span className="truncate">{completed ? "✓" : "○"} {lesson.code}: {lesson.title}</span>
+                                      <span className="text-[10px] shrink-0">{completed ? "Study Again" : "Study"}</span>
+                                    </Link>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
           </div>
         </div>
 
@@ -478,7 +626,7 @@ export default function LearnDashboardPage() {
         <div className="bg-white border border-[var(--divider)] rounded-3xl p-6 shadow-sm space-y-4">
           <div className="flex justify-between items-center border-b border-[var(--divider)] pb-3">
             <h2 className="font-heading font-bold text-charcoal text-base">Recent Badges</h2>
-            <Link href="/scoreboard" className="text-xs font-bold text-primary hover:underline">
+            <Link href="/badge" className="text-xs font-bold text-primary hover:underline">
               View all badges →
             </Link>
           </div>

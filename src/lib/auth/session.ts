@@ -31,6 +31,7 @@ export async function verifySessionToken(token: string): Promise<{ email: string
 }
 
 const RESET_EXPIRY_HOURS = 1;
+const EMAIL_VERIFICATION_EXPIRY_HOURS = 24;
 
 /** Short-lived JWT for password reset. Payload: { email, type: "reset" }. */
 export async function createResetToken(email: string): Promise<string> {
@@ -46,6 +47,28 @@ export async function verifyResetToken(token: string): Promise<{ email: string }
   try {
     const { payload } = await jwtVerify(token, SECRET_KEY);
     if (payload.type !== "reset") return null;
+    const email = payload.email as string;
+    if (!email) return null;
+    return { email };
+  } catch {
+    return null;
+  }
+}
+
+/** 24-hour JWT for email verification. Payload: { email, type: "email_verification" }. */
+export async function createEmailVerificationToken(email: string): Promise<string> {
+  const exp = Math.floor(Date.now() / 1000) + EMAIL_VERIFICATION_EXPIRY_HOURS * 60 * 60;
+  return new SignJWT({ email, type: "email_verification" })
+    .setProtectedHeader({ alg: "HS256" })
+    .setExpirationTime(exp)
+    .sign(SECRET_KEY);
+}
+
+/** Verify email verification token; returns email only if valid and type is "email_verification". */
+export async function verifyEmailVerificationToken(token: string): Promise<{ email: string } | null> {
+  try {
+    const { payload } = await jwtVerify(token, SECRET_KEY);
+    if (payload.type !== "email_verification") return null;
     const email = payload.email as string;
     if (!email) return null;
     return { email };

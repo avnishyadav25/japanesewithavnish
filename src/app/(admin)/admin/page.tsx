@@ -40,6 +40,9 @@ export default async function AdminDashboardPage({
   let lessonsCompletedToday = 0;
   let quizAttempts = 0;
   let avgStreak = 0;
+  let verifiedUsers = 0;
+  let unverifiedUsers = 0;
+  let verificationRate = 0;
 
   // Revenue graph & lists
   let revenueTotal = 0;
@@ -126,6 +129,7 @@ export default async function AdminDashboardPage({
             (SELECT COUNT(*)::int FROM user_subscriptions WHERE status = 'trialing' AND trial_ends_at > NOW()) AS trial_active,
             (SELECT COUNT(*)::int FROM profiles WHERE premium_until <= NOW() AND premium_until >= NOW() - INTERVAL '7 days') AS expired_week
         `,
+
       ]);
 
       totalUsers = totalUsersRows[0]?.c ?? 0;
@@ -161,6 +165,25 @@ export default async function AdminDashboardPage({
     } catch (e) {
       console.error("Dashboard database fetch error:", e);
     }
+
+    try {
+      const verificationRows = await sql`
+        SELECT
+          COUNT(*) FILTER (WHERE email_verified_at IS NOT NULL)::int AS verified,
+          COUNT(*) FILTER (WHERE email_verified_at IS NULL)::int AS unverified,
+          COUNT(*)::int AS total
+        FROM user_auth
+      ` as { verified: number; unverified: number; total: number }[];
+      const verification = verificationRows[0];
+      verifiedUsers = verification?.verified ?? 0;
+      unverifiedUsers = verification?.unverified ?? 0;
+      const verificationTotal = verification?.total ?? 0;
+      verificationRate = verificationTotal > 0 ? Math.round((verifiedUsers / verificationTotal) * 100) : 0;
+    } catch (e) {
+      if ((e as { code?: string })?.code !== "42703") {
+        console.error("Dashboard verification stats error:", e);
+      }
+    }
   }
 
   const kpis = [
@@ -172,6 +195,8 @@ export default async function AdminDashboardPage({
     { label: "Lessons Completed Today", value: lessonsCompletedToday, sub: "Lessons today" },
     { label: "Quiz Attempts", value: quizAttempts, sub: "Placement quiz attempts" },
     { label: "Avg Streak", value: `${avgStreak} days`, sub: "Average streak length" },
+    { label: "Verified Emails", value: verifiedUsers, sub: `${verificationRate}% of registered auth users` },
+    { label: "Unverified Emails", value: unverifiedUsers, sub: "Need verification follow-up" },
   ];
 
   const quickAccess = [

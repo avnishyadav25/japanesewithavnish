@@ -21,7 +21,7 @@ function sm2(quality: number, intervalDays: number, repetitions: number, easeFac
   return { intervalDays: nextInterval, repetitions: repetitions + 1, easeFactor: newEase };
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   const session = await getSession();
   if (!session?.email) {
     return NextResponse.json({ error: "Unauthorized", items: [] }, { status: 401 });
@@ -30,13 +30,18 @@ export async function GET() {
     return NextResponse.json({ items: [] });
   }
   try {
+    const url = new URL(req.url);
+    const includeAll = url.searchParams.get("all") === "1";
     const now = new Date().toISOString();
     const rows = await sql`
       SELECT rs.id, rs.item_type, rs.item_id, rs.next_review_at, rs.interval_days, rs.repetitions,
-             p.title, p.slug, p.content_type, p.content, p.meta
+             p.title AS post_title, p.slug AS post_slug, p.content_type AS post_content_type, p.content, p.meta,
+             cl.title AS lesson_title, cl.slug AS lesson_slug, cl.content_type AS lesson_content_type
       FROM review_schedule rs
       LEFT JOIN posts p ON p.slug = rs.item_id AND p.content_type = rs.item_type AND p.status = 'published'
-      WHERE rs.user_email = ${session.email} AND rs.next_review_at <= ${now}::timestamptz
+      LEFT JOIN curriculum_lessons cl ON rs.item_type = 'lesson' AND cl.id::text = rs.item_id
+      WHERE rs.user_email = ${session.email}
+        AND (${includeAll}::boolean = TRUE OR rs.next_review_at <= ${now}::timestamptz)
       ORDER BY rs.next_review_at ASC
       LIMIT 20
     ` as {
@@ -46,9 +51,12 @@ export async function GET() {
       next_review_at: string;
       interval_days: number;
       repetitions: number;
-      title: string | null;
-      slug: string | null;
-      content_type: string | null;
+      post_title: string | null;
+      post_slug: string | null;
+      post_content_type: string | null;
+      lesson_title: string | null;
+      lesson_slug: string | null;
+      lesson_content_type: string | null;
       content: string | null;
       meta: unknown;
     }[];
@@ -57,11 +65,12 @@ export async function GET() {
       id: r.id,
       itemType: r.item_type,
       itemId: r.item_id,
-      title: r.title ?? r.item_id,
-      slug: r.slug ?? r.item_id,
-      contentType: r.content_type,
+      title: r.lesson_title ?? r.post_title ?? r.item_id,
+      slug: r.lesson_slug ?? r.post_slug ?? r.item_id,
+      contentType: r.lesson_content_type ?? r.post_content_type,
       content: r.content?.slice(0, 500) ?? "",
       meta: r.meta,
+      nextReviewAt: r.next_review_at,
     }));
     return NextResponse.json({ items });
   } catch (e) {
@@ -80,6 +89,42 @@ export async function POST(req: Request) {
   }
   try {
     const body = await req.json();
+    if (body.action === "add") {
+      const itemType = typeof body.itemType === "string" ? body.itemType : "";
+      const itemId = typeof body.itemId === "string" ? body.itemId : "";
+      if (!itemType || !itemId) {
+        return NextResponse.json({ error: "itemType and itemId required" }, { status: 400 });
+      }
+
+      const allowedTypes = new Set(["lesson", "vocab", "kanji", "grammar", "reading", "listening"]);
+      if (!allowedTypes.has(itemType)) {
+        return NextResponse.json({ error: "Unsupported review item type" }, { status: 400 });
+      }
+
+      if (itemType === "lesson") {
+        const lessonRows = await sql`
+          SELECT id FROM curriculum_lessons WHERE id::text = ${itemId} OR slug = ${itemId} LIMIT 1
+        ` as { id: string }[];
+        if (!lessonRows[0]) {
+          return NextResponse.json({ error: "Lesson not found" }, { status: 404 });
+        }
+      }
+
+      const nextReview = new Date();
+      nextReview.setDate(nextReview.getDate() + 1);
+
+      await sql`
+        INSERT INTO review_schedule (user_email, item_type, item_id, next_review_at, interval_days, updated_at)
+        VALUES (${session.email}, ${itemType}, ${itemId}, ${nextReview.toISOString()}, 1, NOW())
+        ON CONFLICT (user_email, item_type, item_id) DO UPDATE SET
+          next_review_at = EXCLUDED.next_review_at,
+          interval_days = 1,
+          updated_at = NOW()
+      `;
+
+      return NextResponse.json({ success: true });
+    }
+
     const { scheduleId, correct } = body;
     if (!scheduleId || typeof correct !== "boolean") {
       return NextResponse.json({ error: "scheduleId and correct required" }, { status: 400 });

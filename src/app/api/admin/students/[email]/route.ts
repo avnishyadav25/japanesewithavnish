@@ -1,6 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth/admin";
+import { createEmailVerificationToken } from "@/lib/auth/session";
 import { sql } from "@/lib/db";
+import { sendEmailVerificationEmail } from "@/lib/email";
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://japanesewithavnish.com";
+
+function isMissingVerificationColumnError(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: string }).code === "42703"
+  );
+}
 
 export async function GET(
   _req: NextRequest,
@@ -13,35 +26,90 @@ export async function GET(
   const email = decodeURIComponent((await params).email);
   if (!email) return NextResponse.json({ error: "Email required" }, { status: 400 });
 
-  const rows = await sql`
-    SELECT
-      p.email,
-      p.recommended_level,
-      p.display_name,
-      p.first_name,
-      p.last_name,
-      p.is_active,
-      p.last_login_at::text,
-      p.avatar_url,
-      p.address,
-      p.phone,
-      p.linkedin_url,
-      p.instagram_url,
-      p.facebook_url,
-      p.twitter_url,
-      p.website,
-      p.current_streak,
-      p.longest_streak,
-      p.last_activity_date::text,
-      p.created_at::text,
-      p.updated_at::text,
-      (SELECT COUNT(*)::int FROM user_learning_progress u WHERE u.user_email = p.email AND u.status = 'learned') AS learned_count,
-      (SELECT COUNT(*)::int FROM review_schedule r WHERE r.user_email = p.email AND r.next_review_at <= NOW()) AS due_count,
-      (SELECT COALESCE(SUM(e.points), 0)::int FROM reward_events e WHERE e.user_email = p.email) AS total_points
-    FROM profiles p
-    WHERE p.email = ${email}
-    LIMIT 1
-  ` as Record<string, unknown>[];
+  let rows: Record<string, unknown>[] = [];
+  try {
+    rows = await sql`
+      SELECT
+        p.email,
+        p.recommended_level,
+        p.display_name,
+        p.first_name,
+        p.last_name,
+        p.is_active,
+        p.last_login_at::text,
+        p.avatar_url,
+        p.address,
+        p.phone,
+        p.linkedin_url,
+        p.instagram_url,
+        p.facebook_url,
+        p.twitter_url,
+        p.website,
+        p.current_streak,
+        p.longest_streak,
+        p.last_activity_date::text,
+        p.created_at::text,
+        p.updated_at::text,
+        p.role,
+        p.premium_until::text,
+        p.is_lifetime,
+        COALESCE(p.subscription_status, us.status) AS subscription_status,
+        us.trial_ends_at::text,
+        p.xp,
+        p.points,
+        ua.email_verified_at::text,
+        ua.verification_sent_at::text,
+        (SELECT COUNT(*)::int FROM user_learning_progress u WHERE u.user_email = p.email AND u.status = 'learned') AS learned_count,
+        (SELECT COUNT(*)::int FROM review_schedule r WHERE r.user_email = p.email AND r.next_review_at <= NOW()) AS due_count,
+        (SELECT COALESCE(SUM(e.points), 0)::int FROM reward_events e WHERE e.user_email = p.email) AS total_points
+      FROM profiles p
+      LEFT JOIN user_auth ua ON ua.email = p.email
+      LEFT JOIN user_subscriptions us ON us.user_email = p.email AND us.status = 'trialing'
+      WHERE p.email = ${email}
+      LIMIT 1
+    ` as Record<string, unknown>[];
+  } catch (e) {
+    if (!isMissingVerificationColumnError(e)) throw e;
+    rows = await sql`
+      SELECT
+        p.email,
+        p.recommended_level,
+        p.display_name,
+        p.first_name,
+        p.last_name,
+        p.is_active,
+        p.last_login_at::text,
+        p.avatar_url,
+        p.address,
+        p.phone,
+        p.linkedin_url,
+        p.instagram_url,
+        p.facebook_url,
+        p.twitter_url,
+        p.website,
+        p.current_streak,
+        p.longest_streak,
+        p.last_activity_date::text,
+        p.created_at::text,
+        p.updated_at::text,
+        p.role,
+        p.premium_until::text,
+        p.is_lifetime,
+        COALESCE(p.subscription_status, us.status) AS subscription_status,
+        us.trial_ends_at::text,
+        p.xp,
+        p.points,
+        NULL::text AS email_verified_at,
+        NULL::text AS verification_sent_at,
+        (SELECT COUNT(*)::int FROM user_learning_progress u WHERE u.user_email = p.email AND u.status = 'learned') AS learned_count,
+        (SELECT COUNT(*)::int FROM review_schedule r WHERE r.user_email = p.email AND r.next_review_at <= NOW()) AS due_count,
+        (SELECT COALESCE(SUM(e.points), 0)::int FROM reward_events e WHERE e.user_email = p.email) AS total_points
+      FROM profiles p
+      LEFT JOIN user_subscriptions us ON us.user_email = p.email AND us.status = 'trialing'
+      WHERE p.email = ${email}
+      LIMIT 1
+    ` as Record<string, unknown>[];
+  }
 
   const row = rows?.[0];
   if (!row) return NextResponse.json({ error: "Student not found" }, { status: 404 });
@@ -86,6 +154,31 @@ export async function PATCH(
   ` as Record<string, unknown>[];
   const current = rows?.[0];
   if (!current) return NextResponse.json({ error: "Student not found" }, { status: 404 });
+
+  if (body.resend_verification === true) {
+    const authRows = await sql`
+      SELECT
+        ua.email,
+        ua.email_verified_at::text,
+        p.display_name,
+        p.first_name,
+        p.last_name
+      FROM user_auth ua
+      LEFT JOIN profiles p ON p.email = ua.email
+      WHERE ua.email = ${email}
+      LIMIT 1
+    ` as { email: string; email_verified_at: string | null; display_name: string | null; first_name: string | null; last_name: string | null }[];
+    const authRow = authRows?.[0];
+    if (!authRow) return NextResponse.json({ error: "Auth account not found" }, { status: 404 });
+    if (authRow.email_verified_at) return NextResponse.json({ success: true, alreadyVerified: true });
+
+    const token = await createEmailVerificationToken(authRow.email);
+    const verifyLink = `${SITE_URL.replace(/\/$/, "")}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
+    const name = authRow.display_name || [authRow.first_name, authRow.last_name].filter(Boolean).join(" ") || null;
+    await sendEmailVerificationEmail(authRow.email, verifyLink, name);
+    await sql`UPDATE user_auth SET verification_sent_at = NOW(), updated_at = NOW() WHERE email = ${authRow.email}`;
+    return NextResponse.json({ success: true, alreadyVerified: false });
+  }
 
   const fn = first_name !== undefined ? first_name : (current.first_name as string | null);
   const ln = last_name !== undefined ? last_name : (current.last_name as string | null);

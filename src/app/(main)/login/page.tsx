@@ -4,15 +4,16 @@ import { useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
-type Tab = "magic" | "signin" | "signup" | "forgot";
+type Tab = "signin" | "signup" | "forgot";
 
 export default function LoginPage() {
   const searchParams = useSearchParams();
   const redirect = searchParams?.get("redirect") || "/learn/dashboard";
   const safeRedirect = redirect.startsWith("/") ? redirect : "/learn/dashboard";
   const showForgot = searchParams?.get("forgot") === "1";
+  const verificationStatus = searchParams?.get("verification") || "";
 
-  const [tab, setTab] = useState<Tab>(showForgot ? "forgot" : "magic");
+  const [tab, setTab] = useState<Tab>(showForgot ? "forgot" : "signin");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
@@ -128,28 +129,6 @@ export default function LoginPage() {
     }
   }
 
-  async function handleMagicLink(e: React.FormEvent) {
-    e.preventDefault();
-    setStatus("loading");
-    setErrorMsg("");
-    try {
-      const res = await fetch("/api/auth/magic-link", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed");
-      setStatus("success");
-      setErrorMsg("");
-    } catch (err) {
-      setStatus("error");
-      setErrorMsg(err instanceof Error ? err.message : "Something went wrong. Try again.");
-    }
-  }
-
-  const isMagicSent = tab === "magic" && status === "success";
-
   return (
     <div className="py-12 sm:py-20 px-4 sm:px-6 bg-[var(--base)] min-h-[85vh] flex items-center">
       <div className="max-w-[1000px] mx-auto w-full">
@@ -157,92 +136,44 @@ export default function LoginPage() {
           
           {/* Left Form Card */}
           <div className="md:col-span-7 bg-white rounded-3xl p-8 border border-[var(--divider)] shadow-card flex flex-col justify-between min-h-[500px]">
-            {isMagicSent ? (
-              <div className="space-y-6 my-auto text-center py-8">
-                <span className="text-5xl" role="img" aria-label="email">✉️</span>
-                <h2 className="font-heading text-2xl font-black text-charcoal">Check your email</h2>
-                <p className="text-secondary text-sm max-w-sm mx-auto leading-relaxed">
-                  We sent a secure, passwordless sign-in link to: <br />
-                  <strong className="text-charcoal font-semibold">{email}</strong>
+            <div>
+              <div className="mb-6">
+                <h1 className="font-heading text-3xl font-black text-charcoal mb-2">Welcome back</h1>
+                <p className="text-secondary text-sm">
+                  Sign in with your password to continue your Japanese learning, track progress, and access your lessons.
                 </p>
-                <p className="text-secondary text-xs">Open the link to continue learning.</p>
-                <div className="flex gap-4 justify-center pt-4">
-                  <button
-                    type="button"
-                    onClick={handleMagicLink}
-                    className="text-xs font-bold text-primary hover:underline"
-                  >
-                    Resend Link
-                  </button>
-                  <span className="text-[var(--divider)]">|</span>
-                  <button
-                    type="button"
-                    onClick={() => { setTab("magic"); setStatus("idle"); }}
-                    className="text-xs font-bold text-secondary hover:underline"
-                  >
-                    Use Different Email
-                  </button>
-                </div>
               </div>
-            ) : (
-              <div>
-                <div className="mb-6">
-                  <h1 className="font-heading text-3xl font-black text-charcoal mb-2">Welcome back</h1>
-                  <p className="text-secondary text-sm">
-                    Sign in to continue your Japanese learning, track progress, and access your lessons.
-                  </p>
+
+              {verificationStatus === "failed" && (
+                <div className="mb-5 p-3 rounded-xl border border-primary/10 bg-[#FFF7F7] text-primary text-xs font-semibold">
+                  Verification link is invalid, expired, or your database migration has not been applied yet. Log in and use “Resend verification link” from your dashboard.
                 </div>
+              )}
 
-                {/* Tabs */}
-                <div className="flex gap-4 mb-6 border-b border-[var(--divider)]">
-                  {(["magic", "signin", "signup"] as const).map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => {
-                        setTab(t);
-                        setStatus("idle");
-                        setErrorMsg("");
-                      }}
-                      className={`pb-2.5 px-1 text-sm font-semibold border-b-2 -mb-[2px] transition capitalize ${
-                        tab === t
-                          ? "border-primary text-primary"
-                          : "border-transparent text-secondary hover:text-charcoal"
-                      }`}
-                    >
-                      {t === "magic" ? "Magic Link" : t === "signin" ? "Sign In" : "Sign Up"}
-                    </button>
-                  ))}
-                </div>
+              {/* Tabs */}
+              <div className="flex gap-4 mb-6 border-b border-[var(--divider)]">
+                {(["signin", "signup"] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => {
+                      setTab(t);
+                      setStatus("idle");
+                      setErrorMsg("");
+                    }}
+                    className={`pb-2.5 px-1 text-sm font-semibold border-b-2 -mb-[2px] transition capitalize ${
+                      tab === t
+                        ? "border-primary text-primary"
+                        : "border-transparent text-secondary hover:text-charcoal"
+                    }`}
+                  >
+                    {t === "signin" ? "Sign In" : "Sign Up"}
+                  </button>
+                ))}
+              </div>
 
-                {/* Form fields depending on Tab */}
-                {tab === "magic" && (
-                  <form onSubmit={handleMagicLink} className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-bold uppercase text-charcoal mb-1">Email Address</label>
-                      <input
-                        type="email"
-                        placeholder="your@email.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                        className="w-full h-12 px-4 border border-[var(--divider)] rounded-xl text-charcoal focus:border-primary focus:outline-none text-sm transition"
-                      />
-                    </div>
-                    <button
-                      type="submit"
-                      disabled={status === "loading"}
-                      className="w-full h-12 rounded-xl bg-primary text-white font-bold text-sm hover:bg-primary/95 transition disabled:opacity-50"
-                    >
-                      {status === "loading" ? "Sending..." : "Send Magic Link"}
-                    </button>
-                    <p className="text-xs text-secondary text-center">
-                      No password needed. We&apos;ll email you a secure sign-in link.
-                    </p>
-                  </form>
-                )}
-
-                {tab === "signin" && (
+              {/* Form fields depending on Tab */}
+              {tab === "signin" && (
                   <form onSubmit={handleSignIn} className="space-y-4">
                     <div>
                       <label className="block text-xs font-bold uppercase text-charcoal mb-1">Email Address</label>
@@ -409,7 +340,6 @@ export default function LoginPage() {
                   </div>
                 )}
               </div>
-            )}
 
             <div className="pt-6 border-t border-[var(--divider)] mt-8">
               <Link href="/" className="text-xs font-bold text-secondary hover:text-charcoal flex items-center gap-1.5">

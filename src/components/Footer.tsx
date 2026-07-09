@@ -28,6 +28,7 @@ const quickLinks = [
   { href: "/learn", label: "Learn" },
   { href: "/tutor", label: "Nihongo Navi" },
   { href: "/quiz", label: "Quiz" },
+  { href: "/pricing", label: "Pricing" },
   { href: "/blog", label: "Blog" },
   { href: "/contact", label: "Contact" },
 ];
@@ -77,7 +78,7 @@ export async function Footer() {
               <span className="text-[15px]">Japanese with Avnish</span>
             </Link>
             <p className="text-white/60 text-[14px] leading-relaxed mb-5 max-w-[260px]">
-              Clean JLPT mastery system from N5 to N1. Subscription plans, AI tutor, placement quiz.
+              Clean JLPT mastery system from N5 to N1. Learn free every day, or upgrade for unlimited daily lessons.
             </p>
             <p className="text-white/50 text-[12px] mb-2">JLPT tips + updates. No spam.</p>
             <NewsletterForm variant="dark" />

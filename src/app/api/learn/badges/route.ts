@@ -15,10 +15,20 @@ export async function GET() {
   try {
     // 1. Fetch all system badges
     const allBadges = await sql`
-      SELECT id, name, slug, description, points_reward, icon_emoji
+      SELECT id, name, slug, description, emoji, color, category, trigger_type
       FROM badges
-      ORDER BY points_reward ASC
-    ` as { id: string; name: string; slug: string; description: string; points_reward: number; icon_emoji: string }[];
+      WHERE is_active = TRUE
+      ORDER BY category ASC, created_at ASC, name ASC
+    ` as {
+      id: string;
+      name: string;
+      slug: string;
+      description: string;
+      emoji: string | null;
+      color: string | null;
+      category: string;
+      trigger_type: string;
+    }[];
 
     // 2. Fetch badges earned by current user
     const earnedRows = await sql`
@@ -37,8 +47,10 @@ export async function GET() {
         name: b.name,
         slug: b.slug,
         description: b.description,
-        pointsReward: b.points_reward,
-        iconEmoji: b.icon_emoji || "🏆",
+        category: b.category,
+        triggerType: b.trigger_type,
+        color: b.color || "#D0021B",
+        iconEmoji: b.emoji || "🏆",
         isEarned: !!earnedInfo,
         awardedAt: earnedInfo?.awarded_at ?? null,
         reason: earnedInfo?.reason ?? null,

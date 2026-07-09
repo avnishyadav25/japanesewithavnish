@@ -23,17 +23,29 @@ type UserRow = {
   premium_until: string | null;
   is_lifetime: boolean;
   subscription_status: string | null;
+  email_verified_at: string | null;
+  verification_sent_at: string | null;
 };
+
+function isMissingVerificationColumnError(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: string }).code === "42703"
+  );
+}
 
 export default async function AdminUsersPage({
   searchParams,
 }: {
-  searchParams?: { plan?: string; status?: string; level?: string; q?: string };
+  searchParams?: { plan?: string; status?: string; level?: string; q?: string; verified?: string };
 }) {
   const planFilter = searchParams?.plan || "";
   const statusFilter = searchParams?.status || "";
   const levelFilter = searchParams?.level || "";
   const searchQuery = searchParams?.q || "";
+  const verifiedFilter = searchParams?.verified || "";
 
   let users: UserRow[] = [];
   let total = 0;
@@ -46,32 +58,38 @@ export default async function AdminUsersPage({
       let paramIdx = 1;
 
       if (planFilter === "free") {
-        conditions.push(`(is_lifetime = FALSE AND (premium_until IS NULL OR premium_until <= NOW()))`);
+        conditions.push(`(p.is_lifetime = FALSE AND (p.premium_until IS NULL OR p.premium_until <= NOW()))`);
       } else if (planFilter === "premium") {
-        conditions.push(`(is_lifetime = TRUE OR premium_until > NOW())`);
+        conditions.push(`(p.is_lifetime = TRUE OR p.premium_until > NOW())`);
       } else if (planFilter === "trial") {
-        conditions.push(`subscription_status = 'trialing'`);
+        conditions.push(`p.subscription_status = 'trialing'`);
       }
 
       if (statusFilter === "suspended") {
-        conditions.push(`is_active = FALSE`);
+        conditions.push(`p.is_active = FALSE`);
       }
 
       if (levelFilter) {
-        conditions.push(`recommended_level = $${paramIdx}`);
+        conditions.push(`p.recommended_level = $${paramIdx}`);
         params.push(levelFilter);
         paramIdx++;
       }
 
+      if (verifiedFilter === "verified") {
+        conditions.push(`ua.email_verified_at IS NOT NULL`);
+      } else if (verifiedFilter === "unverified") {
+        conditions.push(`ua.email IS NOT NULL AND ua.email_verified_at IS NULL`);
+      }
+
       if (searchQuery) {
-        conditions.push(`(email ILIKE $${paramIdx} OR display_name ILIKE $${paramIdx} OR first_name ILIKE $${paramIdx} OR last_name ILIKE $${paramIdx})`);
+        conditions.push(`(p.email ILIKE $${paramIdx} OR p.display_name ILIKE $${paramIdx} OR p.first_name ILIKE $${paramIdx} OR p.last_name ILIKE $${paramIdx})`);
         params.push(`%${searchQuery}%`);
         paramIdx++;
       }
 
       const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-      const countQuery = `SELECT COUNT(*)::int AS c FROM profiles ${whereClause}`;
+      const countQuery = `SELECT COUNT(*)::int AS c FROM profiles p LEFT JOIN user_auth ua ON ua.email = p.email ${whereClause}`;
       const countResultArr = [countQuery, ...params];
       Object.defineProperty(countResultArr, "raw", { value: [countQuery] });
       const countRows = await sql(countResultArr as any) as { c: number }[];
@@ -95,8 +113,11 @@ export default async function AdminUsersPage({
           p.premium_until::text,
           p.is_lifetime,
           p.subscription_status,
+          ua.email_verified_at::text,
+          ua.verification_sent_at::text,
           (SELECT COUNT(*)::int FROM user_learning_progress u WHERE u.user_email = p.email AND u.status = 'learned') AS learned_count
         FROM profiles p
+        LEFT JOIN user_auth ua ON ua.email = p.email
         ${whereClause}
         ORDER BY p.last_activity_date DESC NULLS LAST, p.updated_at DESC
         LIMIT 100
@@ -106,7 +127,78 @@ export default async function AdminUsersPage({
       users = await sql(selectResultArr as any) as UserRow[];
 
     } catch (e) {
-      console.error("Admin users query error:", e);
+      if (isMissingVerificationColumnError(e)) {
+        try {
+          const conditions: string[] = [];
+          const params: any[] = [];
+          let paramIdx = 1;
+
+          if (planFilter === "free") {
+            conditions.push(`(p.is_lifetime = FALSE AND (p.premium_until IS NULL OR p.premium_until <= NOW()))`);
+          } else if (planFilter === "premium") {
+            conditions.push(`(p.is_lifetime = TRUE OR p.premium_until > NOW())`);
+          } else if (planFilter === "trial") {
+            conditions.push(`p.subscription_status = 'trialing'`);
+          }
+
+          if (statusFilter === "suspended") {
+            conditions.push(`p.is_active = FALSE`);
+          }
+
+          if (levelFilter) {
+            conditions.push(`p.recommended_level = $${paramIdx}`);
+            params.push(levelFilter);
+            paramIdx++;
+          }
+
+          if (searchQuery) {
+            conditions.push(`(p.email ILIKE $${paramIdx} OR p.display_name ILIKE $${paramIdx} OR p.first_name ILIKE $${paramIdx} OR p.last_name ILIKE $${paramIdx})`);
+            params.push(`%${searchQuery}%`);
+            paramIdx++;
+          }
+
+          const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+          const countQuery = `SELECT COUNT(*)::int AS c FROM profiles p ${whereClause}`;
+          const countResultArr = [countQuery, ...params];
+          Object.defineProperty(countResultArr, "raw", { value: [countQuery] });
+          const countRows = await sql(countResultArr as any) as { c: number }[];
+          total = countRows[0]?.c ?? 0;
+
+          const selectQuery = `
+            SELECT
+              p.email,
+              p.recommended_level,
+              p.display_name,
+              p.first_name,
+              p.last_name,
+              p.is_active,
+              p.role,
+              p.last_login_at::text,
+              COALESCE(p.current_streak, 0)::int AS current_streak,
+              COALESCE(p.longest_streak, 0)::int AS longest_streak,
+              p.last_activity_date::text,
+              p.xp,
+              p.points,
+              p.premium_until::text,
+              p.is_lifetime,
+              p.subscription_status,
+              NULL::text AS email_verified_at,
+              NULL::text AS verification_sent_at,
+              (SELECT COUNT(*)::int FROM user_learning_progress u WHERE u.user_email = p.email AND u.status = 'learned') AS learned_count
+            FROM profiles p
+            ${whereClause}
+            ORDER BY p.last_activity_date DESC NULLS LAST, p.updated_at DESC
+            LIMIT 100
+          `;
+          const selectResultArr = [selectQuery, ...params];
+          Object.defineProperty(selectResultArr, "raw", { value: [selectQuery] });
+          users = await sql(selectResultArr as any) as UserRow[];
+        } catch (fallbackError) {
+          console.error("Admin users fallback query error:", fallbackError);
+        }
+      } else {
+        console.error("Admin users query error:", e);
+      }
     }
   }
 
@@ -119,7 +211,7 @@ export default async function AdminUsersPage({
 
       {/* Filter and Search Bar */}
       <div className="bg-white border border-[var(--divider)] rounded-3xl p-5 shadow-sm space-y-4">
-        <form method="GET" className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <form method="GET" className="grid grid-cols-1 sm:grid-cols-5 gap-4">
           <div>
             <label className="block text-[10px] font-bold uppercase text-secondary mb-1">Search User</label>
             <input
@@ -154,6 +246,18 @@ export default async function AdminUsersPage({
               <option value="suspended">Suspended Only</option>
             </select>
           </div>
+          <div>
+            <label className="block text-[10px] font-bold uppercase text-secondary mb-1">Email</label>
+            <select
+              name="verified"
+              defaultValue={verifiedFilter}
+              className="w-full h-10 px-3 border border-[var(--divider)] rounded-xl text-xs text-charcoal bg-white"
+            >
+              <option value="">All Emails</option>
+              <option value="verified">Verified</option>
+              <option value="unverified">Unverified</option>
+            </select>
+          </div>
           <div className="flex items-end gap-2">
             <div className="flex-1">
               <label className="block text-[10px] font-bold uppercase text-secondary mb-1">JLPT Target</label>
@@ -184,6 +288,7 @@ export default async function AdminUsersPage({
               "User",
               "Plan",
               "Status",
+              "Email",
               "Target Level",
               "Lessons",
               "Streak",
@@ -223,6 +328,21 @@ export default async function AdminUsersPage({
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary">Suspended</span>
                     ) : (
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-50 text-green-700">Active</span>
+                    )}
+                  </td>
+                  <td className="py-3 px-2">
+                    {u.email_verified_at ? (
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-50 text-green-700">Verified</span>
+                        <p className="text-[9px] text-secondary">{new Date(u.email_verified_at).toLocaleDateString()}</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary">Unverified</span>
+                        <p className="text-[9px] text-secondary">
+                          {u.verification_sent_at ? `Sent ${new Date(u.verification_sent_at).toLocaleDateString()}` : "No link sent"}
+                        </p>
+                      </div>
                     )}
                   </td>
                   <td className="py-3 px-2 text-xs font-semibold text-charcoal">{u.recommended_level || "—"}</td>

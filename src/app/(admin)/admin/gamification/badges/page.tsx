@@ -27,6 +27,9 @@ export default function AdminBadgesPage() {
   const [editingBadge, setEditingBadge] = useState<Badge | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   // Form fields
   const [name, setName] = useState("");
@@ -139,6 +142,21 @@ export default function AdminBadgesPage() {
     }
   };
 
+  const filteredBadges = badges.filter((b) => {
+    const q = search.trim().toLowerCase();
+    const matchesSearch =
+      !q ||
+      b.name.toLowerCase().includes(q) ||
+      b.slug.toLowerCase().includes(q) ||
+      b.description.toLowerCase().includes(q);
+    const matchesCategory = categoryFilter === "all" || b.category === categoryFilter;
+    const matchesStatus =
+      statusFilter === "all" ||
+      (statusFilter === "active" && b.is_active) ||
+      (statusFilter === "inactive" && !b.is_active);
+    return matchesSearch && matchesCategory && matchesStatus;
+  });
+
   return (
     <div className="space-y-6 page-enter">
       <AdminPageHeader
@@ -148,7 +166,7 @@ export default function AdminBadgesPage() {
 
       <div className="flex justify-between items-center mb-4">
         <p className="text-secondary text-sm">
-          Create and manage system achievement badges awarded to students automatically or manually.
+          Create and manage system achievement badges awarded to students automatically or manually. {badges.length} total badges.
         </p>
         <button
           type="button"
@@ -159,12 +177,57 @@ export default function AdminBadgesPage() {
         </button>
       </div>
 
+      <AdminCard>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="md:col-span-2">
+            <label className="block text-[10px] font-bold uppercase text-secondary mb-1">Search Badges</label>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Name, slug, or description..."
+              className="w-full h-10 px-3 border border-[var(--divider)] rounded-xl text-xs text-charcoal focus:border-primary focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold uppercase text-secondary mb-1">Category</label>
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="w-full h-10 px-3 border border-[var(--divider)] rounded-xl text-xs text-charcoal bg-white"
+            >
+              <option value="all">All Categories</option>
+              <option value="level">Level</option>
+              <option value="streak">Streak</option>
+              <option value="skill">Skill</option>
+              <option value="milestone">Milestone</option>
+              <option value="special">Special</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold uppercase text-secondary mb-1">Status</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full h-10 px-3 border border-[var(--divider)] rounded-xl text-xs text-charcoal bg-white"
+            >
+              <option value="all">All Statuses</option>
+              <option value="active">Active</option>
+              <option value="inactive">Disabled</option>
+            </select>
+          </div>
+        </div>
+        <p className="text-[11px] text-secondary mt-3">
+          Showing {filteredBadges.length} of {badges.length} badges.
+        </p>
+      </AdminCard>
+
       {loading ? (
         <p className="text-secondary py-8 text-center text-xs">Loading badges...</p>
-      ) : badges.length > 0 ? (
+      ) : filteredBadges.length > 0 ? (
         <AdminCard>
           <AdminTable headers={["Badge", "Slug", "Description", "Category", "Trigger", "Status", "Actions"]}>
-            {badges.map((b) => (
+            {filteredBadges.map((b) => (
               <tr key={b.id} className="border-b border-[var(--divider)] hover:bg-[var(--base)] transition-colors">
                 <td className="py-3 px-2">
                   <div className="flex items-center gap-2.5">
@@ -212,7 +275,7 @@ export default function AdminBadgesPage() {
           </AdminTable>
         </AdminCard>
       ) : (
-        <AdminEmptyState message="No badges created yet." />
+        <AdminEmptyState message="No badges match the current filters." />
       )}
 
       {/* Modal dialog */}

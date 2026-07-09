@@ -132,9 +132,10 @@ export default function AccountPage() {
   if (!profile) {
     return (
       <div className="min-h-screen bg-[var(--base)] py-12 px-4">
-        <div className="max-w-[600px] mx-auto">
-          <p className="text-secondary mb-4">Sign in to manage your settings.</p>
-          <Link href="/login" className="text-primary font-medium hover:underline">Log in</Link>
+        <div className="max-w-[640px] mx-auto rounded-3xl border border-[var(--divider)] bg-white p-8 shadow-sm text-center">
+          <h1 className="font-heading text-2xl font-black text-charcoal mb-2">Edit Profile</h1>
+          <p className="text-secondary mb-6">Please log in to manage your profile, contact details, and scoreboard settings.</p>
+          <Link href="/login?redirect=/account" className="btn-primary inline-block">Log in</Link>
         </div>
       </div>
     );
@@ -143,7 +144,7 @@ export default function AccountPage() {
   return (
     <div className="min-h-screen bg-[var(--base)] py-12 px-4">
       <div className="max-w-[600px] mx-auto">
-        <h1 className="font-heading text-2xl font-bold text-charcoal mb-2">My settings</h1>
+        <h1 className="font-heading text-2xl font-bold text-charcoal mb-2">Edit Profile</h1>
         <p className="text-secondary mb-6">
           Manage your profile, contact info, and preferences.
         </p>

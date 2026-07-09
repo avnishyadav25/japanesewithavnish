@@ -23,6 +23,8 @@ type UserDetail = {
   is_lifetime: boolean;
   subscription_status: string | null;
   trial_ends_at: string | null;
+  email_verified_at: string | null;
+  verification_sent_at: string | null;
   learned_count: number;
 };
 
@@ -78,19 +80,21 @@ export default function AdminUserDetailPage() {
     }
   };
 
-  const handleResendMagicLink = async () => {
+  const handleResendVerification = async () => {
     setUpdating(true);
     setMsg("");
     try {
-      const res = await fetch("/api/auth/magic-link", {
-        method: "POST",
+      const res = await fetch(`/api/admin/students/${encodeURIComponent(email)}`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ resend_verification: true }),
       });
-      if (!res.ok) throw new Error("Failed to send magic link");
-      setMsg("✅ Secure sign-in magic link resent to user's email.");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Failed to send verification email");
+      setMsg(data.alreadyVerified ? "Email is already verified." : "Verification email sent to user.");
+      fetchUser();
     } catch (err: any) {
-      setMsg(`❌ Error: ${err.message}`);
+      setMsg(`Error: ${err.message}`);
     } finally {
       setUpdating(false);
     }
@@ -188,6 +192,16 @@ export default function AdminUserDetailPage() {
               <div>
                 <dt className="text-secondary font-bold uppercase text-[9px] tracking-wider">Last Login</dt>
                 <dd className="text-charcoal mt-1">{user.last_login_at ? new Date(user.last_login_at).toLocaleString() : "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-secondary font-bold uppercase text-[9px] tracking-wider">Email Verification</dt>
+                <dd className={`mt-1 font-semibold ${user.email_verified_at ? "text-green-700" : "text-primary"}`}>
+                  {user.email_verified_at ? `Verified ${new Date(user.email_verified_at).toLocaleDateString()}` : "Not verified"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-secondary font-bold uppercase text-[9px] tracking-wider">Verification Sent</dt>
+                <dd className="text-charcoal mt-1">{user.verification_sent_at ? new Date(user.verification_sent_at).toLocaleString() : "—"}</dd>
               </div>
             </dl>
           </AdminCard>
@@ -375,13 +389,15 @@ export default function AdminUserDetailPage() {
                   >
                     {user.is_active === false ? "Activate User" : "Suspend User"}
                   </button>
-                  <button
-                    onClick={handleResendMagicLink}
-                    disabled={updating}
-                    className="w-full py-2.5 border border-[var(--divider)] hover:border-charcoal text-charcoal rounded-xl text-xs font-bold font-heading transition"
-                  >
-                    Resend Magic Link
-                  </button>
+                  {!user.email_verified_at && (
+                    <button
+                      onClick={handleResendVerification}
+                      disabled={updating}
+                      className="w-full py-2.5 border border-[var(--divider)] hover:border-charcoal text-charcoal rounded-xl text-xs font-bold font-heading transition"
+                    >
+                      Resend Verification Email
+                    </button>
+                  )}
                   <button
                     onClick={handleResetProgress}
                     disabled={updating}
