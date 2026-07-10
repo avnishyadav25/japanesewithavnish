@@ -35,31 +35,209 @@ export default async function AdminLearnPage({
     sort_order: number;
     meta: Record<string, unknown> | null;
     og_image_url?: string | null;
+    vocabulary_word?: string | null;
+    vocabulary_reading?: string | null;
+    vocabulary_romaji?: string | null;
+    vocabulary_meaning?: string | null;
+    kanji_character?: string | null;
+    kanji_meaning?: string | null;
+    kanji_onyomi?: string[] | null;
+    kanji_kunyomi?: string[] | null;
+    kanji_stroke_count?: number | null;
   };
 
   let items: Row[] = [];
+  let levelCounts: Record<string, number> = {
+    ALL: 0,
+    N5: 0,
+    N4: 0,
+    N3: 0,
+    N2: 0,
+    N1: 0,
+  };
+
   if (sql) {
-    if (selectedLevel === "ALL") {
-      const rows = await sql`
-        SELECT id, slug, title, (jlpt_level)[1] AS jlpt_level, status, sort_order, meta, og_image_url
-        FROM posts WHERE content_type = ${normalized}
-        ORDER BY sort_order, created_at DESC
-      `;
-      items = (rows ?? []) as Row[];
+    if (normalized === "vocabulary") {
+      const countRows = (await sql`
+        SELECT coalesce(v.jlpt_level, (p.jlpt_level)[1], 'ALL') AS level, COUNT(*)::int AS count
+        FROM posts p
+        JOIN vocabulary v ON v.post_id = p.id
+        WHERE p.content_type = 'vocabulary'
+        GROUP BY 1
+      `) as { level: string; count: number }[];
+
+      const counts = { ...levelCounts };
+      for (const row of countRows ?? []) {
+        const key = String(row.level || "ALL").toUpperCase();
+        if (key in counts) counts[key] = Number(row.count) || 0;
+        counts.ALL += Number(row.count) || 0;
+      }
+      levelCounts = counts;
+
+      if (selectedLevel === "ALL") {
+        const rows = await sql`
+          SELECT
+            p.id,
+            p.slug,
+            p.title,
+            coalesce(v.jlpt_level, (p.jlpt_level)[1]) AS jlpt_level,
+            p.status,
+            p.sort_order,
+            p.meta,
+            p.og_image_url,
+            v.word AS vocabulary_word,
+            v.reading AS vocabulary_reading,
+            v.romaji AS vocabulary_romaji,
+            v.meaning AS vocabulary_meaning
+          FROM posts p
+          JOIN vocabulary v ON v.post_id = p.id
+          WHERE p.content_type = 'vocabulary'
+          ORDER BY coalesce(v.jlpt_level, (p.jlpt_level)[1]), coalesce(v.romaji, v.reading, v.word), v.word
+        `;
+        items = (rows ?? []) as Row[];
+      } else {
+        const rows = await sql`
+          SELECT
+            p.id,
+            p.slug,
+            p.title,
+            coalesce(v.jlpt_level, (p.jlpt_level)[1]) AS jlpt_level,
+            p.status,
+            p.sort_order,
+            p.meta,
+            p.og_image_url,
+            v.word AS vocabulary_word,
+            v.reading AS vocabulary_reading,
+            v.romaji AS vocabulary_romaji,
+            v.meaning AS vocabulary_meaning
+          FROM posts p
+          JOIN vocabulary v ON v.post_id = p.id
+          WHERE p.content_type = 'vocabulary'
+            AND (v.jlpt_level = ${selectedLevel} OR (p.jlpt_level)[1] = ${selectedLevel})
+          ORDER BY coalesce(v.romaji, v.reading, v.word), v.word
+        `;
+        items = (rows ?? []) as Row[];
+      }
+    } else if (normalized === "kanji") {
+      const countRows = (await sql`
+        SELECT coalesce(k.jlpt_level, (p.jlpt_level)[1], 'ALL') AS level, COUNT(*)::int AS count
+        FROM posts p
+        JOIN kanji k ON k.post_id = p.id
+        WHERE p.content_type = 'kanji'
+        GROUP BY 1
+      `) as { level: string; count: number }[];
+
+      const counts = { ...levelCounts };
+      for (const row of countRows ?? []) {
+        const key = String(row.level || "ALL").toUpperCase();
+        if (key in counts) counts[key] = Number(row.count) || 0;
+        counts.ALL += Number(row.count) || 0;
+      }
+      levelCounts = counts;
+
+      if (selectedLevel === "ALL") {
+        const rows = await sql`
+          SELECT
+            p.id,
+            p.slug,
+            p.title,
+            coalesce(k.jlpt_level, (p.jlpt_level)[1]) AS jlpt_level,
+            p.status,
+            p.sort_order,
+            p.meta,
+            p.og_image_url,
+            k.character AS kanji_character,
+            k.meaning AS kanji_meaning,
+            k.onyomi AS kanji_onyomi,
+            k.kunyomi AS kanji_kunyomi,
+            k.stroke_count AS kanji_stroke_count
+          FROM posts p
+          JOIN kanji k ON k.post_id = p.id
+          WHERE p.content_type = 'kanji'
+          ORDER BY coalesce(k.jlpt_level, (p.jlpt_level)[1]), k.character
+        `;
+        items = (rows ?? []) as Row[];
+      } else {
+        const rows = await sql`
+          SELECT
+            p.id,
+            p.slug,
+            p.title,
+            coalesce(k.jlpt_level, (p.jlpt_level)[1]) AS jlpt_level,
+            p.status,
+            p.sort_order,
+            p.meta,
+            p.og_image_url,
+            k.character AS kanji_character,
+            k.meaning AS kanji_meaning,
+            k.onyomi AS kanji_onyomi,
+            k.kunyomi AS kanji_kunyomi,
+            k.stroke_count AS kanji_stroke_count
+          FROM posts p
+          JOIN kanji k ON k.post_id = p.id
+          WHERE p.content_type = 'kanji'
+            AND (k.jlpt_level = ${selectedLevel} OR (p.jlpt_level)[1] = ${selectedLevel})
+          ORDER BY k.character
+        `;
+        items = (rows ?? []) as Row[];
+      }
     } else {
-      const rows = await sql`
-        SELECT id, slug, title, (jlpt_level)[1] AS jlpt_level, status, sort_order, meta, og_image_url
-        FROM posts WHERE content_type = ${normalized} AND (jlpt_level)[1] = ${selectedLevel}
-        ORDER BY sort_order, created_at DESC
-      `;
-      items = (rows ?? []) as Row[];
+      const countRows = (await sql`
+        SELECT coalesce((jlpt_level)[1], 'ALL') AS level, COUNT(*)::int AS count
+        FROM posts
+        WHERE content_type = ${normalized}
+        GROUP BY 1
+      `) as { level: string; count: number }[];
+
+      const counts = { ...levelCounts };
+      for (const row of countRows ?? []) {
+        const key = String(row.level || "ALL").toUpperCase();
+        if (key in counts) counts[key] = Number(row.count) || 0;
+        counts.ALL += Number(row.count) || 0;
+      }
+      levelCounts = counts;
+
+      if (selectedLevel === "ALL") {
+        const rows = await sql`
+          SELECT id, slug, title, (jlpt_level)[1] AS jlpt_level, status, sort_order, meta, og_image_url
+          FROM posts WHERE content_type = ${normalized}
+          ORDER BY sort_order, created_at DESC
+        `;
+        items = (rows ?? []) as Row[];
+      } else {
+        const rows = await sql`
+          SELECT id, slug, title, (jlpt_level)[1] AS jlpt_level, status, sort_order, meta, og_image_url
+          FROM posts WHERE content_type = ${normalized} AND (jlpt_level)[1] = ${selectedLevel}
+          ORDER BY sort_order, created_at DESC
+        `;
+        items = (rows ?? []) as Row[];
+      }
     }
   }
 
   const featureImageUrl = (item: Row) =>
     item.og_image_url ?? (item.meta && typeof item.meta.feature_image_url === "string" ? item.meta.feature_image_url : null);
 
+  const vocabularyWord = (item: Row) =>
+    item.vocabulary_word ?? (typeof item.meta?.japanese === "string" ? item.meta.japanese : item.title);
+  const vocabularyReading = (item: Row) =>
+    item.vocabulary_reading ?? (typeof item.meta?.reading === "string" ? item.meta.reading : "");
+  const vocabularyRomaji = (item: Row) =>
+    item.vocabulary_romaji ?? (typeof item.meta?.romaji === "string" ? item.meta.romaji : "");
+  const vocabularyMeaning = (item: Row) =>
+    item.vocabulary_meaning ?? (typeof item.meta?.meaning === "string" ? item.meta.meaning : "");
+  const kanjiCharacter = (item: Row) =>
+    item.kanji_character ?? (typeof item.meta?.character === "string" ? item.meta.character : item.title.slice(0, 1));
+  const kanjiMeaning = (item: Row) =>
+    item.kanji_meaning ?? (typeof item.meta?.meaning === "string" ? item.meta.meaning : "");
+  const kanjiOnyomi = (item: Row) => item.kanji_onyomi ?? [];
+  const kanjiKunyomi = (item: Row) => item.kanji_kunyomi ?? [];
+  const kanjiStrokeCount = (item: Row) =>
+    item.kanji_stroke_count ?? (typeof item.meta?.stroke_count === "number" ? item.meta.stroke_count : null);
+
   const levels = ["ALL", "N5", "N4", "N3", "N2", "N1"];
+  const publishedCount = items.filter((item) => item.status === "published").length;
+  const draftCount = items.filter((item) => item.status !== "published").length;
 
   return (
     <div className="space-y-6">
@@ -93,6 +271,9 @@ export default async function AdminLearnPage({
                 }`}
               >
                 {lvl}
+                <span className={`ml-2 ${active ? "text-white/80" : "text-secondary"}`}>
+                  {levelCounts[lvl].toLocaleString()}
+                </span>
               </Link>
             );
           })}
@@ -122,6 +303,21 @@ export default async function AdminLearnPage({
         </div>
       </div>
 
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="rounded-xl border border-[var(--divider)] bg-white p-4">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-secondary">Showing</span>
+          <strong className="block font-heading text-2xl text-charcoal mt-1">{items.length.toLocaleString()}</strong>
+        </div>
+        <div className="rounded-xl border border-[var(--divider)] bg-white p-4">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-secondary">Published</span>
+          <strong className="block font-heading text-2xl text-charcoal mt-1">{publishedCount.toLocaleString()}</strong>
+        </div>
+        <div className="rounded-xl border border-[var(--divider)] bg-white p-4">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-secondary">Draft</span>
+          <strong className="block font-heading text-2xl text-charcoal mt-1">{draftCount.toLocaleString()}</strong>
+        </div>
+      </div>
+
       <div className="mb-4">
         <GenerateLearnListButton
           contentType={normalized}
@@ -133,29 +329,78 @@ export default async function AdminLearnPage({
         <>
           {selectedView === "table" && (
             <AdminCard>
-              <AdminTable headers={["Image", "Title", "JLPT", "Status", "Actions"]}>
+              <AdminTable
+                headers={
+                  normalized === "vocabulary"
+                    ? ["#", "Kanji / Kana", "Furigana", "Romaji", "Meaning", "JLPT", "Status", "Actions"]
+                    : normalized === "kanji"
+                    ? ["#", "Kanji", "Meaning", "On-yomi", "Kun-yomi", "Strokes", "JLPT", "Status", "Actions"]
+                    : ["Image", "Title", "JLPT", "Status", "Actions"]
+                }
+              >
                 {items.map((item) => (
                   <tr key={item.id} className="border-b border-[var(--divider)]">
-                    <td className="py-2 px-2">
-                      {featureImageUrl(item) ? (
-                        <div className="w-10 h-10 rounded overflow-hidden border border-[var(--divider)] bg-[var(--divider)]/20 flex-shrink-0">
-                          <img src={featureImageUrl(item)!} alt="" className="w-full h-full object-cover" />
-                        </div>
-                      ) : (
-                        <span className="text-secondary text-xs">—</span>
-                      )}
-                    </td>
-                    <td className="py-2 px-2 font-medium text-charcoal">{item.title}</td>
-                    <td className="py-2 px-2 text-secondary text-sm">{item.jlpt_level ?? "—"}</td>
-                    <td className="py-2 px-2">
-                      <StatusBadge
-                        status={item.status}
-                        variant={item.status === "published" ? "published" : "draft"}
-                      />
-                    </td>
-                    <td className="py-2 px-2">
-                      <LearnContentRowActions contentType={normalized} slug={item.slug} status={item.status} />
-                    </td>
+                    {normalized === "vocabulary" ? (
+                      <>
+                        <td className="py-2 px-2 text-secondary text-xs tabular-nums">{items.indexOf(item) + 1}</td>
+                        <td className="py-2 px-2 font-semibold text-charcoal">{vocabularyWord(item) || "—"}</td>
+                        <td className="py-2 px-2 text-secondary text-sm">{vocabularyReading(item) || "—"}</td>
+                        <td className="py-2 px-2 text-secondary text-sm">{vocabularyRomaji(item) || "—"}</td>
+                        <td className="py-2 px-2 text-secondary text-sm max-w-[360px]">{vocabularyMeaning(item) || "—"}</td>
+                        <td className="py-2 px-2 text-secondary text-sm">{item.jlpt_level ?? "—"}</td>
+                        <td className="py-2 px-2">
+                          <StatusBadge
+                            status={item.status}
+                            variant={item.status === "published" ? "published" : "draft"}
+                          />
+                        </td>
+                        <td className="py-2 px-2">
+                          <LearnContentRowActions contentType={normalized} slug={item.slug} status={item.status} />
+                        </td>
+                      </>
+                    ) : normalized === "kanji" ? (
+                      <>
+                        <td className="py-2 px-2 text-secondary text-xs tabular-nums">{items.indexOf(item) + 1}</td>
+                        <td className="py-2 px-2 font-heading text-xl text-charcoal">{kanjiCharacter(item) || "—"}</td>
+                        <td className="py-2 px-2 text-secondary text-sm max-w-[320px]">{kanjiMeaning(item) || "—"}</td>
+                        <td className="py-2 px-2 text-secondary text-sm">{kanjiOnyomi(item).join(", ") || "—"}</td>
+                        <td className="py-2 px-2 text-secondary text-sm">{kanjiKunyomi(item).join(", ") || "—"}</td>
+                        <td className="py-2 px-2 text-secondary text-sm tabular-nums">{kanjiStrokeCount(item) ?? "—"}</td>
+                        <td className="py-2 px-2 text-secondary text-sm">{item.jlpt_level ?? "—"}</td>
+                        <td className="py-2 px-2">
+                          <StatusBadge
+                            status={item.status}
+                            variant={item.status === "published" ? "published" : "draft"}
+                          />
+                        </td>
+                        <td className="py-2 px-2">
+                          <LearnContentRowActions contentType={normalized} slug={item.slug} status={item.status} />
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="py-2 px-2">
+                          {featureImageUrl(item) ? (
+                            <div className="w-10 h-10 rounded overflow-hidden border border-[var(--divider)] bg-[var(--divider)]/20 flex-shrink-0">
+                              <img src={featureImageUrl(item)!} alt="" className="w-full h-full object-cover" />
+                            </div>
+                          ) : (
+                            <span className="text-secondary text-xs">—</span>
+                          )}
+                        </td>
+                        <td className="py-2 px-2 font-medium text-charcoal">{item.title}</td>
+                        <td className="py-2 px-2 text-secondary text-sm">{item.jlpt_level ?? "—"}</td>
+                        <td className="py-2 px-2">
+                          <StatusBadge
+                            status={item.status}
+                            variant={item.status === "published" ? "published" : "draft"}
+                          />
+                        </td>
+                        <td className="py-2 px-2">
+                          <LearnContentRowActions contentType={normalized} slug={item.slug} status={item.status} />
+                        </td>
+                      </>
+                    )}
                   </tr>
                 ))}
               </AdminTable>
@@ -189,7 +434,11 @@ export default async function AdminLearnPage({
                       </div>
                       <h3 className="font-bold text-charcoal text-sm truncate">{item.title}</h3>
                       <p className="text-secondary text-xs mt-1 truncate">
-                        {String(item.meta?.summary ?? item.meta?.meaning ?? "Learn Japanese")}
+                        {normalized === "vocabulary"
+                          ? `${vocabularyReading(item) || "—"} • ${vocabularyRomaji(item) || "—"} • ${vocabularyMeaning(item) || "—"}`
+                          : normalized === "kanji"
+                          ? `${kanjiMeaning(item) || "—"} • ${kanjiOnyomi(item).join(", ") || "—"} • ${kanjiKunyomi(item).join(", ") || "—"}`
+                          : String(item.meta?.summary ?? item.meta?.meaning ?? "Learn Japanese")}
                       </p>
                     </div>
                     <div className="mt-4 border-t border-[var(--divider)] pt-3 flex items-center justify-end">
@@ -226,9 +475,15 @@ export default async function AdminLearnPage({
                           variant={item.status === "published" ? "published" : "draft"}
                         />
                       </div>
-                      <h3 className="font-bold text-charcoal text-sm truncate">{item.title}</h3>
+                      <h3 className="font-bold text-charcoal text-sm truncate">
+                        {normalized === "vocabulary" ? vocabularyWord(item) : normalized === "kanji" ? `${kanjiCharacter(item)} - ${kanjiMeaning(item)}` : item.title}
+                      </h3>
                       <p className="text-secondary text-xs truncate mt-0.5">
-                        {String(item.meta?.summary ?? item.meta?.meaning ?? "Learn Japanese")}
+                        {normalized === "vocabulary"
+                          ? `${vocabularyReading(item) || "—"} • ${vocabularyRomaji(item) || "—"} • ${vocabularyMeaning(item) || "—"}`
+                          : normalized === "kanji"
+                          ? `${kanjiOnyomi(item).join(", ") || "—"} • ${kanjiKunyomi(item).join(", ") || "—"} • ${kanjiStrokeCount(item) ?? "—"} strokes`
+                          : String(item.meta?.summary ?? item.meta?.meaning ?? "Learn Japanese")}
                       </p>
                     </div>
                     <div className="flex-shrink-0">

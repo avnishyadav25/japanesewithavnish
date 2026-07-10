@@ -13,7 +13,13 @@
     "gen:level-lessons": "tsx scripts/generate-level-lesson-payload.ts",
     "seed:n5-practice": "tsx scripts/seed-n5-starter-practice.ts",
     "seed:curriculum": "tsx scripts/seed-curriculum.ts",
-    "seed:curriculum-from-docs": "tsx scripts/seed-curriculum-from-docs.ts"
+    "seed:curriculum-from-docs": "tsx scripts/seed-curriculum-from-docs.ts",
+    "content:audit": "tsx scripts/content-audit.ts",
+    "content:dedupe": "node scripts/dedupe-learning-content.mjs",
+    "content:seed-kanji": "node scripts/seed-kanji-coverage-from-json.mjs",
+    "content:import-n5-n4-vocab": "node scripts/import-nihongoichiban-n5-n4-vocab.mjs",
+    "content:import-n3-n2-n1-vocab": "node scripts/import-japanesetest4you-n3-n2-n1-vocab.mjs",
+    "content:import-kanshudo-kanji": "node scripts/import-kanshudo-jlpt-kanji.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1000.0",

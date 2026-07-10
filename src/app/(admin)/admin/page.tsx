@@ -205,6 +205,7 @@ export default async function AdminDashboardPage({
     { href: "/admin/payments", label: "Payments", desc: "Track Razorpay payments", emoji: "💰" },
     { href: "/admin/coupons", label: "Coupons", desc: "Promo codes and discounts", emoji: "🎟️" },
     { href: "/admin/settings/access-rules", label: "Access Rules", desc: "Free daily lesson rules", emoji: "⚙️" },
+    { href: "/admin/content-audit", label: "Content Audit", desc: "Coverage, duplicates, lesson quality", emoji: "🔎" },
     { href: "/admin/learn/curriculum", label: "Curriculum", desc: "Levels, modules, lessons", emoji: "🎌" },
     { href: "/admin/learn/lessons", label: "Lessons", desc: "Edit published content", emoji: "📘" },
     { href: "/admin/quiz", label: "Quiz", desc: "Placement questions", emoji: "📝" },

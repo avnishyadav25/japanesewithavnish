@@ -305,7 +305,10 @@ export function LearnContent({
                             <div className="flex items-baseline gap-2 flex-wrap mt-2">
                               <h3 className="font-bold text-charcoal text-base">{item.title}</h3>
                               {item.subtitle && (
-                                <span className="text-secondary text-xs font-bold">({item.subtitle})</span>
+                                <span className="text-secondary text-xs font-bold">ふりがな: {item.subtitle}</span>
+                              )}
+                              {item.romaji && (
+                                <span className="text-primary text-xs font-bold">romaji: {item.romaji}</span>
                               )}
                             </div>
                             <p className="text-charcoal font-semibold text-xs mt-2">{item.meaning}</p>
@@ -414,35 +417,63 @@ export function LearnContent({
                 <div className="overflow-x-auto rounded-xl border border-[#EEEEEE]">
                   <table className="min-w-full divide-y divide-[#EEEEEE] bg-white text-left text-xs text-charcoal">
                     <thead className="bg-base font-bold text-secondary uppercase tracking-wider">
-                      <tr>
-                        <th className="px-4 py-3">Term / Item</th>
-                        <th className="px-4 py-3">Details / Reading</th>
-                        <th className="px-4 py-3">Meaning / Description</th>
-                        <th className="px-4 py-3 text-right">Actions</th>
-                      </tr>
+                      {lockCategory === "vocabulary" ? (
+                        <tr>
+                          <th className="px-4 py-3">Kanji / Kana</th>
+                          <th className="px-4 py-3">Furigana</th>
+                          <th className="px-4 py-3">Romaji</th>
+                          <th className="px-4 py-3">Meaning</th>
+                          <th className="px-4 py-3 text-right">Action</th>
+                        </tr>
+                      ) : (
+                        <tr>
+                          <th className="px-4 py-3">Term / Item</th>
+                          <th className="px-4 py-3">Details / Reading</th>
+                          <th className="px-4 py-3">Meaning / Description</th>
+                          <th className="px-4 py-3 text-right">Actions</th>
+                        </tr>
+                      )}
                     </thead>
                     <tbody className="divide-y divide-[#EEEEEE]">
                       {directoryItems.map((item) => (
                         <tr key={item.id} className="hover:bg-base/30 transition">
-                          <td className="px-4 py-3 font-bold text-sm">{item.title}</td>
-                          <td className="px-4 py-3 text-secondary">{item.subtitle || item.type || "—"}</td>
-                          <td className="px-4 py-3 text-secondary truncate max-w-[300px]">{item.meaning || item.notes || "—"}</td>
-                          <td className="px-4 py-3 text-right space-x-2">
-                            {lockCategory === "kanji" || lockCategory === "writing" ? (
-                              <button
-                                type="button"
-                                onClick={() => handleOpenWritingModal(item.title, (item.type as "kanji" | "hiragana" | "katakana" | undefined) || "kanji", item.strokeCount, item.subtitle || item.meaning, item.meaning)}
-                                className="text-primary font-bold hover:underline"
-                              >
-                                Draw
-                              </button>
-                            ) : null}
-                            {item.slug ? (
-                              <Link href={`/learn/${lockCategory}/${item.slug}`} className="text-primary font-bold hover:underline">
-                                View
-                              </Link>
-                            ) : null}
-                          </td>
+                          {lockCategory === "vocabulary" ? (
+                            <>
+                              <td className="px-4 py-3 font-bold text-sm text-charcoal">{item.title || item.subtitle}</td>
+                              <td className="px-4 py-3 text-secondary whitespace-nowrap">{item.subtitle || "—"}</td>
+                              <td className="px-4 py-3 text-secondary whitespace-nowrap">{item.romaji || "—"}</td>
+                              <td className="px-4 py-3 text-secondary min-w-[260px]">{item.meaning || "—"}</td>
+                              <td className="px-4 py-3 text-right">
+                                {item.slug ? (
+                                  <Link href={`/learn/vocabulary/${item.slug}`} className="text-primary font-bold hover:underline">
+                                    Study
+                                  </Link>
+                                ) : null}
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="px-4 py-3 font-bold text-sm">{item.title}</td>
+                              <td className="px-4 py-3 text-secondary">{item.subtitle || item.type || "—"}</td>
+                              <td className="px-4 py-3 text-secondary truncate max-w-[300px]">{item.meaning || item.notes || "—"}</td>
+                              <td className="px-4 py-3 text-right space-x-2">
+                                {lockCategory === "kanji" || lockCategory === "writing" ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenWritingModal(item.title, (item.type as "kanji" | "hiragana" | "katakana" | undefined) || "kanji", item.strokeCount, item.subtitle || item.meaning, item.meaning)}
+                                    className="text-primary font-bold hover:underline"
+                                  >
+                                    Draw
+                                  </button>
+                                ) : null}
+                                {item.slug ? (
+                                  <Link href={`/learn/${lockCategory}/${item.slug}`} className="text-primary font-bold hover:underline">
+                                    View
+                                  </Link>
+                                ) : null}
+                              </td>
+                            </>
+                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -459,7 +490,10 @@ export function LearnContent({
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-bold text-charcoal text-base">{item.title}</span>
                           {item.subtitle && (
-                            <span className="text-secondary text-xs">({item.subtitle})</span>
+                            <span className="text-secondary text-xs">ふりがな: {item.subtitle}</span>
+                          )}
+                          {item.romaji && (
+                            <span className="text-primary text-xs font-semibold">romaji: {item.romaji}</span>
                           )}
                           <span className="text-[9px] font-bold text-secondary bg-base px-2 py-0.5 rounded border border-[var(--divider)] uppercase">
                             {level.toUpperCase()} • {lockCategory}

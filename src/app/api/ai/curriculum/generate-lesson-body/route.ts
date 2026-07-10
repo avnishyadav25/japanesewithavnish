@@ -21,6 +21,19 @@ const BODY_SYSTEM = `You are an expert Japanese curriculum writer. Write the MAI
 Core rules:
 - Output ONLY the Markdown. No JSON, no code fences.
 - Always include romaji for kana/characters (never omit romaji).
+- Write original Japanese with Avnish teaching content. You may use JLPT reference lists to understand topic coverage, but never copy outside lesson text.
+- Use a flow-based lesson structure with these exact sections:
+  ## Learning Goal
+  ## Concept
+  ## Step-by-Step Breakdown
+  ## Mini Examples
+  ## Common Mistake
+  ## Quick Practice
+  ## Summary and Next Step
+- Use Markdown callouts where helpful:
+  > [!TIP] for memory tips
+  > [!MISTAKE] for learner traps
+  > [!PRACTICE] for practice prompts
 
 Kana / character lessons:
 - Teach each kana/character you see in the linked kana list.
@@ -33,7 +46,7 @@ Grammar / vocab lessons:
 - Explain the pattern and meaning with examples. Include romaji and English for examples.
 
 Length:
-- Enough depth for the whole lesson (for N5 “first 15 sounds”, cover each sound clearly).`;
+- Minimum 700 characters. Enough depth for the whole lesson (for N5 “first 15 sounds”, cover each sound clearly).`;
 
 export async function POST(req: Request) {
   const admin = await getAdminSession();
@@ -142,7 +155,7 @@ ${kanaContext}
 ${vocabContext}
 ${grammarContext}
 
-Write the full lesson body in Markdown. Teach the topic so a beginner can follow. Output ONLY the Markdown, no code fences or labels.${regenerate ? " Replace any existing content with a fresh, complete lesson body." : ""}`;
+Write the full lesson body in Markdown using the required flow: Learning Goal, Concept, Step-by-Step Breakdown, Mini Examples, Common Mistake, Quick Practice, Summary and Next Step. Teach the topic so a beginner can follow. Output ONLY the Markdown, no code fences or labels.${regenerate ? " Replace any existing content with a fresh, complete lesson body." : ""}`;
 
   const systemPrompt = (await getPromptContent("curriculum_lesson_body")) ?? BODY_SYSTEM;
 

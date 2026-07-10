@@ -68,9 +68,13 @@ export function LearnMarkdown({
     const id = text ? (slugify(text) || `h-${level}`) : undefined;
     const url = text ? sectionAudio[text] ?? sectionAudio[text.trim()] : "";
     const Tag = level === 2 ? "h2" : "h3";
+    const headingClass =
+      level === 2
+        ? "scroll-mt-24 mt-9 mb-4 font-heading text-xl font-black text-charcoal first:mt-0"
+        : "scroll-mt-24 mt-7 mb-3 font-heading text-lg font-bold text-charcoal";
     return (
       <>
-        <Tag id={id} className={["scroll-mt-24", className].filter(Boolean).join(" ")} {...props}>
+        <Tag id={id} className={[headingClass, className].filter(Boolean).join(" ")} {...props}>
           {children}
         </Tag>
         {url && (
@@ -106,6 +110,9 @@ export function LearnMarkdown({
             )}
             {metaStr(meta, "reading") && (
               <span className="text-secondary text-lg">({metaStr(meta, "reading")})</span>
+            )}
+            {metaStr(meta, "romaji") && (
+              <span className="text-primary text-sm font-bold">romaji: {metaStr(meta, "romaji")}</span>
             )}
             {metaStr(meta, "type") && (
               <span className="text-xs text-secondary border border-[var(--divider)] px-2 py-0.5 rounded">
@@ -180,8 +187,13 @@ export function LearnMarkdown({
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkBreaks]}
         components={{
+          p: ({ children, ...props }) => (
+            <p className="my-4 leading-8 text-[0.95rem]" {...props}>
+              {children}
+            </p>
+          ),
           img: ({ alt, src, ...props }) => (
-            <span className="block my-4 text-center">
+            <span className="block my-7 text-center">
               <img
                 {...props}
                 alt={alt || ""}
@@ -200,8 +212,16 @@ export function LearnMarkdown({
               {children}
             </SectionWithAudio>
           ),
+          h4: ({ children, ...props }) => (
+            <h4 className="mt-7 mb-3 font-heading text-base font-bold text-charcoal" {...props}>
+              {children}
+            </h4>
+          ),
+          hr: ({ ...props }) => (
+            <hr className="my-8 border-[var(--divider)]" {...props} />
+          ),
           table: ({ children, ...props }) => (
-            <div className="my-6 overflow-x-auto">
+            <div className="my-8 overflow-x-auto rounded-xl border border-[var(--divider)]">
               <table className="w-full border-collapse border border-[var(--divider)]" {...props}>
                 {children}
               </table>
@@ -237,16 +257,16 @@ export function LearnMarkdown({
             ),
           ul: ({ children, ...props }) =>
             contentType === "sounds" ? (
-              <ol className="list-decimal list-inside mb-4 space-y-2 [&_p]:inline [&_p]:my-0">
+              <ol className="list-decimal list-inside mb-6 space-y-3 [&_p]:inline [&_p]:my-0">
                 {children}
               </ol>
             ) : (
-              <ul className="list-disc list-outside pl-5 mb-4 space-y-2" {...props}>
+              <ul className="list-disc list-outside pl-6 my-5 space-y-3" {...props}>
                 {children}
               </ul>
             ),
           ol: ({ children, ...props }) => (
-            <ol className="list-decimal list-outside pl-5 mb-4 space-y-2" {...props}>
+            <ol className="list-decimal list-outside pl-6 my-5 space-y-3" {...props}>
               {children}
             </ol>
           ),
@@ -338,12 +358,12 @@ export function LearnMarkdown({
               };
 
               return (
-                <div className={`my-5 p-4 rounded-r-xl border-l-4 border-y border-r border-black/5 ${configs.bg}`}>
+                <div className={`my-7 p-5 rounded-r-xl border-l-4 border-y border-r border-black/5 ${configs.bg}`}>
                   <div className={`flex items-center gap-1.5 font-bold text-xs uppercase tracking-wider mb-2 ${configs.titleColor}`}>
                     <span>{configs.emoji}</span>
                     <span>{title}</span>
                   </div>
-                  <div className="prose-sm leading-relaxed [&_p]:my-1">
+                  <div className="prose-sm leading-relaxed [&_p]:my-2">
                     {stripAlertTag(children)}
                   </div>
                 </div>
@@ -351,7 +371,7 @@ export function LearnMarkdown({
             }
 
             return (
-              <blockquote className="border-l-4 border-primary pl-4 italic my-4 text-secondary" {...props}>
+              <blockquote className="border-l-4 border-primary pl-5 italic my-7 text-secondary" {...props}>
                 {children}
               </blockquote>
             );

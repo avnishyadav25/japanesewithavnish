@@ -6,6 +6,14 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "";
 
 export async function POST(req: Request) {
   try {
+    if (!ADMIN_EMAILS.length || !ADMIN_PASSWORD) {
+      console.error("Admin login configuration missing", {
+        hasAdminEmails: ADMIN_EMAILS.length > 0,
+        hasAdminPassword: Boolean(ADMIN_PASSWORD),
+      });
+      return NextResponse.json({ error: "Admin login is not configured" }, { status: 503 });
+    }
+
     const { email, password } = await req.json();
     if (!email || !password || typeof email !== "string" || typeof password !== "string") {
       return NextResponse.json({ error: "Email and password required" }, { status: 400 });
@@ -13,15 +21,16 @@ export async function POST(req: Request) {
 
     const normalizedEmail = email.trim().toLowerCase();
     if (!ADMIN_EMAILS.includes(normalizedEmail)) {
+      console.warn("Admin login rejected: email is not allowed", { email: normalizedEmail });
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
-    if (!ADMIN_PASSWORD || password !== ADMIN_PASSWORD) {
+    if (password !== ADMIN_PASSWORD) {
+      console.warn("Admin login rejected: invalid password", { email: normalizedEmail });
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
     const token = await createSessionToken(normalizedEmail);
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-    const redirectUrl = `${siteUrl.replace(/\/$/, "")}/admin`;
+    const redirectUrl = "/admin";
 
     const res = NextResponse.json({ success: true, redirect: redirectUrl });
     res.cookies.set(getSessionCookieName(), token, {

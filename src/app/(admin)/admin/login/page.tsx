@@ -21,7 +21,7 @@ export default function AdminLoginPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Login failed");
-      window.location.href = "/admin";
+      window.location.href = typeof data.redirect === "string" ? data.redirect : "/admin";
     } catch (e) {
       setStatus("error");
       setErrorMsg(e instanceof Error ? e.message : "Something went wrong. Try again.");

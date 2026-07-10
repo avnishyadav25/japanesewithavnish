@@ -5,6 +5,7 @@ export interface DirectoryItem {
   title: string;
   slug?: string;
   subtitle?: string; // Romaji or reading
+  romaji?: string;
   meaning?: string;
   notes?: string;
   level?: string;
@@ -43,18 +44,19 @@ export async function getDirectoryItems(
 
     if (contentType === "vocabulary") {
       const rows = (await sql`
-        SELECT v.id, v.word as title, v.reading as subtitle, v.meaning, v.notes, p.slug
+        SELECT v.id, v.word as title, v.reading as subtitle, v.romaji, v.meaning, v.notes, p.slug
         FROM vocabulary v
         JOIN posts p ON v.post_id = p.id
-        WHERE p.jlpt_level[1] = ${normalizedLevel}
-        ORDER BY v.word ASC
-        LIMIT 300
-      `) as { id: string; title: string; subtitle: string; meaning: string; notes: string | null; slug: string }[];
+        WHERE v.jlpt_level = ${normalizedLevel} OR p.jlpt_level[1] = ${normalizedLevel}
+        ORDER BY coalesce(v.romaji, v.reading, v.word) ASC, v.word ASC
+        LIMIT 2000
+      `) as { id: string; title: string; subtitle: string; romaji: string | null; meaning: string; notes: string | null; slug: string }[];
 
       return (rows || []).map((r) => ({
         id: r.id,
         title: r.title,
         subtitle: r.subtitle,
+        romaji: r.romaji || "",
         meaning: r.meaning,
         notes: r.notes || "",
         slug: r.slug,
