@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth/admin";
 import { sql } from "@/lib/db";
 import { LEARN_CONTENT_TYPES, type LearnContentType } from "@/lib/learn-filters";
+import { syncPostToTypeTable } from "@/lib/admin/syncTypeTables";
 
 export async function GET(
   _req: Request,
@@ -64,7 +65,7 @@ export async function PUT(
     const publishedAtVal = statusVal === "published" ? new Date().toISOString() : null;
 
     try {
-      await sql`
+      const updatedRows = await sql`
         UPDATE posts SET
           slug = ${String(slug).trim()},
           title = ${String(title).trim()},
@@ -77,7 +78,14 @@ export async function PUT(
           published_at = ${publishedAtVal},
           updated_at = ${new Date().toISOString()}
         WHERE content_type = ${type} AND slug = ${oldSlug}
-      `;
+        RETURNING id, content_type, title, jlpt_level, meta
+      ` as { id: string; content_type: string; title: string; jlpt_level: string[] | null; meta: unknown }[];
+
+      const updated = updatedRows[0];
+      if (updated) {
+        await syncPostToTypeTable(updated);
+      }
+
       return NextResponse.json({ success: true });
     } catch (err: unknown) {
       const e = err as { code?: string };

@@ -100,12 +100,17 @@ function isModuleLocked(mod: Module, isLoggedIn: boolean): boolean {
 
 // Content type display config
 const CONTENT_TYPE_CONFIG: Record<string, { label: string; color: string; emoji: string }> = {
-  grammar:     { label: "Grammar",    color: "#4F46E5", emoji: "📖" },
-  vocabulary:  { label: "Vocabulary", color: "#0891B2", emoji: "📝" },
-  kanji:       { label: "Kanji",      color: "#7C3AED", emoji: "漢" },
-  reading:     { label: "Reading",    color: "#059669", emoji: "📰" },
-  listening:   { label: "Listening",  color: "#D97706", emoji: "👂" },
-  mock_test:   { label: "Mock Test",  color: "#DC2626", emoji: "📋" },
+  grammar:      { label: "Grammar",      color: "#4F46E5", emoji: "📖" },
+  vocabulary:   { label: "Vocabulary",   color: "#0891B2", emoji: "📝" },
+  kanji:        { label: "Kanji",        color: "#7C3AED", emoji: "漢" },
+  kana:         { label: "Kana",         color: "#DB2777", emoji: "あ" },
+  reading:      { label: "Reading",      color: "#059669", emoji: "📰" },
+  listening:    { label: "Listening",    color: "#D97706", emoji: "👂" },
+  writing:      { label: "Writing",      color: "#0D9488", emoji: "✍️" },
+  conversation: { label: "Conversation", color: "#65A30D", emoji: "💬" },
+  review:       { label: "Review",       color: "#6366F1", emoji: "🔄" },
+  mock_test:    { label: "Mock Test",    color: "#DC2626", emoji: "📋" },
+  mixed:        { label: "Mixed",        color: "#78716C", emoji: "🧩" },
 };
 
 const PRACTICE_TYPE_CONFIG: Record<string, { label: string; emoji: string }> = {

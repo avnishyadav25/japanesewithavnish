@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth/admin";
 import { getPromptContent } from "@/lib/ai/load-prompts";
+import { filterValidItems } from "@/lib/ai/jsonItemValidators";
 
 const DEEPSEEK_API = "https://api.deepseek.com/v1/chat/completions";
 const GEMINI_TEXT_MODEL = "gemini-2.0-flash";
@@ -72,12 +73,15 @@ export async function POST(req: Request) {
   try {
     const arr = JSON.parse(cleaned);
     if (!Array.isArray(arr)) throw new Error("Not an array");
-    const items = arr.slice(0, count).map((x: { word?: string; reading?: string; meaning?: string }) => ({
-      word: typeof x?.word === "string" ? x.word : "",
-      reading: typeof x?.reading === "string" ? x.reading : "",
-      meaning: typeof x?.meaning === "string" ? x.meaning : "",
-    }));
-    return NextResponse.json({ items });
+    const { items, droppedCount } = filterValidItems<{ word: string; reading: string; meaning: string }>(
+      arr.slice(0, count),
+      ["word", "meaning"],
+      ["word", "reading", "meaning"]
+    );
+    if (items.length === 0) {
+      return NextResponse.json({ error: "AI returned no valid vocabulary items" }, { status: 502 });
+    }
+    return NextResponse.json({ items, droppedCount });
   } catch {
     return NextResponse.json({ error: "Invalid JSON from AI" }, { status: 502 });
   }

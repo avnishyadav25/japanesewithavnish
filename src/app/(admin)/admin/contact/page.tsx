@@ -49,12 +49,12 @@ export default async function AdminContactPage({
         breadcrumb={[{ label: "Admin", href: "/admin" }]}
       />
       <div className="flex flex-wrap items-center gap-4 mb-6">
-        <div className="card-content bento-span-2 inline-block w-fit">
+        <div className="card-content inline-block w-fit">
           <p className="text-secondary text-sm uppercase tracking-wider">Total</p>
           <p className="font-heading text-2xl font-bold text-charcoal">{items.length}</p>
         </div>
         {items.some((i) => i.status === "new") && (
-          <div className="card-content bento-span-2 inline-block w-fit">
+          <div className="card-content inline-block w-fit">
             <p className="text-secondary text-sm uppercase tracking-wider">Unread</p>
             <p className="font-heading text-2xl font-bold text-primary">{newCount}</p>
           </div>

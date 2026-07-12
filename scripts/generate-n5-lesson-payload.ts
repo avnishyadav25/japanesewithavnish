@@ -20,6 +20,7 @@ import "dotenv/config";
 import { neon } from "@neondatabase/serverless";
 import * as fs from "fs";
 import * as path from "path";
+import { parseProseToBlocks } from "../src/lib/curriculum/parseProseToBlocks";
 
 type LlmProvider = "deepseek" | "gemini" | "placeholder";
 
@@ -397,34 +398,40 @@ async function createPost(args: {
   return rows[0]!.id;
 }
 
-async function ensureLessonContentPosts(levelCode: string, lessonId: string, lessonTitle: string) {
+// Placeholder main lesson body, split into lesson_blocks (not posts/curriculum_lesson_content —
+// that legacy path is no longer rendered on the student page after the Phase 3 block migration).
+// Gives the admin a starting point to flesh out via the block editor / "Generate with AI" button.
+async function ensureLessonBlocksMain(lessonId: string, lessonTitle: string) {
+  const existing = (await sql`SELECT COUNT(*)::int AS c FROM lesson_blocks WHERE lesson_id = ${lessonId}`) as { c: number }[];
+  if ((existing[0]?.c ?? 0) > 0) return;
+
+  const mainContent = `## ${lessonTitle}\n\nIn this lesson you’ll build practical intuition with clear examples and mini-drills.\n\n### Key takeaways\n- Understand the core idea\n- See 3–5 examples\n- Try short exercises\n`;
+  const blocks = parseProseToBlocks(mainContent);
+  let sortOrder = 10;
+  for (const b of blocks) {
+    await sql`
+      INSERT INTO lesson_blocks (lesson_id, block_type, block_data, sort_order, status)
+      VALUES (${lessonId}, ${b.block_type}, ${JSON.stringify(b.block_data)}::jsonb, ${sortOrder}, 'published')
+    `;
+    sortOrder += 10;
+  }
+}
+
+async function ensureExercisePosts(levelCode: string, lessonId: string, lessonTitle: string) {
   const baseSlug = `${levelCode.toLowerCase()}-${slugify(lessonTitle)}`.slice(0, 70);
-  const mainSlug = `${baseSlug}-main`;
   const ex1Slug = `${baseSlug}-ex-1`;
   const ex2Slug = `${baseSlug}-ex-2`;
 
   const existing = (await sql`
     SELECT content_role, content_slug
     FROM curriculum_lesson_content
-    WHERE lesson_id = ${lessonId}
+    WHERE lesson_id = ${lessonId} AND content_role = 'exercise'
   `) as { content_role: string; content_slug: string }[];
   if (existing.length >= 1) return;
 
-  const mainContent = `## ${lessonTitle}\n\nIn this lesson you’ll build practical intuition with clear examples and mini-drills.\n\n### Key takeaways\n- Understand the core idea\n- See 3–5 examples\n- Try short exercises\n`;
   const ex1 = `## Exercise 1\n\nFill in the blanks and read aloud.\n\n1) わたしは __ です。\n2) これは __ です。\n`;
   const ex2 = `## Exercise 2\n\nTranslate to Japanese (keep it simple).\n\n1) This is a pen.\n2) I am a student.\n`;
 
-  const mainPostId = await createPost({
-    content_type: "study_guide",
-    slug: mainSlug,
-    title: `${lessonTitle} (Main)`,
-    content: mainContent,
-    jlpt_level: levelCode,
-    status: "published",
-    meta: { summary: `Main lesson content for: ${lessonTitle}` },
-    tags: [levelCode, "lesson", "curriculum"],
-    sort_order: 0,
-  });
   const ex1PostId = await createPost({
     content_type: "study_guide",
     slug: ex1Slug,
@@ -451,7 +458,6 @@ async function ensureLessonContentPosts(levelCode: string, lessonId: string, les
   await sql`
     INSERT INTO curriculum_lesson_content (lesson_id, content_slug, post_id, content_role, sort_order)
     VALUES
-      (${lessonId}, ${mainSlug}, ${mainPostId}, 'main', 0),
       (${lessonId}, ${ex1Slug}, ${ex1PostId}, 'exercise', 10),
       (${lessonId}, ${ex2Slug}, ${ex2PostId}, 'exercise', 20)
     ON CONFLICT DO NOTHING
@@ -651,7 +657,8 @@ async function main() {
     }
 
     if (!dryRun) {
-      await ensureLessonContentPosts(levelCode, lessonId, lessonTitle);
+      await ensureLessonBlocksMain(lessonId, lessonTitle);
+      await ensureExercisePosts(levelCode, lessonId, lessonTitle);
     }
 
     // Linked lists (generate only if empty)

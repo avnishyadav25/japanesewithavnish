@@ -42,15 +42,25 @@ export default async function ListeningDetailPage({ params }: Props) {
     return notFound();
   }
 
-  // 3. Fetch all scenarios linked to this listening ID
+  // 3. Fetch all scenarios linked to this listening ID, with each scenario's question count,
+  // and only keep scenarios that are actually complete (real audio + transcript + 3+ questions).
+  // A published post with no complete scenario should 404, not render a half-finished page.
   const scenariosRows = await sql`
-    SELECT id, title, audio_url, transcript, sort_order
-    FROM listening_scenarios
-    WHERE listening_id = ${listening.id}
-    ORDER BY sort_order, title
-  ` as { id: string; title: string; audio_url: string; transcript: string | null; sort_order: number }[];
+    SELECT ls.id, ls.title, ls.audio_url, ls.transcript, ls.sort_order,
+           (SELECT COUNT(*) FROM listening_questions lq WHERE lq.scenario_id = ls.id)::int AS question_count
+    FROM listening_scenarios ls
+    WHERE ls.listening_id = ${listening.id}
+    ORDER BY ls.sort_order, ls.title
+  ` as { id: string; title: string; audio_url: string; transcript: string | null; sort_order: number; question_count: number }[];
 
-  const scenarios = scenariosRows.map((s) => ({
+  const completeScenariosRows = scenariosRows.filter(
+    (s) => s.audio_url && s.transcript && s.question_count >= 3
+  );
+  if (completeScenariosRows.length === 0) {
+    return notFound();
+  }
+
+  const scenarios = completeScenariosRows.map((s) => ({
     id: s.id,
     title: s.title,
     audioUrl: s.audio_url,
@@ -84,16 +94,10 @@ export default async function ListeningDetailPage({ params }: Props) {
           )}
         </div>
 
-        {scenarios.length === 0 ? (
-          <div className="card p-8 bg-white border border-[var(--divider)] text-center text-secondary text-xs">
-            No audio scenarios available for this practice lesson yet.
-          </div>
-        ) : (
-          <DetailComprehensionClient
-            scenarios={scenarios}
-            sessionEmail={session?.email ?? null}
-          />
-        )}
+        <DetailComprehensionClient
+          scenarios={scenarios}
+          sessionEmail={session?.email ?? null}
+        />
 
       </div>
     </div>

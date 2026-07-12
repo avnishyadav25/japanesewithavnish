@@ -31,7 +31,7 @@ export default async function AdminCommentsPage() {
         breadcrumb={[{ label: "Admin", href: "/admin" }]}
       />
       <div className="mb-6">
-        <div className="card-content bento-span-2 inline-block w-fit">
+        <div className="card-content inline-block w-fit">
           <p className="text-secondary text-sm uppercase tracking-wider">Total</p>
           <p className="font-heading text-2xl font-bold text-charcoal">
             {items.length}

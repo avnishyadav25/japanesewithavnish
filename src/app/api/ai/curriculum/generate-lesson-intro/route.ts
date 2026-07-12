@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth/admin";
 import { getPromptContent } from "@/lib/ai/load-prompts";
+import { validateRequiredFields } from "@/lib/ai/jsonItemValidators";
 
 const DEEPSEEK_API = "https://api.deepseek.com/v1/chat/completions";
 const GEMINI_TEXT_MODEL = "gemini-2.0-flash";
@@ -71,9 +72,13 @@ export async function POST(req: Request) {
   const cleaned = raw.replace(/^```\w*\n?|\n?```$/g, "").trim();
   try {
     const parsed = JSON.parse(cleaned) as { introduction?: string; goal?: string };
+    const errors = validateRequiredFields(parsed, ["introduction"]);
+    if (errors.length > 0) {
+      return NextResponse.json({ error: `AI response missing required fields: ${errors.join(", ")}` }, { status: 502 });
+    }
     return NextResponse.json({
-      introduction: typeof parsed.introduction === "string" ? parsed.introduction : "",
-      goal: typeof parsed.goal === "string" ? parsed.goal : goal,
+      introduction: parsed.introduction!.trim(),
+      goal: typeof parsed.goal === "string" && parsed.goal.trim() ? parsed.goal.trim() : goal,
     });
   } catch {
     return NextResponse.json({ error: "Invalid JSON from AI" }, { status: 502 });

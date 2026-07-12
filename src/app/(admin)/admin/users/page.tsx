@@ -210,7 +210,7 @@ export default async function AdminUsersPage({
       />
 
       {/* Filter and Search Bar */}
-      <div className="bg-white border border-[var(--divider)] rounded-3xl p-5 shadow-sm space-y-4">
+      <AdminCard>
         <form method="GET" className="grid grid-cols-1 sm:grid-cols-5 gap-4">
           <div>
             <label className="block text-[10px] font-bold uppercase text-secondary mb-1">Search User</label>
@@ -279,7 +279,7 @@ export default async function AdminUsersPage({
             </button>
           </div>
         </form>
-      </div>
+      </AdminCard>
 
       {users.length > 0 ? (
         <AdminCard>

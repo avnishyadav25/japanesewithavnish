@@ -2,9 +2,10 @@ import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { LessonEditForm } from "./LessonEditForm";
-import { LessonBodySection } from "./LessonBodySection";
 import { LessonLinksSection } from "./LessonLinksSection";
+import { LessonObjectivesSection } from "./LessonObjectivesSection";
 import { LessonPracticesSection } from "./LessonPracticesSection";
+import { LessonBlocksSection } from "./LessonBlocksSection";
 
 export default async function AdminCurriculumLessonPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -58,8 +59,9 @@ export default async function AdminCurriculumLessonPage({ params }: { params: Pr
               feature_image_url: row.feature_image_url ?? ""
             }}
           />
+          <LessonObjectivesSection lessonId={row.id} />
           <LessonPracticesSection lessonId={row.id} />
-          <LessonBodySection lessonId={row.id} lessonTitle={row.title} levelCode={row.level_code} />
+          <LessonBlocksSection lessonId={row.id} />
         </div>
         <div className="md:col-span-1">
           <LessonLinksSection lessonId={row.id} lessonTitle={row.title} levelCode={row.level_code} />

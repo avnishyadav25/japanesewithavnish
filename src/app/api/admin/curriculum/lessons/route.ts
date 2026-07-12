@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth/admin";
 import { sql } from "@/lib/db";
+import { getLessonTemplateBlocks } from "@/lib/curriculum/lessonTemplates";
 
 const VALID_ACCESS = ["free", "premium"];
-const VALID_CONTENT_TYPES = ["grammar", "vocabulary", "kanji", "reading", "listening", "mock_test"];
+const VALID_CONTENT_TYPES = ["grammar", "vocabulary", "kanji", "kana", "reading", "listening", "writing", "conversation", "review", "mock_test", "mixed"];
 
 export async function GET(req: NextRequest) {
   const admin = await getAdminSession();
@@ -56,7 +57,20 @@ export async function POST(req: Request) {
                 description, access_type, content_type, estimated_minutes,
                 sort_order, feature_image_url, created_at, updated_at
     `;
-    return NextResponse.json((rows as object[])[0]);
+    const lesson = (rows as { id: string }[])[0];
+
+    // Scaffold-on-create: give the admin a starter block set matching the lesson's content type.
+    const templateBlocks = getLessonTemplateBlocks(contentTypeVal);
+    let sort2 = 10;
+    for (const b of templateBlocks) {
+      await sql`
+        INSERT INTO lesson_blocks (lesson_id, block_type, block_data, sort_order, status)
+        VALUES (${lesson.id}, ${b.block_type}, ${JSON.stringify(b.block_data)}::jsonb, ${sort2}, 'draft')
+      `;
+      sort2 += 10;
+    }
+
+    return NextResponse.json(lesson);
   } catch (e: unknown) {
     const msg = e && typeof e === "object" && "code" in e && (e as { code: string }).code === "23505"
       ? "Lesson code already exists for this submodule"

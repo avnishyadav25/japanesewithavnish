@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminCard } from "@/components/admin/AdminCard";
+import { AdminTable } from "@/components/admin/AdminTable";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { ResendOrderEmailButton } from "@/components/admin/ResendOrderEmailButton";
 import { MarkAsPaidButton } from "@/components/admin/MarkAsPaidButton";
@@ -149,34 +150,24 @@ export default async function AdminOrderDetailPage({
         <AdminCard>
           <h2 className="font-semibold text-charcoal mb-3">Line items</h2>
           {itemRows.length > 0 ? (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[var(--divider)] text-left text-secondary">
-                  <th className="py-2 pr-2">Product</th>
-                  <th className="py-2 pr-2">Qty</th>
-                  <th className="py-2 pr-2">Price</th>
-                  <th className="py-2 pr-2">Subtotal</th>
+            <AdminTable headers={["Product", "Qty", "Price", "Subtotal"]}>
+              {itemRows.map((row) => (
+                <tr key={row.id} className="border-b border-[var(--divider)] hover:bg-[var(--base)] transition-colors">
+                  <td className="py-2 px-2">
+                    <Link
+                      href={`/admin/products/${row.product_id}/edit`}
+                      className="text-primary hover:underline"
+                    >
+                      {row.product_name}
+                    </Link>
+                    <span className="text-secondary text-xs ml-1">/{row.product_slug}</span>
+                  </td>
+                  <td className="py-2 px-2">{row.quantity}</td>
+                  <td className="py-2 px-2">₹{row.price_paise / 100}</td>
+                  <td className="py-2 px-2">₹{(row.quantity * row.price_paise) / 100}</td>
                 </tr>
-              </thead>
-              <tbody>
-                {itemRows.map((row) => (
-                  <tr key={row.id} className="border-b border-[var(--divider)]">
-                    <td className="py-2 pr-2">
-                      <Link
-                        href={`/admin/products/${row.product_id}/edit`}
-                        className="text-primary hover:underline"
-                      >
-                        {row.product_name}
-                      </Link>
-                      <span className="text-secondary text-xs ml-1">/{row.product_slug}</span>
-                    </td>
-                    <td className="py-2 pr-2">{row.quantity}</td>
-                    <td className="py-2 pr-2">₹{row.price_paise / 100}</td>
-                    <td className="py-2 pr-2">₹{(row.quantity * row.price_paise) / 100}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+              ))}
+            </AdminTable>
           ) : (
             <p className="text-secondary text-sm">No items.</p>
           )}
@@ -185,28 +176,19 @@ export default async function AdminOrderDetailPage({
         <AdminCard>
           <h2 className="font-semibold text-charcoal mb-3">Payments</h2>
           {paymentRows.length > 0 ? (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[var(--divider)] text-left text-secondary">
-                  <th className="py-2 pr-2">Provider payment ID</th>
-                  <th className="py-2 pr-2">Status</th>
-                  <th className="py-2 pr-2">Created</th>
+            <AdminTable headers={["Provider payment ID", "Status", "Created"]}>
+              {paymentRows.map((p) => (
+                <tr key={p.id} className="border-b border-[var(--divider)] hover:bg-[var(--base)] transition-colors">
+                  <td className="py-2 px-2 font-mono text-xs">{p.provider_payment_id ?? "—"}</td>
+                  <td className="py-2 px-2">
+                    <StatusBadge status={p.status} />
+                  </td>
+                  <td className="py-2 px-2 text-secondary">
+                    {new Date(p.created_at).toLocaleString()}
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {paymentRows.map((p) => (
-                  <tr key={p.id} className="border-b border-[var(--divider)]">
-                    <td className="py-2 pr-2 font-mono text-xs">{p.provider_payment_id ?? "—"}</td>
-                    <td className="py-2 pr-2">
-                      <StatusBadge status={p.status} />
-                    </td>
-                    <td className="py-2 pr-2 text-secondary">
-                      {new Date(p.created_at).toLocaleString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+              ))}
+            </AdminTable>
           ) : (
             <p className="text-secondary text-sm">No payment records.</p>
           )}

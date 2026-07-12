@@ -269,7 +269,7 @@ const WHY_FEATURES = [
   },
   {
     title: "JLPT-style mock tests at every level",
-    sub: "Practise exactly what appears on exam day.",
+    sub: "Practise JLPT-style vocabulary, grammar, reading, and listening formats.",
   },
   {
     title: "Progressive grammar, vocab, and kanji",

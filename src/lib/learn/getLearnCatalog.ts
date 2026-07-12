@@ -5,6 +5,7 @@ import {
   type LearnItemForFilter,
   type LearnLevel,
 } from "@/lib/learn-filters";
+import { getCompleteListeningPostIds } from "@/lib/learn/listeningPublishGate";
 
 const PER_PAGE = 12;
 
@@ -69,6 +70,12 @@ export async function getLearnCatalog({
       ]);
 
       allItems = (Array.isArray(contentRows) ? contentRows : []) as LearnItemForFilter[];
+
+      // Hide listening posts that don't yet have a complete scenario (real audio + transcript + 3+ questions).
+      if (!contentType || contentType === "listening") {
+        const completeIds = await getCompleteListeningPostIds();
+        allItems = allItems.filter((item) => item.content_type !== "listening" || completeIds.has(item.id));
+      }
 
       const settingsRow = (Array.isArray(settingsRows) ? settingsRows[0] : settingsRows) as
         | { value: Record<string, string[]> }

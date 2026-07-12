@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth/admin";
 import { getPromptContent } from "@/lib/ai/load-prompts";
+import { filterValidItems } from "@/lib/ai/jsonItemValidators";
 
 const DEEPSEEK_API = "https://api.deepseek.com/v1/chat/completions";
 const GEMINI_TEXT_MODEL = "gemini-2.0-flash";
@@ -76,12 +77,15 @@ export async function POST(req: Request) {
   try {
     const arr = JSON.parse(cleaned);
     if (!Array.isArray(arr)) throw new Error("Not an array");
-    const items = arr.slice(0, count).map((x: { sentence_ja?: string; sentence_romaji?: string; sentence_en?: string }) => ({
-      sentence_ja: typeof x?.sentence_ja === "string" ? x.sentence_ja : "",
-      sentence_romaji: typeof x?.sentence_romaji === "string" ? x.sentence_romaji : "",
-      sentence_en: typeof x?.sentence_en === "string" ? x.sentence_en : "",
-    }));
-    return NextResponse.json({ items });
+    const { items, droppedCount } = filterValidItems<{ sentence_ja: string; sentence_romaji: string; sentence_en: string }>(
+      arr.slice(0, count),
+      ["sentence_ja", "sentence_en"],
+      ["sentence_ja", "sentence_romaji", "sentence_en"]
+    );
+    if (items.length === 0) {
+      return NextResponse.json({ error: "AI returned no valid example sentences" }, { status: 502 });
+    }
+    return NextResponse.json({ items, droppedCount });
   } catch {
     return NextResponse.json({ error: "Invalid JSON from AI" }, { status: 502 });
   }

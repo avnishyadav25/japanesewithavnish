@@ -54,30 +54,30 @@ export default function AdminReadingGlossaryPage() {
         <AdminCard>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-charcoal mb-1">Reading post slug</label>
+              <label className="block text-xs font-bold uppercase text-charcoal mb-1">Reading post slug</label>
               <input
                 value={slug}
                 onChange={(e) => setSlug(e.target.value)}
                 placeholder="e.g. n5-reading-..."
-                className="w-full px-3 py-2 border border-[var(--divider)] rounded-bento bg-white"
+                className="w-full px-4 py-2 border border-[var(--divider)] rounded-xl text-sm focus:outline-none focus:border-primary text-charcoal"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-charcoal mb-1">Post ID (UUID)</label>
+              <label className="block text-xs font-bold uppercase text-charcoal mb-1">Post ID (UUID)</label>
               <input
                 value={postId}
                 onChange={(e) => setPostId(e.target.value)}
                 placeholder="optional if slug provided"
-                className="w-full px-3 py-2 border border-[var(--divider)] rounded-bento bg-white"
+                className="w-full px-4 py-2 border border-[var(--divider)] rounded-xl text-sm focus:outline-none focus:border-primary text-charcoal"
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-charcoal mb-1">Level</label>
+                <label className="block text-xs font-bold uppercase text-charcoal mb-1">Level</label>
                 <select
                   value={levelCode}
                   onChange={(e) => setLevelCode(e.target.value)}
-                  className="w-full px-3 py-2 border border-[var(--divider)] rounded-bento bg-white"
+                  className="w-full px-4 py-2 border border-[var(--divider)] rounded-xl text-sm focus:outline-none focus:border-primary text-charcoal bg-white"
                 >
                   <option value="N5">N5</option>
                   <option value="N4">N4</option>
@@ -87,36 +87,38 @@ export default function AdminReadingGlossaryPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-charcoal mb-1">Count</label>
+                <label className="block text-xs font-bold uppercase text-charcoal mb-1">Count</label>
                 <input
                   type="number"
                   value={count}
                   min={1}
                   max={60}
                   onChange={(e) => setCount(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-[var(--divider)] rounded-bento bg-white"
+                  className="w-full px-4 py-2 border border-[var(--divider)] rounded-xl text-sm focus:outline-none focus:border-primary text-charcoal"
                 />
               </div>
             </div>
-            <label className="flex items-center gap-2 text-sm text-charcoal">
+            <label className="flex items-center gap-2 text-xs text-charcoal font-semibold">
               <input
                 type="checkbox"
                 checked={regenerate}
                 onChange={(e) => setRegenerate(e.target.checked)}
+                className="h-4 w-4 text-primary focus:ring-primary rounded"
               />
               Delete existing glossary items first
             </label>
             <button
+              type="button"
               onClick={run}
               disabled={status === "loading" || (!slug.trim() && !postId.trim())}
-              className="px-4 py-2 rounded-bento bg-primary text-white disabled:opacity-50"
+              className="btn-primary disabled:opacity-50"
             >
               {status === "loading" ? "Generating…" : "Generate glossary"}
             </button>
             {message && (
               <div
                 className={[
-                  "text-sm p-3 rounded-bento border",
+                  "text-xs p-3 rounded-xl border",
                   status === "error" ? "border-red-200 bg-red-50 text-red-700" : "border-[var(--divider)] bg-base text-charcoal",
                 ].join(" ")}
               >

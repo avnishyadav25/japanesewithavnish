@@ -3,7 +3,7 @@ import { getAdminSession } from "@/lib/auth/admin";
 import { sql } from "@/lib/db";
 
 const VALID_ACCESS = ["free", "premium"];
-const VALID_CONTENT_TYPES = ["grammar", "vocabulary", "kanji", "reading", "listening", "mock_test"];
+const VALID_CONTENT_TYPES = ["grammar", "vocabulary", "kanji", "kana", "reading", "listening", "writing", "conversation", "review", "mock_test", "mixed"];
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const admin = await getAdminSession();

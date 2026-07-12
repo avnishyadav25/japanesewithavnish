@@ -20,6 +20,11 @@ interface LearnLessonCardProps {
   variant?: "card" | "list";
 }
 
+/** study_guide stays canonical under /blog (editorial); every other type's canonical home is /learn. */
+function getLearnHref(contentType: string, slug: string): string {
+  return contentType === "study_guide" ? `/blog/study_guide/${slug}` : `/learn/${contentType}/${slug}`;
+}
+
 export function LearnLessonCard({ item, variant = "card" }: LearnLessonCardProps) {
   const summary = getSummary(item);
   const typeLabel = TYPE_LABELS[item.content_type] || item.content_type;
@@ -38,7 +43,7 @@ export function LearnLessonCard({ item, variant = "card" }: LearnLessonCardProps
   if (variant === "list") {
     return (
       <Link
-        href={`/blog/${item.content_type}/${item.slug}`}
+        href={getLearnHref(item.content_type, item.slug)}
         className="flex items-center gap-4 p-4 hover:no-underline group border-b border-[var(--divider)] last:border-b-0 hover:bg-[var(--divider)]/10 transition"
       >
         {featureImageUrl ? (
@@ -85,7 +90,7 @@ export function LearnLessonCard({ item, variant = "card" }: LearnLessonCardProps
   if (item.content_type === "grammar") {
     return (
       <Link
-        href={`/blog/grammar/${item.slug}`}
+        href={`/learn/grammar/${item.slug}`}
         className="card bg-white border border-[var(--divider)] p-5 rounded-2xl flex flex-col justify-between hover:shadow-md transition hover:no-underline group"
       >
         <div>
@@ -110,7 +115,7 @@ export function LearnLessonCard({ item, variant = "card" }: LearnLessonCardProps
   if (item.content_type === "vocabulary") {
     return (
       <Link
-        href={`/blog/vocabulary/${item.slug}`}
+        href={`/learn/vocabulary/${item.slug}`}
         className="card bg-white border border-[var(--divider)] p-5 rounded-2xl flex flex-col justify-between hover:shadow-md transition hover:no-underline group"
       >
         <div>
@@ -140,7 +145,7 @@ export function LearnLessonCard({ item, variant = "card" }: LearnLessonCardProps
   if (item.content_type === "kanji") {
     return (
       <Link
-        href={`/blog/kanji/${item.slug}`}
+        href={`/learn/kanji/${item.slug}`}
         className="card bg-white border border-[var(--divider)] p-5 rounded-2xl flex flex-col justify-between hover:shadow-md transition hover:no-underline text-center group"
       >
         <div>
@@ -225,7 +230,7 @@ export function LearnLessonCard({ item, variant = "card" }: LearnLessonCardProps
   // F. BLOG CARD OR DEFAULT FALLBACK
   return (
     <Link
-      href={`/blog/${item.content_type}/${item.slug}`}
+      href={getLearnHref(item.content_type, item.slug)}
       className="card block overflow-hidden p-0 hover:shadow-md transition hover:no-underline group bg-white border border-[var(--divider)] rounded-2xl"
     >
       <div className="aspect-video w-full bg-[var(--divider)]/20 relative overflow-hidden">

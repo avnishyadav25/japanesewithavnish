@@ -87,7 +87,7 @@ async function FullHomeView() {
           <div className="space-y-6">
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase bg-white/10 text-white border border-white/5">
-                🔥 2,000+ Active Learners
+                🔥 Join a growing community
               </span>
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase bg-[#D0021B]/20 text-[#FF6B6B] border border-[#D0021B]/10">
                 JLPT N5 → N1
@@ -100,7 +100,7 @@ async function FullHomeView() {
             </h1>
 
             <p className="text-white/70 text-sm leading-relaxed max-w-lg">
-              Unlock unlimited Japanese learning with a premium pass. Get 600+ sequential lessons, interactive practice drills, community scoreboards, streaks, and badges.
+              Unlock unlimited Japanese learning with a premium pass. Get 150+ structured lessons from N5 to N1, interactive practice drills, community scoreboards, streaks, and badges.
             </p>
 
             <div className="flex flex-wrap gap-3 pt-2">
@@ -200,7 +200,7 @@ async function FullHomeView() {
               {lessons.map((item) => (
                 <Link
                   key={item.id}
-                  href={`/blog/${item.content_type}/${item.slug}`}
+                  href={`/learn/${item.content_type}/${item.slug}`}
                   className="block bg-white border border-[var(--divider)] rounded-2xl p-5 hover:border-primary/30 transition shadow-sm group"
                 >
                   <h3 className="font-bold text-xs text-charcoal group-hover:text-primary transition mb-1 leading-snug">

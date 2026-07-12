@@ -46,3 +46,4 @@ google-cloud-cli-*.tar.gz
 
 # backups
 /backups
+/scripts/backups

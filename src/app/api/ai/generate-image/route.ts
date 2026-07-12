@@ -4,6 +4,9 @@ import { getAdminSession } from "@/lib/auth/admin";
 import { getImagePrompt, type ImageType } from "@/lib/ai/image-prompts";
 import { getPromptContent } from "@/lib/ai/load-prompts";
 import { insertAiLog } from "@/lib/ai-logs";
+import { generateImageWithGemini, type GeneratedImage } from "@/lib/ai/image-providers/gemini";
+import { generateImageWithHuggingFace } from "@/lib/ai/image-providers/huggingface";
+import { generateImageWithDeepSeekHtml } from "@/lib/ai/image-providers/deepseek-html";
 
 const validImageTypes: ImageType[] = ["product", "blog", "newsletter", "page", "learning", "curriculum"];
 
@@ -24,17 +27,6 @@ export async function POST(req: Request) {
     const admin = await getAdminSession();
     if (!admin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY;
-    const geminiImageModel =
-      process.env.GEMINI_IMAGE_MODEL || "gemini-2.0-flash-preview-image-generation";
-
-    if (!key) {
-      return NextResponse.json(
-        { error: "Gemini not configured. Set GEMINI_API_KEY in .env." },
-        { status: 503 }
-      );
     }
 
     const body = await req.json();
@@ -80,90 +72,78 @@ Use the reference image for style and mood. Clean flat-vector educational style.
       userPrompt = `${userPrompt}\n\nAt the bottom of the image, display the text japanesewithavnish.com in clean, readable typography (subtle but legible).`;
     }
 
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${geminiImageModel}:generateContent?key=${key}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: userPrompt }] }],
-          generationConfig: {
-            temperature: 0.9,
-            maxOutputTokens: 2048,
-            responseModalities: ["TEXT", "IMAGE"],
-          },
-        }),
-      }
-    );
+    // Provider fallback chain: Gemini first, then HuggingFace (Z-Image via fal-ai),
+    // then DeepSeek-authored HTML card rendered via next/og as a last resort.
+    let generated: GeneratedImage | null = null;
+    let modelUsed = "";
+    const providerErrors: string[] = [];
 
-    if (!geminiRes.ok) {
-      const err = await geminiRes.text();
-      console.error("Gemini API:", err);
-      let msg = "Image generation failed";
+    try {
+      generated = await generateImageWithGemini(userPrompt);
+      modelUsed = "gemini";
+    } catch (e) {
+      providerErrors.push(`gemini: ${e instanceof Error ? e.message : String(e)}`);
+    }
+
+    if (!generated) {
       try {
-        const errJson = JSON.parse(err);
-        msg = errJson.error?.message || msg;
-      } catch {
-        // use default
+        generated = await generateImageWithHuggingFace(userPrompt);
+        modelUsed = "huggingface-z-image";
+      } catch (e) {
+        providerErrors.push(`huggingface: ${e instanceof Error ? e.message : String(e)}`);
       }
-      return NextResponse.json({ error: msg }, { status: 502 });
     }
 
-    const data = await geminiRes.json();
-    const parts = data.candidates?.[0]?.content?.parts ?? [];
-    const text = parts.find((p: { text?: string }) => p.text)?.text ?? "";
-
-    // Look for inline image data in response
-    const imagePart = parts.find(
-      (p: { inlineData?: { mimeType?: string; data?: string } }) => p.inlineData?.data
-    );
-    if (imagePart?.inlineData?.data) {
-      const mime = imagePart.inlineData.mimeType || "image/png";
-      const ext = mime.includes("jpeg") || mime.includes("jpg") ? "jpg" : "png";
-      const folder = imageType;
-      const key = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-
-      const r2 = getR2Client();
-      const bucket = process.env.R2_BUCKET_NAME;
-      const bucketUrl = process.env.R2_BUCKET_URL?.replace(/\/$/, "");
-
-      if (!r2 || !bucket || !bucketUrl) {
-        return NextResponse.json(
-          { error: "R2 not configured. Set R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME, R2_BUCKET_URL." },
-          { status: 503 }
-        );
+    if (!generated) {
+      try {
+        generated = await generateImageWithDeepSeekHtml(userPrompt);
+        modelUsed = "deepseek-html-card";
+      } catch (e) {
+        providerErrors.push(`deepseek-html: ${e instanceof Error ? e.message : String(e)}`);
       }
+    }
 
-      const buf = Buffer.from(imagePart.inlineData.data, "base64");
-      await r2.send(
-        new PutObjectCommand({
-          Bucket: bucket,
-          Key: key,
-          Body: buf,
-          ContentType: mime,
-        })
+    if (!generated) {
+      console.error("All image providers failed:", providerErrors);
+      return NextResponse.json({ error: `Image generation failed on all providers: ${providerErrors.join("; ")}` }, { status: 502 });
+    }
+
+    const { buffer, mime, textResponse } = generated;
+    const ext = mime.includes("jpeg") || mime.includes("jpg") ? "jpg" : "png";
+    const folder = imageType;
+    const key = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+
+    const r2 = getR2Client();
+    const bucket = process.env.R2_BUCKET_NAME;
+    const bucketUrl = process.env.R2_BUCKET_URL?.replace(/\/$/, "");
+
+    if (!r2 || !bucket || !bucketUrl) {
+      return NextResponse.json(
+        { error: "R2 not configured. Set R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME, R2_BUCKET_URL." },
+        { status: 503 }
       );
-
-      const publicUrl = `${bucketUrl}/${key}`;
-      const admin = await getAdminSession();
-      await insertAiLog({
-        log_type: "image_generate",
-        content_type: imageType,
-        entity_type: imageType === "blog" ? "post" : imageType === "product" ? "product" : imageType === "newsletter" ? "newsletter" : undefined,
-        model_used: "gemini",
-        prompt_sent: userPrompt,
-        result_preview: publicUrl,
-        admin_email: admin?.email,
-      });
-      return NextResponse.json({ imageUrl: publicUrl, content: text });
     }
 
-    // No image in response - model may not support image gen yet
-    return NextResponse.json({
-      error:
-        "No image in response. Ensure GEMINI_IMAGE_MODEL supports image generation (e.g. gemini-2.0-flash-preview-image-generation).",
-      content: text,
+    await r2.send(
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        Body: buffer,
+        ContentType: mime,
+      })
+    );
+
+    const publicUrl = `${bucketUrl}/${key}`;
+    await insertAiLog({
+      log_type: "image_generate",
+      content_type: imageType,
+      entity_type: imageType === "blog" ? "post" : imageType === "product" ? "product" : imageType === "newsletter" ? "newsletter" : undefined,
+      model_used: modelUsed,
+      prompt_sent: userPrompt,
+      result_preview: publicUrl,
+      admin_email: admin?.email,
     });
+    return NextResponse.json({ imageUrl: publicUrl, content: textResponse ?? "" });
   } catch (e) {
     console.error("AI generate-image:", e);
     const msg = e instanceof Error ? e.message : "Failed to generate";

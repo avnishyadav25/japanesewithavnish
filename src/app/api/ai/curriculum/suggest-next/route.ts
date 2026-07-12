@@ -54,7 +54,9 @@ export async function POST(req: Request) {
       maxTokens: 400,
       parse: (obj) => {
         const o = obj as { suggestions?: unknown };
-        const list = Array.isArray(o.suggestions) ? o.suggestions.filter((x): x is string => typeof x === "string") : [];
+        const list = Array.isArray(o.suggestions)
+          ? o.suggestions.filter((x): x is string => typeof x === "string" && x.trim().length > 0).map((x) => x.trim())
+          : [];
         return { suggestions: list };
       },
     });

@@ -6,6 +6,7 @@ import { BlogCommentList } from "@/components/BlogCommentList";
 import { BlogStickyCta } from "@/components/blog/BlogStickyCta";
 import { BlogTableOfContents } from "@/components/blog/BlogTableOfContents";
 import { BlogArticleContent } from "@/components/blog/BlogArticleContent";
+import { JLPTVerificationBox } from "@/components/learn/JLPTVerificationBox";
 import { BlogNextStepCta } from "@/components/blog/BlogNextStepCta";
 import { BlogPostCard } from "@/components/blog/BlogPostCard";
 import { filterPosts, type PostForFilter } from "@/lib/blog-filters";
@@ -54,6 +55,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
   const post = postRaw as {
     id: string; title: string; summary?: string | null; seo_description?: string | null; content?: string | null;
     published_at?: string | null; og_image_url?: string | null; jlpt_level?: unknown; tags?: string[];
+    meta?: { jlpt_verification?: { verifiedAt?: string; source?: string; reviewedBy?: string } } | null;
   };
 
   const jlptLevels = Array.isArray(post.jlpt_level)
@@ -182,6 +184,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
                   {contentStr ? (
                     <BlogArticleContent content={contentStr} />
                   ) : null}
+                  <JLPTVerificationBox verification={post.meta?.jlpt_verification} />
                 </div>
               </div>
             </div>

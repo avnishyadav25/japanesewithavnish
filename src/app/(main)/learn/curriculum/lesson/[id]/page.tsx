@@ -7,6 +7,8 @@ import { LearnMarkdown } from "@/components/learn/LearnMarkdown";
 import { InteractivePracticePanel } from "@/components/learn/practices/InteractivePracticePanel";
 import { canAccessLesson } from "@/lib/auth/access";
 import { Countdown } from "@/components/learn/Countdown";
+import { getResolvedLessonBlocks } from "@/lib/curriculum/getLessonBlocks";
+import { LessonBlockRenderer } from "@/components/curriculum/LessonBlockRenderer";
 
 export default async function LearnCurriculumLessonPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -139,7 +141,6 @@ export default async function LearnCurriculumLessonPage({ params }: { params: Pr
     meta: Record<string, unknown> | null;
     content_type: string | null;
   }[]) ?? [];
-  const mainBlocks = blocks.filter((b) => b.content_role === "main");
   const exercises = blocks.filter((b) => b.content_role === "exercise");
 
   const vocabRows = await sql`
@@ -247,6 +248,8 @@ export default async function LearnCurriculumLessonPage({ params }: { params: Pr
     estimated_minutes: number | null;
   }[]) ?? [];
 
+  const lessonBlocks = await getResolvedLessonBlocks(row.id);
+
   const writingHiraganaChars = kana
     .filter((k) => k.type === "hiragana" && k.character)
     .map((k) => k.character);
@@ -324,16 +327,8 @@ export default async function LearnCurriculumLessonPage({ params }: { params: Pr
           <div className="lg:col-span-8 space-y-8 min-w-0">
             <section id="lesson" className="scroll-mt-6">
               <h2 className="font-heading text-lg font-semibold text-charcoal mb-3">Lesson Content</h2>
-              {mainBlocks.length ? (
-                <div className="space-y-6">
-                  {mainBlocks.map((b) => (
-                    <div key={b.id} className="bg-white border border-[var(--divider)] rounded-bento p-6">
-                      <div className="prose prose-charcoal max-w-none text-sm leading-relaxed">
-                        <LearnMarkdown content={(b.content ?? "").trim() || "_Content coming soon._"} meta={b.meta ?? {}} contentType={b.content_type ?? undefined} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
+              {lessonBlocks.length > 0 ? (
+                <LessonBlockRenderer blocks={lessonBlocks} />
               ) : (
                 <p className="text-secondary text-xs italic">No main lesson content yet.</p>
               )}

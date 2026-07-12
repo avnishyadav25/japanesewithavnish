@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth/admin";
 import { sql } from "@/lib/db";
 import { LEARN_CONTENT_TYPES, type LearnContentType } from "@/lib/learn-filters";
+import { syncPostToTypeTable } from "@/lib/admin/syncTypeTables";
 
 type BulkItem = {
   title?: string;
@@ -87,7 +88,7 @@ export async function POST(
       if (existingSlugs.has(slug)) {
         if (override) {
           try {
-            await sql`
+            const rows = await sql`
               UPDATE posts SET
                 title = ${title},
                 content = COALESCE(content, ''),
@@ -99,7 +100,9 @@ export async function POST(
                 published_at = ${publishedAtVal},
                 updated_at = ${new Date().toISOString()}
               WHERE content_type = ${type} AND slug = ${slug}
-            `;
+              RETURNING id, content_type, title, jlpt_level, meta
+            ` as { id: string; content_type: string; title: string; jlpt_level: string[] | null; meta: unknown }[];
+            if (rows[0]) await syncPostToTypeTable(rows[0]);
             updated++;
           } catch {
             errors.push(`Item ${i + 1} (${slug}): update failed`);
@@ -111,10 +114,12 @@ export async function POST(
       }
 
       try {
-        await sql`
+        const rows = await sql`
           INSERT INTO posts (content_type, slug, title, content, jlpt_level, tags, meta, status, published_at, sort_order)
           VALUES (${type}, ${slug}, ${title}, '', ${jlptArr}, ${tags}, ${metaVal}::jsonb, ${statusVal}, ${publishedAtVal}, ${sortOrderVal})
-        `;
+          RETURNING id, content_type, title, jlpt_level, meta
+        ` as { id: string; content_type: string; title: string; jlpt_level: string[] | null; meta: unknown }[];
+        if (rows[0]) await syncPostToTypeTable(rows[0]);
         existingSlugs.add(slug);
         created++;
       } catch (err: unknown) {

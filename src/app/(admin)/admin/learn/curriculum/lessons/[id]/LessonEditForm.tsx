@@ -103,9 +103,14 @@ export function LessonEditForm({ lessonId, levelCode = "N5", initial }: Props) {
             <option value="grammar">Grammar 📖</option>
             <option value="vocabulary">Vocabulary 📝</option>
             <option value="kanji">Kanji 漢</option>
+            <option value="kana">Kana あ</option>
             <option value="reading">Reading 📰</option>
             <option value="listening">Listening 👂</option>
+            <option value="writing">Writing ✍️</option>
+            <option value="conversation">Conversation 💬</option>
+            <option value="review">Review 🔄</option>
             <option value="mock_test">Mock Test 📋</option>
+            <option value="mixed">Mixed 🧩</option>
           </select>
         </div>
         <div>

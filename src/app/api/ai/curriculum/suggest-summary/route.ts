@@ -35,9 +35,12 @@ export async function POST(req: Request) {
       maxTokens: 500,
       parse: (obj) => {
         const o = obj as { summary?: string; description?: string };
+        if (typeof o.summary !== "string" || !o.summary.trim()) {
+          throw new Error("AI response missing required field: summary");
+        }
         return {
-          summary: typeof o.summary === "string" ? o.summary : "",
-          description: typeof o.description === "string" ? o.description : "",
+          summary: o.summary.trim(),
+          description: typeof o.description === "string" ? o.description.trim() : "",
         };
       },
     });

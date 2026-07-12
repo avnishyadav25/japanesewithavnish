@@ -65,7 +65,7 @@ export default async function AdminStudentsPage() {
         breadcrumb={[{ label: "Admin", href: "/admin" }, { label: "Students" }]}
       />
       <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
-        <div className="card-content bento-span-2 inline-block w-fit">
+        <div className="card-content inline-block w-fit">
           <p className="text-secondary text-sm uppercase tracking-wider">Total</p>
           <p className="font-heading text-2xl font-bold text-charcoal">{total}</p>
         </div>

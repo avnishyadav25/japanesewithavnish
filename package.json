@@ -15,6 +15,8 @@
     "seed:curriculum": "tsx scripts/seed-curriculum.ts",
     "seed:curriculum-from-docs": "tsx scripts/seed-curriculum-from-docs.ts",
     "content:audit": "tsx scripts/content-audit.ts",
+    "content:verify-jlpt-facts": "tsx scripts/verify-jlpt-facts.ts",
+    "content:triage-quality": "tsx scripts/triage-content-quality.ts",
     "content:dedupe": "node scripts/dedupe-learning-content.mjs",
     "content:seed-kanji": "node scripts/seed-kanji-coverage-from-json.mjs",
     "content:import-n5-n4-vocab": "node scripts/import-nihongoichiban-n5-n4-vocab.mjs",
@@ -23,6 +25,9 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1000.0",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@neondatabase/serverless": "^1.0.2",
     "framer-motion": "^12.34.3",
     "jose": "^6.1.3",
@@ -34,6 +39,7 @@
     "react-markdown": "^10.1.0",
     "remark-breaks": "^4.0.0",
     "remark-gfm": "^4.0.1",
+    "satori-html": "^0.3.2",
     "stripe": "^22.3.0"
   },
   "devDependencies": {

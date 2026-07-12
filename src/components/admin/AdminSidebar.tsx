@@ -20,6 +20,7 @@ const navGroups = [
       { href: "/admin/users?plan=premium", label: "Premium Users" },
       { href: "/admin/users?plan=trial", label: "Trial Users" },
       { href: "/admin/users?status=suspended", label: "Suspended Users" },
+      { href: "/admin/students", label: "Students" },
       { href: "/admin/users/roles", label: "Staff & Roles" },
       { href: "/admin/users/activity", label: "User Activity" }
     ]
@@ -35,6 +36,13 @@ const navGroups = [
     ]
   },
   {
+    label: "Store",
+    items: [
+      { href: "/admin/products", label: "Products" },
+      { href: "/admin/orders", label: "Orders" }
+    ]
+  },
+  {
     label: "Offers",
     items: [
       { href: "/admin/coupons", label: "Coupons" },
@@ -46,14 +54,14 @@ const navGroups = [
     label: "Learning Content",
     items: [
       { href: "/admin/learn/curriculum", label: "Curriculum" },
-      { href: "/admin/learn/lessons", label: "Lessons" },
       { href: "/admin/learn/vocabulary", label: "Vocabulary" },
       { href: "/admin/learn/grammar", label: "Grammar" },
       { href: "/admin/learn/kanji", label: "Kanji" },
       { href: "/admin/learn/reading", label: "Reading" },
       { href: "/admin/learn/listening", label: "Listening" },
       { href: "/admin/learn/writing", label: "Writing" },
-      { href: "/admin/learn/practice_test", label: "Mock Tests" }
+      { href: "/admin/learn/practice_test", label: "Mock Tests" },
+      { href: "/admin/blogs", label: "Blogs" }
     ]
   },
   {
@@ -79,17 +87,25 @@ const navGroups = [
     items: [
       { href: "/admin/newsletter/subscribers", label: "Newsletter" },
       { href: "/admin/newsletter/notifications", label: "Notifications" },
-      { href: "/admin/emailtemplate", label: "Email Templates" }
+      { href: "/admin/newsletters", label: "Compose Newsletter" },
+      { href: "/admin/emailtemplate", label: "Email Templates" },
+      { href: "/admin/comments", label: "Comments" },
+      { href: "/admin/contact", label: "Contact Inbox" }
     ]
   },
   {
     label: "AI Tools",
     items: [
+      { href: "/admin/learn/curriculum/review-queue", label: "Review Queue" },
       { href: "/admin/prompts", label: "AI Prompts" },
       { href: "/admin/ai/content-generator", label: "Content Generator" },
       { href: "/admin/ai/listening-generator", label: "Listening Generator" },
       { href: "/admin/listening-generator", label: "Listening Maker Panel" },
-      { href: "/admin/grammar-drills", label: "Practice Drills Panel" }
+      { href: "/admin/grammar-drills", label: "Practice Drills Panel" },
+      { href: "/admin/chatbot", label: "Chatbot Console" },
+      { href: "/admin/reading-glossary", label: "Reading Glossary" },
+      { href: "/admin/social", label: "Social Content" },
+      { href: "/admin/ai-logs", label: "AI Logs" }
     ]
   },
   {
@@ -98,7 +114,8 @@ const navGroups = [
       { href: "/admin/analytics/users", label: "User Analytics" },
       { href: "/admin/analytics/learning", label: "Learning Analytics" },
       { href: "/admin/analytics/revenue", label: "Revenue Analytics" },
-      { href: "/admin/analytics/cohorts", label: "Cohorts" }
+      { href: "/admin/analytics/cohorts", label: "Cohorts" },
+      { href: "/admin/content-audit", label: "Content Audit" }
     ]
   },
   {
@@ -107,7 +124,8 @@ const navGroups = [
       { href: "/admin/settings", label: "Site Settings" },
       { href: "/admin/settings/access-rules", label: "Access Rules" },
       { href: "/admin/settings/payments", label: "Payment Settings" },
-      { href: "/admin/settings/seo", label: "SEO Settings" }
+      { href: "/admin/settings/seo", label: "SEO Settings" },
+      { href: "/admin/progression", label: "Progression Rules" }
     ]
   }
 ];

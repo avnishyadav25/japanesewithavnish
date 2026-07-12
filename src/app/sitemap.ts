@@ -60,9 +60,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           AND content_type IN ('grammar','vocabulary','kanji','reading','writing','listening','sounds','study_guide','practice_test')
         ORDER BY updated_at DESC
       ` as { slug: string; content_type: string; updated_at: string }[];
+      // study_guide stays canonical under /blog (editorial); every other type's canonical home is /learn.
       learnEntries.push(
         ...(learnRows || []).map((row) => ({
-          url: `${BASE}/blog/${row.content_type}/${row.slug}`,
+          url:
+            row.content_type === "study_guide"
+              ? `${BASE}/blog/study_guide/${row.slug}`
+              : `${BASE}/learn/${row.content_type}/${row.slug}`,
           lastModified: row.updated_at ? new Date(row.updated_at) : new Date(),
           changeFrequency: "weekly" as const,
           priority: 0.7 as number,

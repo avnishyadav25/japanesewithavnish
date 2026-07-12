@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { AdminCard } from "@/components/admin/AdminCard";
+import { AdminTable } from "@/components/admin/AdminTable";
 import { getContentAudit } from "@/lib/admin/contentAudit";
 
 function pct(current: number, target: number) {
@@ -35,24 +37,24 @@ export default async function AdminContentAuditPage() {
       {audit && (
         <>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-white border border-[var(--divider)] rounded-3xl p-5 shadow-card">
+            <AdminCard>
               <span className="text-secondary text-[10px] font-bold uppercase tracking-wider">Duplicate Groups</span>
               <strong className="block font-heading text-3xl text-charcoal mt-2">{duplicateTotal}</strong>
               <p className="text-xs text-secondary mt-1">Top 50 groups shown per type.</p>
-            </div>
-            <div className="bg-white border border-[var(--divider)] rounded-3xl p-5 shadow-card">
+            </AdminCard>
+            <AdminCard>
               <span className="text-secondary text-[10px] font-bold uppercase tracking-wider">Lesson Issues</span>
               <strong className="block font-heading text-3xl text-charcoal mt-2">{audit.lessonIssues.length}</strong>
               <p className="text-xs text-secondary mt-1">Short bodies, weak outlines, missing examples, drills, links, or images.</p>
-            </div>
-            <div className="bg-white border border-[var(--divider)] rounded-3xl p-5 shadow-card">
+            </AdminCard>
+            <AdminCard>
               <span className="text-secondary text-[10px] font-bold uppercase tracking-wider">Safe Merge Flow</span>
               <strong className="block font-heading text-lg text-charcoal mt-2">Dry-run first</strong>
               <p className="text-xs text-secondary mt-1">Use scripts before applying destructive duplicate merges.</p>
-            </div>
+            </AdminCard>
           </div>
 
-          <section className="bg-white border border-[var(--divider)] rounded-3xl p-6 shadow-sm">
+          <section>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
               <div>
                 <h2 className="font-heading text-lg font-black text-charcoal">JLPT Coverage Targets</h2>
@@ -62,28 +64,18 @@ export default async function AdminContentAuditPage() {
                 Open curriculum →
               </Link>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="text-left text-xs uppercase tracking-wider text-secondary border-b border-[var(--divider)]">
-                  <tr>
-                    <th className="py-3 pr-4">Level</th>
-                    <th className="py-3 pr-4">Kanji</th>
-                    <th className="py-3 pr-4">Vocabulary</th>
-                    <th className="py-3 pr-4">Grammar</th>
+            <AdminCard>
+              <AdminTable headers={["Level", "Kanji", "Vocabulary", "Grammar"]}>
+                {audit.coverage.map((row) => (
+                  <tr key={row.level} className="border-b border-[var(--divider)] hover:bg-[var(--base)] transition-colors">
+                    <td className="py-3 px-2 font-heading font-bold text-charcoal">{row.level}</td>
+                    <td className="py-3 px-2">{row.kanji.toLocaleString()} / {row.kanjiTarget.toLocaleString()} <span className="text-secondary">({pct(row.kanji, row.kanjiTarget)}%)</span></td>
+                    <td className="py-3 px-2">{row.vocabulary.toLocaleString()} / {row.vocabularyTarget.toLocaleString()} <span className="text-secondary">({pct(row.vocabulary, row.vocabularyTarget)}%)</span></td>
+                    <td className="py-3 px-2">{row.grammar.toLocaleString()} / {row.grammarTarget.toLocaleString()} <span className="text-secondary">({pct(row.grammar, row.grammarTarget)}%)</span></td>
                   </tr>
-                </thead>
-                <tbody>
-                  {audit.coverage.map((row) => (
-                    <tr key={row.level} className="border-b border-[var(--divider)] last:border-0">
-                      <td className="py-3 pr-4 font-heading font-bold text-charcoal">{row.level}</td>
-                      <td className="py-3 pr-4">{row.kanji.toLocaleString()} / {row.kanjiTarget.toLocaleString()} <span className="text-secondary">({pct(row.kanji, row.kanjiTarget)}%)</span></td>
-                      <td className="py-3 pr-4">{row.vocabulary.toLocaleString()} / {row.vocabularyTarget.toLocaleString()} <span className="text-secondary">({pct(row.vocabulary, row.vocabularyTarget)}%)</span></td>
-                      <td className="py-3 pr-4">{row.grammar.toLocaleString()} / {row.grammarTarget.toLocaleString()} <span className="text-secondary">({pct(row.grammar, row.grammarTarget)}%)</span></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </AdminTable>
+            </AdminCard>
           </section>
 
           <section className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -109,31 +101,23 @@ export default async function AdminContentAuditPage() {
             ))}
           </section>
 
-          <section className="bg-white border border-[var(--divider)] rounded-3xl p-6 shadow-sm">
+          <section>
             <h2 className="font-heading text-lg font-black text-charcoal">Lesson Quality Issues</h2>
             <p className="text-sm text-secondary mb-4">Review these before bulk publishing regenerated content.</p>
-            <div className="overflow-x-auto max-h-[520px]">
-              <table className="w-full text-sm">
-                <thead className="text-left text-xs uppercase tracking-wider text-secondary border-b border-[var(--divider)] sticky top-0 bg-white">
-                  <tr>
-                    <th className="py-3 pr-4">Level</th>
-                    <th className="py-3 pr-4">Lesson</th>
-                    <th className="py-3 pr-4">Issue</th>
-                    <th className="py-3 pr-4">Detail</th>
-                  </tr>
-                </thead>
-                <tbody>
+            <AdminCard>
+              <div className="max-h-[520px] overflow-auto">
+                <AdminTable headers={["Level", "Lesson", "Issue", "Detail"]}>
                   {audit.lessonIssues.slice(0, 100).map((issue) => (
-                    <tr key={`${issue.lessonId}-${issue.issue}`} className="border-b border-[var(--divider)] last:border-0">
-                      <td className="py-3 pr-4 font-bold text-charcoal">{issue.level}</td>
-                      <td className="py-3 pr-4">
+                    <tr key={`${issue.lessonId}-${issue.issue}`} className="border-b border-[var(--divider)] hover:bg-[var(--base)] transition-colors">
+                      <td className="py-3 px-2 font-bold text-charcoal">{issue.level}</td>
+                      <td className="py-3 px-2">
                         <Link href={`/admin/learn/curriculum/lessons/${issue.lessonId}`} className="font-semibold text-primary hover:underline">
                           {issue.lessonTitle}
                         </Link>
                         <span className="block text-xs text-secondary">{issue.moduleTitle}</span>
                       </td>
-                      <td className="py-3 pr-4 font-semibold text-charcoal">{issue.issue.replaceAll("_", " ")}</td>
-                      <td className="py-3 pr-4 text-secondary">{issue.detail}</td>
+                      <td className="py-3 px-2 font-semibold text-charcoal">{issue.issue.replaceAll("_", " ")}</td>
+                      <td className="py-3 px-2 text-secondary">{issue.detail}</td>
                     </tr>
                   ))}
                   {!audit.lessonIssues.length && (
@@ -141,9 +125,9 @@ export default async function AdminContentAuditPage() {
                       <td className="py-6 text-secondary" colSpan={4}>No lesson quality issues found.</td>
                     </tr>
                   )}
-                </tbody>
-              </table>
-            </div>
+                </AdminTable>
+              </div>
+            </AdminCard>
           </section>
 
           <section className="bg-[#FFF7F7] border border-primary/15 rounded-3xl p-6">

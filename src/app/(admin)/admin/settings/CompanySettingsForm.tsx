@@ -147,36 +147,6 @@ export function CompanySettingsForm({
         ))}
       </SettingsSection>
 
-      <SettingsSection title="SEO defaults">
-        <div>
-          <label className="block text-sm font-medium text-charcoal mb-1">Default meta title</label>
-          <input
-            type="text"
-            value={String(settings.seo_default_title ?? "")}
-            onChange={(e) => update("seo_default_title", e.target.value)}
-            className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-charcoal mb-1">Default meta description</label>
-          <textarea
-            value={String(settings.seo_default_description ?? "")}
-            onChange={(e) => update("seo_default_description", e.target.value)}
-            rows={2}
-            className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-charcoal mb-1">Default OG image URL</label>
-          <input
-            type="url"
-            value={String(settings.seo_default_og_image ?? "")}
-            onChange={(e) => update("seo_default_og_image", e.target.value)}
-            className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
-          />
-        </div>
-      </SettingsSection>
-
       <SettingsSection title="Footer">
         <div>
           <label className="block text-sm font-medium text-charcoal mb-1">Copyright text</label>

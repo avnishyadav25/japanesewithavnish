@@ -2,19 +2,11 @@ import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth/admin";
 import { sql } from "@/lib/db";
 import { getPromptContent } from "@/lib/ai/load-prompts";
+import { parseProseToBlocks } from "@/lib/curriculum/parseProseToBlocks";
+import { validateBlockData } from "@/lib/curriculum/blockTypes";
 
 const DEEPSEEK_API = "https://api.deepseek.com/v1/chat/completions";
 const GEMINI_TEXT_MODEL = "gemini-2.0-flash";
-
-function slugify(input: string): string {
-  return (input || "")
-    .toLowerCase()
-    .replace(/['"]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 60);
-}
 
 const BODY_SYSTEM = `You are an expert Japanese curriculum writer. Write the MAIN LESSON BODY (teaching content) in Markdown.
 
@@ -55,7 +47,6 @@ export async function POST(req: Request) {
 
   const body = await req.json().catch(() => ({}));
   const lessonId = typeof body.lessonId === "string" ? body.lessonId.trim() : "";
-  const regenerate = body.regenerate === true;
   const contentLLM = ((body.content_llm as string) || process.env.CONTENT_LLM || "deepseek").toLowerCase();
   const model = contentLLM === "gemini" ? "gemini" : "deepseek";
 
@@ -72,45 +63,15 @@ export async function POST(req: Request) {
   const lesson = lessonRows[0];
   if (!lesson) return NextResponse.json({ error: "Lesson not found" }, { status: 404 });
 
+  const existingBlocks = (await sql`SELECT COUNT(*) AS count FROM lesson_blocks WHERE lesson_id = ${lessonId}`) as { count: string }[];
+  if (Number(existingBlocks[0]?.count ?? 0) > 0) {
+    return NextResponse.json(
+      { error: "Lesson already has content blocks. Delete existing blocks in the Lesson Content Blocks editor first, then generate again." },
+      { status: 409 }
+    );
+  }
+
   const levelCode = lesson.level_code || "N5";
-  const baseSlug = `${levelCode.toLowerCase()}-${slugify(lesson.title)}`.replace(/-+/g, "-").slice(0, 70);
-  let mainSlug = `${baseSlug}-main`;
-
-  let mainPostId: string | null = null;
-  let mainLinkId: string | null = null;
-  const contentRows = (await sql`
-    SELECT c.id, c.content_slug, c.post_id
-    FROM curriculum_lesson_content c
-    WHERE c.lesson_id = ${lessonId} AND c.content_role = 'main'
-    ORDER BY c.sort_order LIMIT 1
-  `) as { id: string; content_slug: string; post_id: string | null }[];
-  const mainLink = contentRows[0];
-  if (mainLink?.post_id) {
-    mainPostId = mainLink.post_id;
-  } else if (mainLink) {
-    mainLinkId = mainLink.id;
-    const postRows = (await sql`SELECT id FROM posts WHERE slug = ${mainLink.content_slug} AND content_type = 'study_guide' LIMIT 1`) as { id: string }[];
-    if (postRows[0]) mainPostId = postRows[0].id;
-  }
-  if (mainLink && !mainPostId) mainSlug = mainLink.content_slug;
-  const resolvedMainSlug = mainLink?.content_slug ?? mainSlug;
-
-  // If we already have main content and user only clicked "Generate",
-  // avoid overwriting; this matches the intended semantics vs "Regenerate".
-  if (mainPostId && !regenerate) {
-    const existing = (await sql`
-      SELECT content
-      FROM posts
-      WHERE id = ${mainPostId}
-      LIMIT 1
-    `) as { content: string | null }[];
-
-    return NextResponse.json({
-      content: existing?.[0]?.content ?? "",
-      content_slug: resolvedMainSlug,
-      post_id: mainPostId,
-    });
-  }
 
   const kanaRows = (await sql`
     SELECT k.character, k.romaji, k.row_label, k.type
@@ -137,9 +98,7 @@ export async function POST(req: Request) {
   `) as { pattern: string | null; structure: string | null }[];
 
   const kanaContext = kanaRows.length
-    ? `Kana for this lesson: ${kanaRows
-        .map((k) => `${k.character} (${k.romaji}) [${k.type}]`)
-        .join(", ")}.`
+    ? `Kana for this lesson: ${kanaRows.map((k) => `${k.character} (${k.romaji}) [${k.type}]`).join(", ")}.`
     : "";
   const vocabContext = vocabRows.length
     ? `Vocabulary: ${vocabRows.map((v) => `${v.word} — ${v.meaning ?? ""}`).join("; ")}.`
@@ -155,7 +114,7 @@ ${kanaContext}
 ${vocabContext}
 ${grammarContext}
 
-Write the full lesson body in Markdown using the required flow: Learning Goal, Concept, Step-by-Step Breakdown, Mini Examples, Common Mistake, Quick Practice, Summary and Next Step. Teach the topic so a beginner can follow. Output ONLY the Markdown, no code fences or labels.${regenerate ? " Replace any existing content with a fresh, complete lesson body." : ""}`;
+Write the full lesson body in Markdown using the required flow: Learning Goal, Concept, Step-by-Step Breakdown, Mini Examples, Common Mistake, Quick Practice, Summary and Next Step. Teach the topic so a beginner can follow. Output ONLY the Markdown, no code fences or labels.`;
 
   const systemPrompt = (await getPromptContent("curriculum_lesson_body")) ?? BODY_SYSTEM;
 
@@ -205,43 +164,26 @@ Write the full lesson body in Markdown using the required flow: Learning Goal, C
     raw = data.choices?.[0]?.message?.content ?? "";
   }
 
-  const content = raw.replace(/^```\w*\n?|\n?```$/g, "").trim() || "## " + lesson.title + "\n\n_Content generated._";
+  const markdown = raw.replace(/^```\w*\n?|\n?```$/g, "").trim() || "## " + lesson.title + "\n\n_Content generated._";
 
-  if (!mainPostId) {
-    const insertPost = (await sql`
-      INSERT INTO posts (content_type, slug, title, content, summary, jlpt_level, tags, status, published_at, sort_order, meta)
-      VALUES (
-        'study_guide',
-        ${mainSlug},
-        ${lesson.title + " (Main)"},
-        ${content},
-        ${`Main lesson content: ${lesson.title}`},
-        ${[levelCode]},
-        ${[levelCode, "lesson", "curriculum"]},
-        'published',
-        ${new Date().toISOString()},
-        0,
-        '{}'::jsonb
-      )
-      ON CONFLICT (slug) DO UPDATE SET content = EXCLUDED.content, title = EXCLUDED.title, updated_at = NOW()
-      RETURNING id
-    `) as { id: string }[];
-    mainPostId = insertPost[0]?.id ?? null;
-    if (mainPostId && mainLinkId) {
-      await sql`UPDATE curriculum_lesson_content SET post_id = ${mainPostId}, updated_at = NOW() WHERE id = ${mainLinkId}`;
-    } else if (mainPostId) {
-      await sql`
-        INSERT INTO curriculum_lesson_content (lesson_id, content_slug, post_id, content_role, sort_order)
-        VALUES (${lessonId}, ${mainSlug}, ${mainPostId}, 'main', 0)
-      `;
-    }
-  } else {
-    await sql`UPDATE posts SET content = ${content}, updated_at = NOW() WHERE id = ${mainPostId}`;
+  const plannedBlocks = parseProseToBlocks(markdown);
+  const errors: string[] = [];
+  for (const b of plannedBlocks) {
+    const errs = validateBlockData(b.block_type, b.block_data);
+    if (errs.length > 0) errors.push(`${b.block_type}: ${errs.join(", ")}`);
+  }
+  if (errors.length > 0) {
+    return NextResponse.json({ error: `Generated content failed validation: ${errors.join(" | ")}` }, { status: 502 });
   }
 
-  return NextResponse.json({
-    content,
-    content_slug: mainSlug,
-    post_id: mainPostId,
-  });
+  let sortOrder = 10;
+  for (const b of plannedBlocks) {
+    await sql`
+      INSERT INTO lesson_blocks (lesson_id, block_type, block_data, sort_order, status, review_status, generated_by_model)
+      VALUES (${lessonId}, ${b.block_type}, ${JSON.stringify(b.block_data)}::jsonb, ${sortOrder}, 'draft', 'pending', ${model})
+    `;
+    sortOrder += 10;
+  }
+
+  return NextResponse.json({ blockCount: plannedBlocks.length });
 }
