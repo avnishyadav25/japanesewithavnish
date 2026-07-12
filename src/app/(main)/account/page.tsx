@@ -19,6 +19,10 @@ type Profile = {
   facebook_url?: string | null;
   twitter_url?: string | null;
   website?: string | null;
+  premium_until?: string | null;
+  is_lifetime?: boolean | null;
+  subscription_status?: string | null;
+  stripe_customer_id?: string | null;
   last_login_at?: string | null;
 };
 
@@ -44,6 +48,10 @@ export default function AccountPage() {
   const [saved, setSaved] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
+  const premiumUntil = profile?.premium_until ? new Date(profile.premium_until) : null;
+  const daysLeft = premiumUntil
+    ? Math.max(0, Math.ceil((premiumUntil.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : 0;
 
   useEffect(() => {
     fetch("/api/profile")
@@ -154,6 +162,25 @@ export default function AccountPage() {
             Last login: {new Date(profile.last_login_at).toLocaleString()}
           </p>
         )}
+
+        <section className="rounded-bento border border-[var(--divider)] bg-white p-5 sm:p-6 space-y-3 mb-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-black uppercase tracking-widest text-primary mb-1">Billing</p>
+              <h2 className="font-heading font-semibold text-charcoal">Premium Pass</h2>
+              <p className="text-sm text-secondary mt-1">
+                {profile?.is_lifetime
+                  ? "Lifetime Premium access is active."
+                  : daysLeft > 0
+                  ? `${daysLeft} days left. Access expires ${premiumUntil?.toLocaleDateString("en-IN")}.`
+                  : "You are on the free plan with 2 lessons free daily."}
+              </p>
+            </div>
+            <Link href="/billing" className="btn-secondary text-center shrink-0">
+              View billing
+            </Link>
+          </div>
+        </section>
 
         <form onSubmit={handleSave} className="space-y-6">
           <section className="rounded-bento border border-[var(--divider)] bg-white p-6 space-y-4">

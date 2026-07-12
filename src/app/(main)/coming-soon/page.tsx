@@ -7,7 +7,7 @@ export default function ComingSoonPage() {
           Something Great Is Coming
         </h1>
         <p className="text-secondary text-lg mb-8">
-          We&apos;re building premium Japanese learning resources — JLPT bundles, placement quiz, and more. Stay tuned.
+          We&apos;re building premium Japanese learning resources — structured JLPT lessons, placement quiz, and more. Stay tuned.
         </p>
         <p className="text-secondary text-sm">Coming soon</p>
       </div>

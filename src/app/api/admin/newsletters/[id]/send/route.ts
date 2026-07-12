@@ -22,17 +22,30 @@ export async function POST(
   const subscriberRows = await sql`SELECT email, name FROM subscribers` as { email: string; name: string | null }[];
   const subscribers = subscriberRows ?? [];
   let sent = 0;
+  let failed = 0;
+  let skipped = 0;
   for (const sub of subscribers) {
     try {
-      await sendNewsletter(sub.email, sub.name ?? undefined, newsletter.subject, newsletter.body_html);
-      sent++;
+      const result = await sendNewsletter(sub.email, sub.name ?? undefined, newsletter.subject, newsletter.body_html);
+      const status = result ? "sent" : "skipped";
+      if (status === "sent") sent++;
+      else skipped++;
+      await sql`
+        INSERT INTO newsletter_send_logs (newsletter_id, email, status, error, sent_at)
+        VALUES (${id}, ${sub.email}, ${status}, ${status === "skipped" ? "Email provider not configured or returned no message id" : null}, NOW())
+      `;
     } catch (e) {
       console.error("Newsletter send to", sub.email, e);
+      failed++;
+      await sql`
+        INSERT INTO newsletter_send_logs (newsletter_id, email, status, error, sent_at)
+        VALUES (${id}, ${sub.email}, 'failed', ${e instanceof Error ? e.message.slice(0, 500) : "Unknown send error"}, NOW())
+      `;
     }
   }
 
   await sql`
     UPDATE newsletters SET status = 'sent', sent_at = ${new Date().toISOString()}, updated_at = ${new Date().toISOString()} WHERE id = ${id}
   `;
-  return NextResponse.json({ ok: true, sent, total: subscribers.length });
+  return NextResponse.json({ ok: true, sent, failed, skipped, total: subscribers.length });
 }

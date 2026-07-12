@@ -35,6 +35,7 @@ export async function GET() {
         premium_until::text,
         is_lifetime,
         subscription_status,
+        stripe_customer_id,
         last_login_at::text
       FROM profiles
       WHERE email = ${session.email}

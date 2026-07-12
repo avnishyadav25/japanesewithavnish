@@ -37,7 +37,7 @@ export function HomePricingSection({ plans, defaultCurrency = "INR" }: { plans: 
             Simple, Transparent Pricing Pass
           </h2>
           <p className="text-secondary text-sm">
-            Unlock all curriculum levels, vocabulary guides, grammar pathways, streaks, and badges with a premium pass.
+            Learn free for life with 2 lessons daily, or unlock unlimited daily lessons with a premium pass.
           </p>
         </div>
 
@@ -143,15 +143,19 @@ export function HomePricingSection({ plans, defaultCurrency = "INR" }: { plans: 
         {/* Fixed-duration access prop bar */}
         <div className="bg-white border border-[var(--divider)] rounded-3xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="text-center sm:text-left space-y-1">
-            <h4 className="font-heading text-xs font-bold text-charcoal">One-Time Fixed-Duration Access</h4>
+            <h4 className="font-heading text-xs font-bold text-charcoal">
+              {currency === "USD" ? "International Payments via Razorpay" : "One-Time Fixed-Duration Access"}
+            </h4>
             <p className="text-secondary text-[11px]">
-              Monthly and Yearly passes are one-time purchases for 30-day and 365-day access. No automatic renewal.
+              {currency === "USD"
+                ? "Global Premium Passes are one-time purchases through Razorpay international checkout. PayPal may appear when enabled for your account."
+                : "Monthly and Yearly passes are one-time purchases for 30-day and 365-day access. No automatic renewal."}
             </p>
           </div>
           <div className="flex flex-col gap-0.5 items-center shrink-0">
             <span className="text-[10px] text-secondary font-bold">Secured by</span>
             <span className="text-xs font-black tracking-widest text-[#D0021B] uppercase">
-              {currency === "USD" ? "STRIPE" : "RAZORPAY"}
+              RAZORPAY
             </span>
           </div>
         </div>

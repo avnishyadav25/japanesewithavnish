@@ -26,8 +26,9 @@ export function ContentAnalytics({
 
   useEffect(() => {
     const sessionId = getSessionId();
-    const path = typeof window !== "undefined" ? window.location.pathname : "";
+    const path = typeof window !== "undefined" ? `${window.location.pathname}${window.location.search}` : "";
     const referrer = typeof document !== "undefined" ? document.referrer : "";
+    const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : new URLSearchParams();
 
     fetch("/api/analytics/event", {
       method: "POST",
@@ -39,6 +40,9 @@ export function ContentAnalytics({
         session_id: sessionId,
         path,
         referrer: referrer || null,
+        utm_source: params.get("utm_source"),
+        utm_medium: params.get("utm_medium"),
+        utm_campaign: params.get("utm_campaign"),
       }),
     }).catch(() => {});
 
@@ -60,6 +64,7 @@ export function ContentAnalytics({
           event_type: "duration",
           duration_seconds: duration,
           session_id: sessionId,
+          path,
         }),
       }).catch(() => {});
     };

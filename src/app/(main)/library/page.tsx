@@ -51,7 +51,7 @@ export default async function LibraryPage() {
               <ul className="text-secondary text-sm space-y-1">
                 <li>Completed lessons for study again.</li>
                 <li>Items added to your review queue.</li>
-                <li>Purchased bundles and downloads.</li>
+                <li>Purchases and downloads.</li>
               </ul>
             </div>
           </div>

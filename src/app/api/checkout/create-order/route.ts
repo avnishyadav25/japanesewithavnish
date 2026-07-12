@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { getSession } from "@/lib/auth/session";
 import { createRazorpayClient, getRazorpayErrorStatus, getRazorpayKeyId, getRazorpayKeySecret } from "@/lib/razorpay";
 
 /** Razorpay rejects payloads with emojis (400). Strip emoji/symbols for description. */
@@ -10,9 +11,21 @@ function stripForRazorpay(s: string): string {
 
 export async function POST(req: Request) {
   try {
-    const { productId, planId, name, email, phone, couponCode } = await req.json();
-    if ((!productId && !planId) || !name || !email || !phone) {
+    const session = await getSession();
+    if (!session?.email) {
+      return NextResponse.json({ error: "Please log in before checkout", loginRequired: true }, { status: 401 });
+    }
+
+    const { productId, planId, name, email, phone, couponCode, currency: requestedCurrency } = await req.json();
+    const orderCurrency = String(requestedCurrency || "INR").toUpperCase() === "USD" ? "USD" : "INR";
+    if (productId) {
+      return NextResponse.json({ error: "Store purchases are currently unavailable. Please choose a Premium Pass instead." }, { status: 403 });
+    }
+    if (!planId || !name || !email || !phone) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+    }
+    if (String(email).toLowerCase() !== session.email.toLowerCase()) {
+      return NextResponse.json({ error: "Checkout email must match your logged-in account" }, { status: 400 });
     }
 
     if (!sql) {
@@ -22,30 +35,19 @@ export async function POST(req: Request) {
     let amountPaise = 0;
     let displayName = "Premium Purchase";
     let dbPlanId: string | null = null;
-    let dbProductId: string | null = null;
+    const dbProductId: string | null = null;
 
-    if (planId) {
-      const planRows = await sql`
-        SELECT id, name, price_inr FROM subscription_plans
-        WHERE id::text = ${planId} OR slug = ${planId} LIMIT 1
-      ` as { id: string; name: string; price_inr: number }[];
-      const plan = planRows[0];
-      if (!plan) {
-        return NextResponse.json({ error: "Subscription plan not found" }, { status: 404 });
-      }
-      amountPaise = Number(plan.price_inr);
-      displayName = plan.name;
-      dbPlanId = plan.id;
-    } else if (productId) {
-      const productRows = await sql`SELECT id, name, price_paise FROM products WHERE id = ${productId} LIMIT 1`;
-      const product = productRows[0];
-      if (!product) {
-        return NextResponse.json({ error: "Product not found" }, { status: 404 });
-      }
-      amountPaise = Number(product.price_paise);
-      displayName = product.name;
-      dbProductId = product.id;
+    const planRows = await sql`
+      SELECT id, name, price_inr, price_usd FROM subscription_plans
+      WHERE id::text = ${planId} OR slug = ${planId} LIMIT 1
+    ` as { id: string; name: string; price_inr: number; price_usd: number }[];
+    const plan = planRows[0];
+    if (!plan) {
+      return NextResponse.json({ error: "Subscription plan not found" }, { status: 404 });
     }
+    amountPaise = orderCurrency === "USD" ? Number(plan.price_usd) : Number(plan.price_inr);
+    displayName = plan.name;
+    dbPlanId = plan.id;
 
     let discountPaise = 0;
     let appliedCoupon: string | null = null;
@@ -81,7 +83,7 @@ export async function POST(req: Request) {
     }
 
     if (amountPaise < 100) {
-      return NextResponse.json({ error: "Amount too low for payment (min ₹1)" }, { status: 400 });
+      return NextResponse.json({ error: `Amount too low for payment (min ${orderCurrency === "USD" ? "$1" : "₹1"})` }, { status: 400 });
     }
 
     const keyId = getRazorpayKeyId();
@@ -89,8 +91,8 @@ export async function POST(req: Request) {
     const useRazorpay = Boolean(keyId && keySecret);
 
     const orderRows = await sql`
-      INSERT INTO orders (user_email, user_name, user_phone, status, provider, total_amount_paise, coupon_code, discount_paise, plan_id)
-      VALUES (${email}, ${name}, ${phone}, 'pending_payment', ${useRazorpay ? "razorpay" : "manual"}, ${amountPaise}, ${appliedCoupon}, ${discountPaise}, ${dbPlanId})
+      INSERT INTO orders (user_email, user_name, user_phone, status, provider, total_amount_paise, currency, coupon_code, discount_paise, plan_id)
+      VALUES (${session.email}, ${name}, ${phone}, 'pending_payment', ${useRazorpay ? "razorpay" : "manual"}, ${amountPaise}, ${orderCurrency}, ${appliedCoupon}, ${discountPaise}, ${dbPlanId})
       RETURNING id
     `;
     const order = orderRows[0];
@@ -106,6 +108,7 @@ export async function POST(req: Request) {
     `;
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+    const successUrl = `${siteUrl}/learn/dashboard?payment=success`;
 
     if (!useRazorpay) {
       await sql`
@@ -116,6 +119,7 @@ export async function POST(req: Request) {
         orderId,
         paymentMethod: "manual",
         amountPaise,
+        currency: orderCurrency,
         name: "Japanese with Avnish",
         description: displayName,
       });
@@ -124,7 +128,7 @@ export async function POST(req: Request) {
     const { client: razorpay } = createRazorpayClient();
     const rzOrder = await razorpay.orders.create({
       amount: amountPaise,
-      currency: "INR",
+      currency: orderCurrency,
       receipt: orderId,
       notes: { order_id: orderId },
     });
@@ -139,9 +143,10 @@ export async function POST(req: Request) {
       razorpayOrderId: rzOrder.id,
       key: keyId,
       amount: amountPaise,
+      currency: orderCurrency,
       name: "Japanese with Avnish",
       description: stripForRazorpay(displayName),
-      redirectUrl: `${siteUrl}/thank-you?order=${orderId}`,
+      redirectUrl: successUrl,
     });
   } catch (e) {
     console.error("Create order:", e);

@@ -1,13 +1,13 @@
 import Link from "next/link";
-import { LEVEL_SLUGS, type JLPTLevel } from "@/data/jlpt-levels";
+import { type JLPTLevel } from "@/data/jlpt-levels";
 
 const CTA_COPY: Record<string, string> = {
-  n5: "Get worksheets, mock tests, audio drills, and structured materials for JLPT N5.",
-  n4: "Get worksheets, mock tests, audio drills, and structured materials for JLPT N4.",
-  n3: "Get worksheets, mock tests, audio drills, and structured materials for JLPT N3.",
-  n2: "Get worksheets, mock tests, audio drills, and structured materials for JLPT N2.",
-  n1: "Get worksheets, mock tests, audio drills, and structured materials for JLPT N1.",
-  mega: "Get everything from N5 to N1 in one bundle. Best value for serious learners.",
+  n5: "Get structured lessons, mock tests, audio drills, and daily practice for JLPT N5.",
+  n4: "Get structured lessons, mock tests, audio drills, and daily practice for JLPT N4.",
+  n3: "Get structured lessons, mock tests, audio drills, and daily practice for JLPT N3.",
+  n2: "Get structured lessons, mock tests, audio drills, and daily practice for JLPT N2.",
+  n1: "Get structured lessons, mock tests, audio drills, and daily practice for JLPT N1.",
+  mega: "Get everything from N5 to N1 with a single Premium Pass. Best value for serious learners.",
 };
 
 interface JLPTBundleCTAProps {
@@ -15,9 +15,7 @@ interface JLPTBundleCTAProps {
 }
 
 export function JLPTBundleCTA({ level }: JLPTBundleCTAProps) {
-  const productSlug = LEVEL_SLUGS[level];
   const copy = CTA_COPY[level] || CTA_COPY.n5;
-  const levelLabel = level === "mega" ? "Mega" : level.toUpperCase();
   const isGold = level === "n1" || level === "mega";
 
   return (
@@ -29,11 +27,11 @@ export function JLPTBundleCTA({ level }: JLPTBundleCTAProps) {
       </h3>
       <p className="text-secondary text-sm mb-4">{copy}</p>
       <div className="flex flex-col sm:flex-row gap-3">
-        <Link href={`/product/${productSlug}`} className="btn-primary text-center">
-          Get {levelLabel} Bundle
+        <Link href="/pricing" className="btn-primary text-center">
+          Explore Premium
         </Link>
-        <Link href="/store" className="btn-secondary text-center">
-          Compare all bundles →
+        <Link href="/quiz" className="btn-secondary text-center">
+          Take the quiz →
         </Link>
       </div>
     </div>

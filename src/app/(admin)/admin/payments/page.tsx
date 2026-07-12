@@ -58,7 +58,7 @@ export default async function AdminPaymentsPage({
           o.provider,
           COALESCE(p.provider_payment_id, p.provider_order_id) AS provider_payment_id,
           o.total_amount_paise AS amount,
-          CASE WHEN o.provider = 'stripe' THEN 'USD' ELSE 'INR' END AS currency,
+          COALESCE(o.currency, CASE WHEN o.provider = 'stripe' THEN 'USD' ELSE 'INR' END) AS currency,
           o.status,
           o.coupon_code,
           o.discount_paise AS discount_amount,
@@ -86,7 +86,7 @@ export default async function AdminPaymentsPage({
   return (
     <div className="space-y-6 page-enter">
       <AdminPageHeader
-        title="Razorpay & Stripe Payments"
+        title="Razorpay Payments"
         breadcrumb={[{ label: "Admin", href: "/admin" }, { label: "Payments" }]}
       />
 

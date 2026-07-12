@@ -7,14 +7,14 @@ export function JLPTMegaHighlight() {
         Full JLPT System (N5 → N1)
       </h3>
       <p className="text-secondary text-sm mb-4">
-        Mega includes everything from beginner to advanced. Best value if
+        Premium includes everything from beginner to advanced. Best value if
         you&apos;re serious.
       </p>
       <Link
-        href="/product/complete-japanese-n5-n1-mega-bundle"
+        href="/pricing"
         className="btn-primary inline-block"
       >
-        View Mega Bundle
+        View Premium Plans
       </Link>
     </div>
   );

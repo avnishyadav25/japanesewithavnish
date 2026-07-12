@@ -37,7 +37,7 @@ export function PricingClient({ plans, defaultCurrency = "INR" }: { plans: Plan[
             Unlock Unlimited Japanese Learning
           </h1>
           <p className="text-secondary text-base sm:text-lg leading-relaxed">
-            Start free for life with 2 modules daily. Each module includes multiple chapters and lessons, so you can keep learning Japanese every day within the free access limit.
+            Start free for life with 2 lessons free every day, so you can keep learning Japanese consistently.
           </p>
         </div>
 
@@ -51,18 +51,18 @@ export function PricingClient({ plans, defaultCurrency = "INR" }: { plans: Plan[
                 Learn Japanese every day without paying
               </h2>
               <p className="text-secondary text-sm leading-relaxed font-black">
-                Free users can access 2 modules daily, and every module contains multiple chapters and lessons. Premium Pass is only for learners who want unlimited daily lesson access.
+                Free users can access 2 lessons daily. Premium Pass is only for learners who want unlimited daily lesson access.
               </p>
             </div>
             <div className="rounded-2xl bg-[#FFF7F7] border border-[#D0021B]/15 p-5">
               <ul className="space-y-3 text-sm text-secondary">
                 <li className="flex gap-2">
                   <span className="font-bold text-[#D0021B]">✓</span>
-                  <span>2 free modules every day</span>
+                  <span>2 free lessons every day</span>
                 </li>
                 <li className="flex gap-2">
                   <span className="font-bold text-[#D0021B]">✓</span>
-                  <span>Multiple chapters and lessons inside each module</span>
+                  <span>Resets every day at midnight IST</span>
                 </li>
                 <li className="flex gap-2">
                   <span className="font-bold text-[#D0021B]">✓</span>
@@ -175,15 +175,19 @@ export function PricingClient({ plans, defaultCurrency = "INR" }: { plans: Plan[
         {/* Value Prop banner */}
         <div className="bg-[#FAF8F5] border border-[var(--divider)] rounded-3xl p-8 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="space-y-2 text-center md:text-left">
-            <h4 className="font-heading text-lg font-bold text-charcoal">One-Time Fixed-Duration Access</h4>
+            <h4 className="font-heading text-lg font-bold text-charcoal">
+              {currency === "USD" ? "International Payments via Razorpay" : "One-Time Fixed-Duration Access"}
+            </h4>
             <p className="text-secondary text-sm leading-relaxed max-w-xl">
-              Monthly and Yearly passes are one-time purchases for 30-day and 365-day access. No automatic renewal or cancellation workflow needed.
+              {currency === "USD"
+                ? "Global Premium Passes are one-time purchases through Razorpay international checkout. PayPal may appear when enabled for your account."
+                : "Monthly and Yearly passes are one-time purchases for 30-day and 365-day access. No automatic renewal or cancellation workflow needed."}
             </p>
           </div>
           <div className="flex flex-col gap-1 items-center shrink-0">
             <span className="text-xs text-secondary">Secured by</span>
             <span className="text-sm font-black tracking-widest text-[#D0021B] uppercase">
-              {currency === "USD" ? "STRIPE" : "RAZORPAY"}
+              RAZORPAY
             </span>
           </div>
         </div>

@@ -33,7 +33,7 @@ export function CheckoutDrawer({ open, onClose, product, isPlan = false, currenc
         onClick={onClose}
       />
       <div
-        className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-md bg-base shadow-2xl flex flex-col drawer-panel"
+        className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-md bg-base shadow-2xl flex flex-col drawer-panel sm:rounded-l-2xl"
         role="dialog"
         aria-modal
         aria-labelledby="checkout-drawer-title"
@@ -54,7 +54,7 @@ export function CheckoutDrawer({ open, onClose, product, isPlan = false, currenc
           </button>
         </div>
         <div className="flex-1 overflow-y-auto overscroll-contain">
-          <div className="p-4 pb-8 space-y-6">
+          <div className="p-4 sm:p-5 pb-8 space-y-6">
             <CheckoutForm product={product} compact isPlan={isPlan} currency={currency} />
             <div className="card p-4 bg-[var(--base)] border border-[var(--divider)]">
               <h3 className="font-heading text-sm font-bold text-charcoal mb-2">
@@ -70,12 +70,14 @@ export function CheckoutDrawer({ open, onClose, product, isPlan = false, currenc
                 ) : (
                   <>
                     <li>Instant access link by email after payment.</li>
-                    <li>Lifetime access to your bundles in the Store.</li>
+                    <li>Learn online and keep your progress.</li>
                     <li>Download PDFs and audio anytime on any device.</li>
                   </>
                 )}
               </ul>
-              <p className="text-secondary text-xs mt-3">Secure payment by Razorpay.</p>
+              <p className="text-secondary text-xs mt-3">
+                Secure payment by Razorpay{currency === "USD" ? " with supported international methods including PayPal when enabled." : "."}
+              </p>
             </div>
           </div>
         </div>

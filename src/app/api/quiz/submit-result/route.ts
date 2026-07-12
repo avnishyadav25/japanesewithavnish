@@ -3,11 +3,11 @@ import { sql } from "@/lib/db";
 import { sendQuizResults } from "@/lib/email";
 
 const THRESHOLDS = [
-  { level: "N5", minScore: 0, productSlug: "japanese-n5-mastery-bundle", productName: "Japanese N5 Mastery Bundle" },
-  { level: "N4", minScore: 3, productSlug: "japanese-n4-upgrade-bundle", productName: "Japanese N4 Upgrade Bundle" },
-  { level: "N3", minScore: 5, productSlug: "japanese-n3-power-bundle", productName: "Japanese N3 Power Bundle" },
-  { level: "N2", minScore: 7, productSlug: "japanese-n2-pro-bundle", productName: "Japanese N2 Pro Bundle" },
-  { level: "N1", minScore: 9, productSlug: "japanese-n1-elite-bundle", productName: "Japanese N1 Elite Bundle" },
+  { level: "N5", minScore: 0 },
+  { level: "N4", minScore: 3 },
+  { level: "N3", minScore: 5 },
+  { level: "N2", minScore: 7 },
+  { level: "N1", minScore: 9 },
 ];
 
 export async function POST(req: Request) {
@@ -37,12 +37,7 @@ export async function POST(req: Request) {
     }
 
     try {
-      await sendQuizResults(
-        email,
-        rec.level,
-        rec.productName,
-        `${siteUrl}/product/${rec.productSlug}`
-      );
+      await sendQuizResults(email, rec.level, `${siteUrl}/pricing`);
     } catch (e) {
       console.error("Quiz email error:", e);
     }

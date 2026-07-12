@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(node -e ' *)",
+      "Bash(npx eslint *)",
+      "Read(//Users/avnishyadav2561995gmail.com/.agents/skills/playwright-skill/**)",
+      "Bash(node -e \"require\\('./lib/helpers'\\).detectDevServers\\(\\).then\\(servers => console.log\\(JSON.stringify\\(servers\\)\\)\\)\")",
+      "Bash(npm run *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000)",
+      "Bash(node run.js /tmp/playwright-test-razorpay-subscription.js)",
+      "Bash(node run.js /tmp/playwright-debug-login.js)",
+      "Bash(ps -o pid,lstart,command -p 72268)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3001/pricing)",
+      "Bash(curl -s http://localhost:3000/pricing)",
+      "Bash(curl -s -o /dev/null -w \"status=%{http_code}\\\\n\" http://localhost:3000/store)",
+      "Bash(curl -s -o /dev/null -w \"status=%{http_code}\\\\n\" http://localhost:3000/product/anything)",
+      "Bash(curl -s -I http://localhost:3000/store)"
+    ]
+  }
+}

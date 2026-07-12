@@ -3,7 +3,8 @@ import { sql } from "@/lib/db";
 
 export async function POST(req: NextRequest) {
   try {
-    const { code, productId, isPlan } = await req.json();
+    const { code, productId, isPlan, currency: requestedCurrency } = await req.json();
+    const currency = String(requestedCurrency || "INR").toUpperCase() === "USD" ? "USD" : "INR";
     if (!code || !productId) {
       return NextResponse.json({ error: "Code and productId required" }, { status: 400 });
     }
@@ -23,8 +24,13 @@ export async function POST(req: NextRequest) {
 
     if (coupon) {
       if (isPlan) {
-        const planRows = await sql`SELECT id, price_inr FROM subscription_plans WHERE id::text = ${productId} OR slug = ${productId} LIMIT 1` as { id: string; price_inr: number }[];
-        pricePaise = Number(planRows[0]?.price_inr ?? 0);
+        const planRows = await sql`
+          SELECT id, price_inr, price_usd
+          FROM subscription_plans
+          WHERE id::text = ${productId} OR slug = ${productId}
+          LIMIT 1
+        ` as { id: string; price_inr: number; price_usd: number }[];
+        pricePaise = Number(currency === "USD" ? planRows[0]?.price_usd ?? 0 : planRows[0]?.price_inr ?? 0);
         resolvedId = planRows[0]?.id || productId;
       } else {
         const prodRows = await sql`SELECT price_paise FROM products WHERE id = ${productId} LIMIT 1` as { price_paise: number }[];

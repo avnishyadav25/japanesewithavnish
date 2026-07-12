@@ -349,7 +349,7 @@ export default function QuizPage() {
                 <li>25 questions • 5–8 minutes</li>
                 <li>Computer Adaptive: Gets harder or easier based on your answers.</li>
                 <li>Determines your exact JLPT level.</li>
-                <li>Matches you with the perfect course bundle.</li>
+                <li>Recommends the right learning path for you.</li>
               </ul>
             </div>
             <div className="mt-4">

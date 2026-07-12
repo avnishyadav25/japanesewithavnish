@@ -63,6 +63,7 @@ export default function LearnDashboardPage() {
   const [verificationMessage, setVerificationMessage] = useState("");
   const [verificationError, setVerificationError] = useState("");
   const [resendingVerification, setResendingVerification] = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
 
   const fetchDashboardData = () => {
     Promise.all([
@@ -95,6 +96,8 @@ export default function LearnDashboardPage() {
 
   useEffect(() => {
     fetch("/api/activity", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "activity" }) }).catch(() => {});
+    const params = new URLSearchParams(window.location.search);
+    setPaymentSuccess(params.get("payment") === "success");
     fetchDashboardData();
   }, []);
 
@@ -271,6 +274,20 @@ export default function LearnDashboardPage() {
             )}
           </div>
         </div>
+
+        {paymentSuccess && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-3xl p-5 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h2 className="font-heading text-lg font-black text-emerald-900">Payment successful</h2>
+              <p className="text-emerald-800 text-sm mt-1">
+                Your Premium Pass is being applied to this account. You can continue from the dashboard.
+              </p>
+            </div>
+            <Link href="/learn/curriculum" className="btn-primary text-sm px-5 py-2.5 rounded-xl font-bold shrink-0 text-center">
+              Continue learning
+            </Link>
+          </div>
+        )}
 
         {!isEmailVerified && (
           <div className="bg-white border border-primary/20 rounded-3xl p-5 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">

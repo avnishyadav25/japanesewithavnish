@@ -45,8 +45,8 @@ export function BlogHeroWithSearch({ initialSearch = "" }: { initialSearch?: str
         <Link href="/quiz" className="text-primary font-medium hover:underline">
           Take the Quiz →
         </Link>
-        <Link href="/store" className="text-primary font-medium hover:underline">
-          Browse Bundles →
+        <Link href="/pricing" className="text-primary font-medium hover:underline">
+          Explore Premium →
         </Link>
       </div>
     </div>

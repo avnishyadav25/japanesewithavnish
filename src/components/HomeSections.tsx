@@ -7,23 +7,23 @@ const STEPS = [
   {
     n: "01",
     title: "Take the Quiz",
-    sub: "Know your JLPT level in 3 minutes. Get an instant bundle recommendation.",
+    sub: "Know your JLPT level in 3 minutes. Get an instant recommended JLPT level and learning path.",
     cta: "Start Quiz →",
     href: "/quiz",
   },
   {
     n: "02",
-    title: "Get your Bundle",
-    sub: "Pick a level (N5→N1) or go all-in with Mega. One-time purchase, forever yours.",
-    cta: "Browse Store →",
-    href: "/store",
+    title: "Create your free account",
+    sub: "Pick a level (N5→N1) and start learning. Upgrade anytime for unlimited daily access.",
+    cta: "Explore Premium →",
+    href: "/pricing",
   },
   {
     n: "03",
     title: "Study & Access",
-    sub: "Download instantly. Open your Library anytime — on any device, offline.",
-    cta: "My Library →",
-    href: "/library",
+    sub: "Learn online anytime — on any device. Your progress is saved automatically.",
+    cta: "My Dashboard →",
+    href: "/learn/dashboard",
   },
 ];
 
@@ -114,7 +114,7 @@ export function NihongoNaviSection() {
           </h2>
           <p className="text-[16px] text-white/65 leading-[1.75] mb-8 max-w-[420px]">
             Ask anything — grammar questions, vocab lookups, sentence correction, kanji
-            breakdown. Available 24/7, as part of your bundle.
+            breakdown. Available 24/7, included with Premium access.
           </p>
           <div className="flex flex-col gap-3 mb-8">
             {NAVI_FEATURES.map((f) => (
@@ -232,8 +232,8 @@ export function QuizCTASection() {
               {"We'll tell you in 3 minutes."}
             </h2>
             <p className="text-[15px] text-[#555] leading-[1.7]">
-              Answer 10 questions on grammar, kanji, and vocabulary — get an instant JLPT
-              level recommendation and the right bundle for you.
+              Answer 10 questions on grammar, kanji, and vocabulary — get an instant recommended
+              JLPT level and learning path for you.
             </p>
           </div>
           {/* Right */}
@@ -265,7 +265,7 @@ export function QuizCTASection() {
 const WHY_FEATURES = [
   {
     title: "Structured N5→N1 roadmap",
-    sub: "No guessing what to study next — each bundle builds on the last.",
+    sub: "No guessing what to study next — each lesson builds on the last.",
   },
   {
     title: "JLPT-style mock tests at every level",
@@ -312,7 +312,7 @@ export function WhyAvnishSection() {
           </h2>
           <p className="text-[15px] text-[#555] leading-[1.8] mb-8 max-w-[480px]">
             I built this system because I couldn&apos;t find one that was both structured and
-            actually enjoyable to use. Every bundle follows the exact JLPT syllabus — but
+            actually enjoyable to use. Every lesson is mapped to JLPT level expectations — but
             taught the way I wish I had learned.
           </p>
           <div className="flex flex-col gap-4 mb-8">

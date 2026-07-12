@@ -18,7 +18,7 @@ async function getContactEmail() {
 const FAQS = [
   {
     question: "Do premium passes renew automatically?",
-    answer: "No. Premium passes are fixed-duration one-time purchases. A 30-day pass gives 30 days of access, a 365-day pass gives 365 days of access, and a Lifetime pass gives lifetime access subject to continued operation of the Service.",
+    answer: "India/INR and International/USD Premium Passes are fixed-duration one-time purchases through Razorpay. For USD checkout, PayPal or supported international methods may appear once enabled on the Razorpay account.",
   },
   {
     question: "What is your refund policy?",
@@ -34,7 +34,7 @@ const FAQS = [
   },
   {
     question: "How do I download or access my invoice/receipt?",
-    answer: "Whenever you complete a payment via Stripe or Razorpay, a digital receipt is automatically sent to your registered email address. You can also view and download invoices directly from your Account billing panel.",
+    answer: "Whenever you complete a payment via Razorpay, a digital receipt is automatically sent to your registered email address. You can also view your billing history from your Account billing panel.",
   },
 ];
 

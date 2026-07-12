@@ -1,7 +1,6 @@
 import Link from "next/link";
 import {
   LEVEL_NAMES,
-  LEVEL_SLUGS,
   LEVEL_SUMMARIES,
   LEVEL_OUTCOMES,
   LEVEL_LEARN_BULLETS,
@@ -13,11 +12,9 @@ interface JLPTLevelOverviewProps {
 }
 
 export function JLPTLevelOverview({ level }: JLPTLevelOverviewProps) {
-  const productSlug = LEVEL_SLUGS[level];
   const summary = LEVEL_SUMMARIES[level] || "";
   const outcomes = LEVEL_OUTCOMES[level] || [];
   const learnBullets = LEVEL_LEARN_BULLETS[level] || [];
-  const levelLabel = level === "mega" ? "Mega" : level.toUpperCase();
 
   return (
     <div className="grid md:grid-cols-2 gap-6">
@@ -32,8 +29,8 @@ export function JLPTLevelOverview({ level }: JLPTLevelOverviewProps) {
           ))}
         </ul>
         <div className="flex flex-col sm:flex-row gap-3">
-          <Link href={`/product/${productSlug}`} className="btn-primary text-center">
-            Get {levelLabel} Bundle
+          <Link href="/pricing" className="btn-primary text-center">
+            Explore Premium
           </Link>
           <a
             href="#lessons"

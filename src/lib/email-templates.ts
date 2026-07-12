@@ -11,38 +11,13 @@ export type EmailProduct = {
   jlpt_level?: string | null;
 };
 
-export function productListHtml(products: EmailProduct[], siteUrl: string): string {
-  if (products.length === 0) return "";
-  const base = siteUrl.replace(/\/$/, "");
-  const items = products.map((p) => {
-    const price = `₹${p.price_paise / 100}`;
-    const url = `${base}/product/${p.slug}`;
-    const img = p.image_url
-      ? `<img src="${p.image_url}" alt="" width="120" height="68" style="width:120px;height:68px;object-fit:cover;border-radius:8px;display:block;" />`
-      : `<div style="width:120px;height:68px;background:${BASE};border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;color:${SECONDARY};">No image</div>`;
-    return `
-      <td style="vertical-align:top;padding:8px;width:50%;">
-        <a href="${url}" style="text-decoration:none;color:inherit;display:block;">
-          ${img}
-          <p style="font-size:13px;font-weight:600;margin:6px 0 2px;color:${CHARCOAL};line-height:1.3;">${p.name}</p>
-          <p style="font-size:14px;font-weight:700;color:${PRIMARY};margin:0;">${price}</p>
-        </a>
-      </td>`;
-  });
-  const rows: string[] = [];
-  for (let i = 0; i < items.length; i += 2) {
-    rows.push(`<tr>${items[i]}${items[i + 1] || "<td></td>"}</tr>`);
-  }
-  return `
-    <div style="margin-top:32px;padding-top:24px;border-top:1px solid #eee;">
-      <p style="font-size:14px;font-weight:600;color:${CHARCOAL};margin:0 0 16px;">Our JLPT bundles</p>
-      <table cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">
-        ${rows.join("")}
-      </table>
-      <p style="margin-top:16px;">
-        <a href="${base}/store" style="background:${PRIMARY};color:white;padding:10px 20px;text-decoration:none;border-radius:8px;display:inline-block;font-weight:600;font-size:14px;">Browse all bundles</a>
-      </p>
-    </div>`;
+/**
+ * Bundle/Store checkout is disabled (Premium Pass is the only purchase flow now),
+ * so the product-grid footer is suppressed rather than promoting dead-end /product/* links.
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function productListHtml(_products: EmailProduct[], _siteUrl: string): string {
+  return "";
 }
 
 export function emailWrapper(content: string, productList?: string) {

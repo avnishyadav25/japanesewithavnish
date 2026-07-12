@@ -3,20 +3,11 @@
 import Link from "next/link";
 import { LEARN_TYPE_LABELS, type LearnContentType } from "@/lib/learn-filters";
 
-const LEVEL_TO_BUNDLE: Record<string, { slug: string; label: string }> = {
-  N5: { slug: "japanese-n5-mastery-bundle", label: "Get N5 Bundle" },
-  N4: { slug: "japanese-n4-upgrade-bundle", label: "Get N4 Bundle" },
-  N3: { slug: "japanese-n3-power-bundle", label: "Get N3 Bundle" },
-  N2: { slug: "japanese-n2-pro-bundle", label: "Get N2 Bundle" },
-  N1: { slug: "japanese-n1-elite-bundle", label: "Get N1 Bundle" },
-};
-
 interface LearnStickyCtaProps {
   contentType: string;
-  primaryLevel: string;
 }
 
-export function LearnStickyCta({ contentType, primaryLevel }: LearnStickyCtaProps) {
+export function LearnStickyCta({ contentType }: LearnStickyCtaProps) {
   const typeLabel = LEARN_TYPE_LABELS[contentType as LearnContentType] ?? contentType;
 
   return (

@@ -129,8 +129,8 @@ export async function sendOrderConfirmation(
 
   const content = `
     <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">Hi ${name},</p>
-    <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">Thank you for your purchase! Your digital bundle is ready.</p>
-    <p style="margin:0 0 16px;"><a href="${accessUrl}" style="background:#D0021B;color:white;padding:12px 26px;text-decoration:none;border-radius:8px;display:inline-block;font-weight:600;">Access Store</a></p>
+    <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">Thank you for your purchase! Your access is ready.</p>
+    <p style="margin:0 0 16px;"><a href="${accessUrl}" style="background:#D0021B;color:white;padding:12px 26px;text-decoration:none;border-radius:8px;display:inline-block;font-weight:600;">Access your content</a></p>
     <p style="margin:0 0 16px;"><a href="${orderDetailUrl}" style="color:#D0021B;font-weight:600;">View order details</a></p>
     <p style="font-size:14px;line-height:1.6;margin:0;color:#555;">Order ID: ${orderId}</p>
     <p style="font-size:14px;line-height:1.6;margin:8px 0 0;color:#555;">You can return to your library anytime using the link above (it stays valid for 30 days).</p>
@@ -154,13 +154,11 @@ export async function sendStreakReminder(email: string, streakDays: number) {
 export async function sendQuizResults(
   email: string,
   level: string,
-  recommendedBundle: string,
-  productUrl: string
+  pricingUrl: string
 ) {
   const content = `
     <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">Based on your quiz results, we recommend the <strong>${level}</strong> level.</p>
-    <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">Your best fit: <strong>${recommendedBundle}</strong></p>
-    <p style="margin:0 0 24px;"><a href="${productUrl}" style="background:#D0021B;color:white;padding:12px 26px;text-decoration:none;border-radius:8px;display:inline-block;font-weight:600;">Get Your Bundle</a></p>
+    <p style="margin:0 0 24px;"><a href="${pricingUrl}" style="background:#D0021B;color:white;padding:12px 26px;text-decoration:none;border-radius:8px;display:inline-block;font-weight:600;">Explore Premium</a></p>
     <p style="font-size:14px;line-height:1.6;margin:0;color:#555;">— Japanese with Avnish</p>
   `;
   const products = await getProductsForEmail();
@@ -246,7 +244,7 @@ export async function sendPaymentFailedRetryEmail(
   productUrl: string,
   productName?: string
 ) {
-  const productLabel = productName || "your bundle";
+  const productLabel = productName || "your order";
   const content = `
     <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">Hi ${name},</p>
     <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">Your recent payment didn&apos;t go through. This can happen if the card was declined, insufficient funds, or the payment was cancelled.</p>

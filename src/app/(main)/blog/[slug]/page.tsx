@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
-import { ProductCard } from "@/components/ProductCard";
 import { BlogCommentForm } from "@/components/BlogCommentForm";
 import { BlogCommentList } from "@/components/BlogCommentList";
 import { BlogStickyCta } from "@/components/blog/BlogStickyCta";
@@ -65,18 +64,6 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
   const primaryLevel = (jlptLevels[0] as string)?.toUpperCase?.() || "";
   const tags = (post.tags || []) as string[];
   const topicTag = tags[0] || "Article";
-
-  const productRows = await sql`SELECT id, slug, name, price_paise, compare_price_paise, badge, jlpt_level, image_url, is_mega FROM products ORDER BY sort_order ASC`;
-  const allProducts = (productRows || []) as { id: string; slug: string; name: string; price_paise: number; compare_price_paise?: number; badge?: string; jlpt_level?: string; image_url?: string; is_mega?: boolean }[];
-  const relevantProducts = allProducts.filter(
-    (p) =>
-      p.jlpt_level === primaryLevel ||
-      p.jlpt_level === "N4" ||
-      p.is_mega ||
-      (primaryLevel === "N5" && ["N5", "N4"].includes(p.jlpt_level || ""))
-  );
-  const bundlesToShow =
-    relevantProducts.length > 0 ? relevantProducts.slice(0, 4) : allProducts.slice(0, 4);
 
   const allPostsRows = await sql`
     SELECT id, slug, title, summary, seo_description, published_at, og_image_url, jlpt_level, tags
@@ -242,50 +229,11 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
               </div>
             </section>
 
-            {/* Recommended bundles */}
-            {/*
-            {bundlesToShow.length > 0 && (
-              <section className="mt-12 pt-10 border-t border-[var(--divider)]">
-                <h2 className="font-heading text-2xl sm:text-3xl font-bold text-charcoal mb-2 text-center">
-                  Recommended bundles for you
-                </h2>
-                <p className="text-secondary text-center mb-8 max-w-xl mx-auto">
-                  Structured study materials to accelerate your JLPT journey.
-                </p>
-                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                  {bundlesToShow.map((product, i) => (
-                    <ProductCard
-                      key={product.id}
-                      slug={product.slug}
-                      name={product.name}
-                      price={product.price_paise}
-                      comparePrice={product.compare_price_paise ?? undefined}
-                      badge={
-                        product.badge === "premium"
-                          ? "premium"
-                          : product.badge === "offer"
-                            ? "offer"
-                            : undefined
-                      }
-                      jlptLevel={product.jlpt_level ?? undefined}
-                      size="medium"
-                      imageUrl={product.image_url}
-                      index={i}
-                    />
-                  ))}
-                </div>
-                <div className="mt-6 text-center">
-                  <Link href="/store" className="btn-primary inline-block">
-                    Browse all bundles
-                  </Link>
-                </div>
-              </section>
-            )} */}
           </div>
 
           {/* Right sidebar: sticky CTA only */}
           <aside>
-            <BlogStickyCta primaryLevel={primaryLevel} tags={tags} />
+            <BlogStickyCta />
           </aside>
         </div>
       </div>

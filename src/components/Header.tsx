@@ -10,6 +10,7 @@ const accountMenuItems = [
   { href: "/scoreboard", label: "Scoreboard" },
   { href: "/badge", label: "Badges" },
   { href: "/library", label: "My Library" },
+  { href: "/billing", label: "Billing" },
   { href: "/account", label: "Edit Profile" },
 ];
 
@@ -299,6 +300,13 @@ export function Header({ isAdmin = false }: { isAdmin?: boolean }) {
                       onClick={() => setAccountOpen(false)}
                     >
                       Subscription
+                    </Link>
+                    <Link
+                      href="/billing"
+                      className="block px-4 py-2 text-[#555] hover:bg-[#FAF8F5] hover:text-primary text-sm font-medium transition-colors"
+                      onClick={() => setAccountOpen(false)}
+                    >
+                      Billing
                     </Link>
                     <Link
                       href="/account"

@@ -15,8 +15,12 @@ type RazorpaySuccessResponse = {
 };
 
 const RAZORPAY_CHECKOUT_SRC = "https://checkout.razorpay.com/v1/checkout.js";
-const RAZORPAY_FAILURE_GUIDANCE =
-  "Try UPI or a supported domestic test card. International cards may be unavailable for this Razorpay account.";
+function getRazorpayFailureGuidance(currency: "INR" | "USD") {
+  return currency === "USD"
+    ? "Try PayPal or an approved international card after international payments are enabled on this Razorpay account."
+    : "Try UPI or a supported domestic test card. International cards may be unavailable for this Razorpay account.";
+}
+const PAYMENT_SUCCESS_REDIRECT = "/learn/dashboard?payment=success";
 
 /** Razorpay returns 400 when payload contains emojis. */
 function sanitizeForRazorpay(s: string): string {
@@ -24,9 +28,10 @@ function sanitizeForRazorpay(s: string): string {
   return noEmoji || "Order";
 }
 
-function normalizeIndianContact(phone: string): string {
+function normalizeContact(phone: string, currency: "INR" | "USD"): string {
   const trimmed = phone.trim();
   if (trimmed.startsWith("+")) return trimmed;
+  if (currency === "USD") return trimmed;
 
   const digits = trimmed.replace(/\D/g, "");
   if (digits.length === 10) return `+91${digits}`;
@@ -74,6 +79,7 @@ export function CheckoutForm({ product, compact = false, isPlan = false, currenc
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState({ name: "", email: "", phone: "", couponCode: "" });
+  const [sessionEmail, setSessionEmail] = useState<string | null>(null);
   const [couponStatus, setCouponStatus] = useState<"idle" | "valid" | "invalid" | "checking">("idle");
   const [discountInfo, setDiscountInfo] = useState<{ discount_paise: number; final_paise: number } | null>(null);
   const [agreedTerms, setAgreedTerms] = useState(false);
@@ -81,11 +87,10 @@ export function CheckoutForm({ product, compact = false, isPlan = false, currenc
   const prefilledFromProfile = useRef(false);
 
   useEffect(() => {
-    if (currency === "USD") return; // Stripe handles its own checkout hosted UI script
     if (!scriptPromise.current) {
       scriptPromise.current = loadRazorpayCheckout();
     }
-  }, [currency]);
+  }, []);
 
   useEffect(() => {
     if (prefilledFromProfile.current) return;
@@ -108,6 +113,7 @@ export function CheckoutForm({ product, compact = false, isPlan = false, currenc
           email: current.email || profile.email || "",
           phone: current.phone || profile.phone || "",
         }));
+        setSessionEmail(profile.email || null);
       })
       .catch(() => {
         // Logged-out checkout should stay empty.
@@ -122,7 +128,7 @@ export function CheckoutForm({ product, compact = false, isPlan = false, currenc
       const res = await fetch("/api/coupons/validate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: form.couponCode, productId: product.id, isPlan }),
+        body: JSON.stringify({ code: form.couponCode, productId: product.id, isPlan, currency }),
       });
       const data = await res.json();
       if (data.valid) {
@@ -138,6 +144,10 @@ export function CheckoutForm({ product, compact = false, isPlan = false, currenc
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!sessionEmail) {
+      window.location.href = `/login?redirect=${encodeURIComponent("/pricing")}`;
+      return;
+    }
     if (!agreedTerms) {
       setError("Please agree to the Terms of Service, Privacy Policy, and Refund Policy.");
       return;
@@ -145,27 +155,6 @@ export function CheckoutForm({ product, compact = false, isPlan = false, currenc
     setSubmitting(true);
     setError("");
     try {
-      if (currency === "USD") {
-        const res = await fetch("/api/checkout/stripe", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            planId: product.id,
-            name: form.name,
-            email: form.email,
-            phone: form.phone,
-            couponCode: form.couponCode.trim() || undefined,
-          }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed");
-        if (data.sessionUrl) {
-          window.location.href = data.sessionUrl;
-          return;
-        }
-        throw new Error("Invalid session url returned");
-      }
-
       const checkoutLoaded = await (scriptPromise.current || loadRazorpayCheckout());
       if (!checkoutLoaded || !window.Razorpay) {
         throw new Error("Payment checkout could not load. Please refresh and try again.");
@@ -181,9 +170,14 @@ export function CheckoutForm({ product, compact = false, isPlan = false, currenc
           email: form.email,
           phone: form.phone,
           couponCode: form.couponCode.trim() || undefined,
+          currency,
         }),
       });
       const data = await res.json();
+      if (res.status === 401 && data.loginRequired) {
+        window.location.href = `/login?redirect=${encodeURIComponent("/pricing")}`;
+        return;
+      }
       if (!res.ok) throw new Error(data.error || "Failed");
 
       if (data.paymentMethod === "manual" || !data.razorpayOrderId) {
@@ -191,11 +185,10 @@ export function CheckoutForm({ product, compact = false, isPlan = false, currenc
         return;
       }
 
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || (typeof window !== "undefined" ? window.location.origin : "");
       const options = {
         key: data.key,
         amount: Number(data.amount),
-        currency: "INR",
+        currency: data.currency || currency,
         name: data.name ?? "Japanese with Avnish",
         description: sanitizeForRazorpay(String(data.description ?? "Order")),
         order_id: data.razorpayOrderId,
@@ -216,7 +209,7 @@ export function CheckoutForm({ product, compact = false, isPlan = false, currenc
             setSubmitting(false);
             return;
           }
-          window.location.href = `${siteUrl}/thank-you?order=${data.orderId}`;
+          window.location.href = PAYMENT_SUCCESS_REDIRECT;
         },
         modal: {
           ondismiss: function () {
@@ -227,7 +220,7 @@ export function CheckoutForm({ product, compact = false, isPlan = false, currenc
         prefill: {
           name: sanitizeForRazorpay(form.name),
           email: form.email,
-          contact: normalizeIndianContact(form.phone),
+          contact: normalizeContact(form.phone, currency),
         },
       };
 
@@ -235,7 +228,7 @@ export function CheckoutForm({ product, compact = false, isPlan = false, currenc
       rz.on("payment.failed", function (response: unknown) {
         const paymentError = response as { error?: { description?: string; reason?: string } };
         const message = paymentError.error?.description || paymentError.error?.reason || "Payment failed. Please try again.";
-        setError(`${message} ${RAZORPAY_FAILURE_GUIDANCE}`);
+        setError(`${message} ${getRazorpayFailureGuidance(currency)}`);
         setSubmitting(false);
       });
       rz.open();
@@ -311,7 +304,7 @@ export function CheckoutForm({ product, compact = false, isPlan = false, currenc
           placeholder="Name"
           value={form.name}
           onChange={(e) => setForm({ ...form, name: e.target.value })}
-          required
+          required={Boolean(sessionEmail)}
           className="w-full px-4 py-3 border-2 border-[var(--divider)] rounded-bento focus:border-primary focus:outline-none transition"
         />
         <input
@@ -319,7 +312,8 @@ export function CheckoutForm({ product, compact = false, isPlan = false, currenc
           placeholder="Email"
           value={form.email}
           onChange={(e) => setForm({ ...form, email: e.target.value })}
-          required
+          required={Boolean(sessionEmail)}
+          readOnly={Boolean(sessionEmail)}
           className="w-full px-4 py-3 border-2 border-[var(--divider)] rounded-bento focus:border-primary focus:outline-none transition"
         />
         <div>
@@ -328,7 +322,7 @@ export function CheckoutForm({ product, compact = false, isPlan = false, currenc
             placeholder="Phone"
             value={form.phone}
             onChange={(e) => setForm({ ...form, phone: e.target.value })}
-            required
+            required={Boolean(sessionEmail)}
             className="w-full px-4 py-3 border-2 border-[var(--divider)] rounded-bento focus:border-primary focus:outline-none transition"
           />
           <p className="text-xs text-secondary mt-1">Required for payment.</p>
@@ -339,7 +333,7 @@ export function CheckoutForm({ product, compact = false, isPlan = false, currenc
             checked={agreedTerms}
             onChange={(e) => setAgreedTerms(e.target.checked)}
             className="mt-0.5 w-4 h-4 accent-primary rounded border-[var(--divider)] shrink-0"
-            required
+            required={Boolean(sessionEmail)}
           />
           <span className="text-[11px] text-secondary leading-relaxed">
             I agree to the{" "}
@@ -349,11 +343,14 @@ export function CheckoutForm({ product, compact = false, isPlan = false, currenc
             <a href="/policies/refunds" target="_blank" className="text-primary hover:underline font-semibold">Refund Policy</a>.
           </span>
         </label>
-        <button type="submit" className="btn-primary w-full" disabled={submitting || !agreedTerms}>
-          {submitting ? "Opening payment..." : "Continue to payment"}
+        <button type="submit" className="btn-primary w-full" disabled={submitting || (Boolean(sessionEmail) && !agreedTerms)}>
+          {!sessionEmail ? "Log in to continue" : submitting ? "Opening payment..." : "Continue to payment"}
         </button>
         <p className="text-xs text-secondary mt-2">
-          Payments are secure and encrypted. Premium passes are one-time fixed-duration purchases.
+          Payments are secure and encrypted.{" "}
+          {currency === "USD"
+            ? "International payments are handled by Razorpay with PayPal or supported international methods. Premium passes are one-time fixed-duration purchases."
+            : "Razorpay Premium passes are one-time fixed-duration purchases."}
         </p>
         {error && <p className="text-primary text-sm mt-2">{error}</p>}
       </form>

@@ -34,23 +34,25 @@ export async function POST(req: Request) {
           SELECT
             p.order_id,
             o.total_amount_paise,
+            COALESCE(o.currency, 'INR') AS currency,
             o.status AS order_status
           FROM payments p
           JOIN orders o ON o.id = p.order_id
           WHERE p.order_id = ${localOrderId}
             AND (p.provider_order_id = ${razorpayOrderId} OR p.provider_payment_id = ${razorpayOrderId})
           LIMIT 1
-        ` as { order_id: string; total_amount_paise: number; order_status: string }[]
+        ` as { order_id: string; total_amount_paise: number; currency: string; order_status: string }[]
       : await sql`
           SELECT
             p.order_id,
             o.total_amount_paise,
+            COALESCE(o.currency, 'INR') AS currency,
             o.status AS order_status
           FROM payments p
           JOIN orders o ON o.id = p.order_id
           WHERE p.provider_order_id = ${razorpayOrderId} OR p.provider_payment_id = ${razorpayOrderId}
           LIMIT 1
-        ` as { order_id: string; total_amount_paise: number; order_status: string }[];
+        ` as { order_id: string; total_amount_paise: number; currency: string; order_status: string }[];
 
     const row = rows[0];
     if (!row) {
@@ -71,7 +73,7 @@ export async function POST(req: Request) {
       paymentData.id !== razorpayPaymentId ||
       paymentData.order_id !== razorpayOrderId ||
       Number(paymentData.amount) !== Number(row.total_amount_paise) ||
-      String(paymentData.currency || "").toUpperCase() !== "INR"
+      String(paymentData.currency || "").toUpperCase() !== String(row.currency || "INR").toUpperCase()
     ) {
       return NextResponse.json({ error: "Payment details do not match this order" }, { status: 400 });
     }

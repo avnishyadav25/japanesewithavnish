@@ -9,7 +9,6 @@ import {
 } from "@/lib/learn-filters";
 import { LessonMetaContent, SoundsCharactersBlock } from "@/components/learn/LessonMetaContent";
 import { LearnLessonCard } from "@/components/learn/LearnLessonCard";
-import { ProductCard } from "@/components/ProductCard";
 import { BlogCommentList } from "@/components/BlogCommentList";
 import { LearnCommentForm } from "@/components/learn/LearnCommentForm";
 import { LearnMarkdown } from "@/components/learn/LearnMarkdown";
@@ -100,42 +99,19 @@ export default async function BlogLearnDetailPage({
   const meta = (item.meta ?? {}) as Record<string, unknown>;
   const featureImageUrl =
     item.og_image_url ?? (typeof meta.feature_image_url === "string" ? meta.feature_image_url : null);
-  const primaryLevel = (item.jlpt_level || "").toUpperCase();
 
   let related: LearnItemForFilter[] = [];
   let comments: { id: string; author_name: string; author_email: string; content: string; created_at: string }[] = [];
-  let bundlesToShow: { id: string; slug: string; name: string; price_paise: number; compare_price_paise?: number; badge?: string; jlpt_level?: string; image_url?: string; is_mega?: boolean }[] = [];
 
-  const [relatedRows, productRows] = await Promise.all([
-    sql`
+  const relatedRows = await sql`
       SELECT id, slug, title, content, content_type, (jlpt_level)[1] AS jlpt_level, tags, meta, status, sort_order, created_at, updated_at
       FROM posts
       WHERE content_type = ${normalized} AND status = 'published' AND slug != ${slug}
       ORDER BY sort_order ASC, created_at DESC
       LIMIT 6
-    `,
-    sql`
-      SELECT id, slug, name, price_paise, compare_price_paise, badge, jlpt_level, image_url, is_mega
-      FROM products
-      WHERE is_mega = true OR jlpt_level = ${primaryLevel} OR jlpt_level = 'N4'
-      ORDER BY sort_order ASC
-      LIMIT 4
-    `,
-  ]);
+    `;
 
   related = (Array.isArray(relatedRows) ? relatedRows : []) as LearnItemForFilter[];
-  bundlesToShow = (Array.isArray(productRows) ? productRows : []) as typeof bundlesToShow;
-
-  // Relevant-first product loading: only fetch the top 4 relevant bundles unless none match.
-  if (bundlesToShow.length === 0) {
-    const fallbackRows = await sql`
-      SELECT id, slug, name, price_paise, compare_price_paise, badge, jlpt_level, image_url, is_mega
-      FROM products
-      ORDER BY sort_order ASC
-      LIMIT 4
-    `;
-    bundlesToShow = (Array.isArray(fallbackRows) ? fallbackRows : []) as typeof bundlesToShow;
-  }
 
   try {
     const commentsRows = await sql`
@@ -148,7 +124,6 @@ export default async function BlogLearnDetailPage({
   } catch {
     comments = [];
   }
-  // `bundlesToShow` already uses the relevant-first logic + fallback.
   const contentStr = item.content ?? "";
   const reorderedContent = contentStr ? reorderContentExamplesLast(contentStr) : "";
   const contentWithBoldLabels = reorderedContent ? boldContentLabels(reorderedContent) : "";
@@ -247,48 +222,10 @@ export default async function BlogLearnDetailPage({
                 <LearnCommentForm contentType={normalized} slug={slug} />
               </div>
             </section>
-            {/*
-            {bundlesToShow.length > 0 && (
-              <section className="mt-12 pt-10 border-t border-[var(--divider)]">
-                <h2 className="font-heading text-2xl sm:text-3xl font-bold text-charcoal mb-2 text-center">
-                  Recommended bundles for you
-                </h2>
-                <p className="text-secondary text-center mb-8 max-w-xl mx-auto">
-                  Structured study materials to accelerate your JLPT journey.
-                </p>
-                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                  {bundlesToShow.map((product, i) => (
-                    <ProductCard
-                      key={product.id}
-                      slug={product.slug}
-                      name={product.name}
-                      price={product.price_paise}
-                      comparePrice={product.compare_price_paise ?? undefined}
-                      badge={
-                        product.badge === "premium"
-                          ? "premium"
-                          : product.badge === "offer"
-                            ? "offer"
-                            : undefined
-                      }
-                      jlptLevel={product.jlpt_level ?? undefined}
-                      size="medium"
-                      imageUrl={product.image_url}
-                      index={i}
-                    />
-                  ))}
-                </div>
-                <div className="mt-6 text-center">
-                  <Link href="/store" className="btn-primary inline-block">
-                    Browse all bundles
-                  </Link>
-                </div>
-              </section>
-            )}*/}
           </div>
 
           <aside>
-            <LearnStickyCta contentType={normalized} primaryLevel={primaryLevel} />
+            <LearnStickyCta contentType={normalized} />
           </aside>
         </div>
       </div>

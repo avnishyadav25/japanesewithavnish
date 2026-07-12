@@ -7,17 +7,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticPages: { path: string; priority: number; changeFrequency: "weekly" | "monthly" }[] = [
     { path: "", priority: 1, changeFrequency: "weekly" },
     { path: "/start-here", priority: 0.8, changeFrequency: "weekly" },
+    { path: "/pricing", priority: 0.8, changeFrequency: "weekly" },
     { path: "/blog", priority: 0.8, changeFrequency: "weekly" },
     { path: "/learn", priority: 0.8, changeFrequency: "weekly" },
-    { path: "/store", priority: 0.8, changeFrequency: "weekly" },
+    { path: "/learn/grammar", priority: 0.7, changeFrequency: "weekly" },
+    { path: "/learn/vocabulary", priority: 0.7, changeFrequency: "weekly" },
+    { path: "/learn/kanji", priority: 0.7, changeFrequency: "weekly" },
+    { path: "/learn/reading", priority: 0.7, changeFrequency: "weekly" },
+    { path: "/learn/writing", priority: 0.7, changeFrequency: "weekly" },
+    { path: "/learn/listening", priority: 0.7, changeFrequency: "weekly" },
     { path: "/quiz", priority: 0.8, changeFrequency: "weekly" },
-    { path: "/login", priority: 0.5, changeFrequency: "monthly" },
-    { path: "/library", priority: 0.5, changeFrequency: "monthly" },
     { path: "/free-n5-pack", priority: 0.8, changeFrequency: "weekly" },
-    { path: "/thank-you", priority: 0.5, changeFrequency: "monthly" },
     { path: "/policies/privacy", priority: 0.4, changeFrequency: "monthly" },
     { path: "/policies/terms", priority: 0.4, changeFrequency: "monthly" },
     { path: "/policies/refunds", priority: 0.4, changeFrequency: "monthly" },
+    { path: "/policies/cookies", priority: 0.4, changeFrequency: "monthly" },
     { path: "/jlpt", priority: 0.8, changeFrequency: "weekly" },
   ];
 
@@ -29,7 +33,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }));
 
   const blogEntries: MetadataRoute.Sitemap = [];
-  const productEntries: MetadataRoute.Sitemap = [];
 
   const learnEntries: MetadataRoute.Sitemap = [];
   if (sql) {
@@ -68,22 +71,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     } catch {
       // ignore
     }
-    try {
-      const productRows = await sql`
-        SELECT slug, updated_at FROM products ORDER BY sort_order ASC
-      ` as { slug: string; updated_at: string | null }[];
-      productEntries.push(
-        ...(productRows || []).map((row) => ({
-          url: `${BASE}/product/${row.slug}`,
-          lastModified: row.updated_at ? new Date(row.updated_at) : new Date(),
-          changeFrequency: "weekly" as const,
-          priority: 0.7 as number,
-        }))
-      );
-    } catch {
-      // ignore
-    }
   }
 
-  return [...staticEntries, ...blogEntries, ...learnEntries, ...productEntries];
+  return [...staticEntries, ...blogEntries, ...learnEntries];
 }

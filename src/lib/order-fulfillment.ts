@@ -21,6 +21,7 @@ export async function fulfillOrder(
       o.status,
       o.plan_id,
       o.total_amount_paise,
+      COALESCE(o.currency, 'INR') AS currency,
       o.provider,
       o.coupon_code,
       p.provider_payment_id,
@@ -36,6 +37,7 @@ export async function fulfillOrder(
     status: string;
     plan_id: string | null;
     total_amount_paise: number;
+    currency: string;
     provider: string | null;
     coupon_code: string | null;
     provider_payment_id: string | null;
@@ -107,9 +109,10 @@ export async function fulfillOrder(
       const subId = subRows[0]?.id;
 
       // Log subscription payment
+      const paymentCurrency = String(order.currency || "INR").toUpperCase();
       await sql`
-        INSERT INTO subscription_payments (user_email, subscription_id, plan_id, provider, provider_payment_id, provider_order_id, amount, status, paid_at)
-        VALUES (${userEmail}, ${subId}, ${plan.id}, ${order.provider || 'razorpay'}, ${providerPaymentId}, ${providerOrderId}, ${order.total_amount_paise || 0}, 'paid', NOW())
+        INSERT INTO subscription_payments (user_email, subscription_id, plan_id, provider, provider_payment_id, provider_order_id, amount, currency, status, paid_at)
+        VALUES (${userEmail}, ${subId}, ${plan.id}, ${order.provider || 'razorpay'}, ${providerPaymentId}, ${providerOrderId}, ${order.total_amount_paise || 0}, ${paymentCurrency}, 'paid', NOW())
         ON CONFLICT (provider_payment_id) DO NOTHING
       `;
 

@@ -10,11 +10,11 @@ export function BlogNextStepCta() {
         <Link href="/quiz" className="btn-primary">
           Take the Quiz
         </Link>
-        <Link href="/store" className="btn-secondary">
-          Browse Bundles
+        <Link href="/pricing" className="btn-secondary">
+          Explore Premium
         </Link>
         <Link href="/login" className="text-primary font-medium hover:underline py-2">
-          Store
+          Log in
         </Link>
       </div>
     </div>

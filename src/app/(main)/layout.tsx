@@ -1,9 +1,11 @@
 import { headers } from "next/headers";
+import { Suspense } from "react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { AnnouncementBar } from "@/components/AnnouncementBar";
 import { ChatPanel } from "@/components/ChatPanel";
 import { FeedbackWidget } from "@/components/FeedbackWidget";
+import { PageAnalytics } from "@/components/PageAnalytics";
 import { getAdminSession } from "@/lib/auth/admin";
 
 const isComingSoon =
@@ -30,6 +32,11 @@ export default async function MainLayout({
         </>
       )}
       <main className="flex-1">{children}</main>
+      {!isComingSoon && (
+        <Suspense fallback={null}>
+          <PageAnalytics />
+        </Suspense>
+      )}
       {!isComingSoon && !isTutorRoute && (
         <>
           <Footer />

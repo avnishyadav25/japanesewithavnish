@@ -69,21 +69,21 @@ export default async function JLPTPage({
           </h1>
           <p className="text-secondary mb-6 max-w-2xl">
             Choose your level to get structured lessons, practice guidance, and the
-            right bundle.
+            right learning path.
           </p>
           <div className="flex flex-wrap gap-3 mb-4">
             <Link href="/quiz" className="btn-primary">
               Take the Placement Quiz
             </Link>
             <Link
-              href="/product/complete-japanese-n5-n1-mega-bundle"
+              href="/pricing"
               className="btn-secondary"
             >
-              View Mega Bundle
+              View Premium Plans
             </Link>
           </div>
           <p className="text-secondary text-sm">
-            Instant download • Lifetime access • Study offline
+            Learn online, at your own pace, and keep your progress.
           </p>
         </section>
 

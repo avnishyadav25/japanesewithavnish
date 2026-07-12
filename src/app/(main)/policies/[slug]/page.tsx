@@ -38,14 +38,14 @@ const POLICIES: Record<string, PolicyDef> = {
         <ul>
           <li><strong>Account Information:</strong> Name, email address, and password when you create an account or sign up via magic link.</li>
           <li><strong>Profile Information:</strong> Target JLPT level, avatar, display name, and learning preferences.</li>
-          <li><strong>Payment Information:</strong> Billing details processed securely by our payment partners (Stripe and Razorpay). We do <strong>not</strong> store your credit card or bank details on our servers.</li>
+          <li><strong>Payment Information:</strong> Billing details processed securely by Razorpay and enabled Razorpay payment partners such as PayPal for international checkout. We do <strong>not</strong> store your credit card, PayPal, or bank details on our servers.</li>
           <li><strong>Contact & Feedback:</strong> Name, email, and message content when you use our contact form or feedback widget.</li>
           <li><strong>AI Tutor Interactions:</strong> Questions and conversations you submit to Nihongo Navi, our AI tutor, to provide personalized responses.</li>
         </ul>
         <h3>Information Collected Automatically</h3>
         <ul>
           <li><strong>Learning Activity:</strong> Lesson completions, quiz scores, streak data, XP points, badges earned, and progress metrics.</li>
-          <li><strong>Device & Usage Data:</strong> Browser type, operating system, IP address, pages visited, and access timestamps.</li>
+          <li><strong>Device & Usage Data:</strong> Browser type, operating system, privacy-safe hashed IP identifier, approximate country/region when provided by hosting headers, pages visited, referrer, UTM campaign parameters, and access timestamps.</li>
           <li><strong>Cookies & Local Storage:</strong> Session tokens, authentication state, and user preferences. See our <a href="/policies/cookies" class="text-primary hover:underline">Cookie Policy</a> for details.</li>
         </ul>`,
       },
@@ -71,10 +71,11 @@ const POLICIES: Record<string, PolicyDef> = {
           <tbody>
             <tr><td><strong>Neon (NeonDB)</strong></td><td>Database hosting</td><td>Account data, learning progress, content</td></tr>
             <tr><td><strong>Cloudflare R2</strong></td><td>File & media storage</td><td>Uploaded avatars, generated images</td></tr>
-            <tr><td><strong>Stripe</strong></td><td>Global payment processing</td><td>Email, payment details (handled by Stripe)</td></tr>
-            <tr><td><strong>Razorpay</strong></td><td>India payment processing</td><td>Email, payment details (handled by Razorpay)</td></tr>
+            <tr><td><strong>Razorpay</strong></td><td>India and international payment processing</td><td>Email, payment details (handled by Razorpay)</td></tr>
+            <tr><td><strong>PayPal via Razorpay</strong></td><td>International payment option when enabled</td><td>Email and payment details handled by PayPal/Razorpay</td></tr>
             <tr><td><strong>Google Gemini AI</strong></td><td>AI tutor (Nihongo Navi)</td><td>Your tutor queries (processed in real-time)</td></tr>
             <tr><td><strong>Netlify</strong></td><td>Web hosting & deployment</td><td>Standard HTTP request data</td></tr>
+            <tr><td><strong>Google Analytics / Google Tag Manager</strong></td><td>Traffic analytics and tag management when enabled</td><td>Page views, referrer, approximate location, device/browser data, and campaign parameters</td></tr>
           </tbody>
         </table>
         <p>We do <strong>not</strong> sell, rent, or trade your personal information to any third party for marketing purposes.</p>`,
@@ -182,17 +183,17 @@ const POLICIES: Record<string, PolicyDef> = {
         <p>All registered users receive free access to limited daily lessons, basic quizzes, the JLPT placement quiz, and selected blog content. Free access may be subject to daily limits (e.g., lessons per day, AI tutor queries).</p>
         <h3>Premium Pass</h3>
         <p>Premium pass holders receive access to all lessons, mock exams, advanced AI tutoring, writing practice, and streak freeze purchases for the pass duration purchased. Premium passes are available as 30-day, 365-day, or lifetime access.</p>
-        <p>Pass details, pricing, and access terms are displayed on our <a href="/pricing" class="text-primary hover:underline">Pricing page</a> at the time of purchase. Monthly and yearly passes are one-time purchases and do not renew automatically.</p>`,
+        <p>Pass details, pricing, payment provider, and access terms are displayed on our <a href="/pricing" class="text-primary hover:underline">Pricing page</a> at the time of purchase. India/INR and International/USD Razorpay passes are one-time fixed-duration purchases. Lifetime access is always one-time.</p>`,
       },
       {
         id: "billing",
         heading: "Billing & Payments",
         body: `<ul>
-          <li><strong>30-Day Passes:</strong> One-time payment granting 30 days of premium access.</li>
-          <li><strong>365-Day Passes:</strong> One-time payment granting 365 days of premium access.</li>
+          <li><strong>India/INR Passes:</strong> One-time Razorpay payments granting 30 days, 365 days, or lifetime premium access.</li>
+          <li><strong>International/USD Passes:</strong> One-time Razorpay international payments granting 30 days, 365 days, or lifetime premium access. PayPal may be available when enabled on Razorpay Checkout.</li>
           <li><strong>Lifetime Passes:</strong> One-time payment granting indefinite premium access, subject to the continued operation of the Service.</li>
         </ul>
-        <p>Payments are processed securely by <strong>Stripe</strong> (international) and <strong>Razorpay</strong> (India). We do not store your payment card details. All prices are inclusive of applicable taxes unless stated otherwise.</p>
+        <p>Payments are processed securely by <strong>Razorpay</strong>. International methods, including PayPal, may be presented by Razorpay when enabled. We do not store your payment card, PayPal, or bank details. All prices are inclusive of applicable taxes unless stated otherwise.</p>
         <p>For cancellation and refund terms, see our <a href="/policies/refunds" class="text-primary hover:underline">Cancellation & Refund Policy</a>.</p>`,
       },
       {
@@ -382,8 +383,8 @@ const POLICIES: Record<string, PolicyDef> = {
       {
         id: "third-party-cookies",
         heading: "Third-Party Cookies",
-        body: `<p>Our payment partners (Stripe and Razorpay) may set their own cookies during the checkout process to prevent fraud and process payments securely. These cookies are governed by their respective privacy policies.</p>
-        <p>We do not currently use third-party advertising or analytics cookies.</p>`,
+        body: `<p>Razorpay and enabled Razorpay payment partners such as PayPal may set their own cookies during the checkout process to prevent fraud and process payments securely. These cookies are governed by their respective privacy policies.</p>
+        <p>We may use Google Analytics and Google Tag Manager when enabled through our public configuration. We also use first-party analytics events to understand page views, learning engagement, referrers, campaign parameters, approximate country, and device/browser mix. We do not store full IP addresses in our first-party analytics; IPs are hashed for privacy-safe grouping.</p>`,
       },
       {
         id: "managing-cookies",

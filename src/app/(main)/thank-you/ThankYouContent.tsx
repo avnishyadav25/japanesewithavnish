@@ -38,8 +38,8 @@ export function ThankYouContent({ orderId }: { orderId: string | undefined }) {
             Payment successful!
           </h1>
           <p className="text-secondary max-w-md">
-            We&apos;ve sent your access link to your email. You can also access your library or
-            bundle below.
+            We&apos;ve sent your access link to your email. You can also access your library
+            below.
           </p>
 
           {urls ? (
@@ -51,7 +51,7 @@ export function ThankYouContent({ orderId }: { orderId: string | undefined }) {
                   rel="noopener noreferrer"
                   className="btn-primary inline-flex justify-center"
                 >
-                  Access Store
+                  Access your content
                 </a>
                 <Link
                   href={urls.orderDetailUrl}
@@ -66,13 +66,13 @@ export function ThankYouContent({ orderId }: { orderId: string | undefined }) {
               >
                 <strong>Save this link somewhere safe.</strong> This page does not show the link
                 again after you refresh or leave—use the link above or the one in your email to
-                access your bundle later.
+                access your content later.
               </div>
             </div>
           ) : (
             <div className="flex flex-col sm:flex-row gap-3 mt-2">
               <Link href="/library" className="btn-primary">
-                Go to Store
+                Go to My Library
               </Link>
               <Link href="/learn" className="btn-secondary">
                 Continue learning
@@ -102,7 +102,7 @@ export function ThankYouContent({ orderId }: { orderId: string | undefined }) {
               </h2>
               <ul className="text-secondary text-sm space-y-1">
                 <li>Save your access link (email or this page before refresh).</li>
-                <li>Click the link to open your library or bundle.</li>
+                <li>Click the link to open your library.</li>
                 <li>Download your PDFs and audio to start studying.</li>
               </ul>
               <p className="text-secondary text-xs mt-3">

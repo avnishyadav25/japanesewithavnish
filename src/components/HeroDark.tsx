@@ -44,7 +44,7 @@ export function HeroDark({ megaProduct, isAdmin = false }: HeroDarkProps) {
         <div>
           <div className="flex flex-wrap items-center gap-2 mb-5">
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold tracking-[.06em] uppercase bg-white/15 text-white">
-              ⭐ 2,000+ learners
+              ⭐ Growing community
             </span>
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold tracking-[.06em] uppercase bg-white/15 text-white">
               JLPT N5 → N1
@@ -60,7 +60,7 @@ export function HeroDark({ megaProduct, isAdmin = false }: HeroDarkProps) {
           </h1>
 
           <p className="text-white/70 text-[17px] leading-[1.75] mb-8 max-w-[480px]">
-            Premium JLPT bundles from N5 to N1, a placement quiz, AI tutor, and a clear
+            A structured Premium Pass from N5 to N1, a placement quiz, AI tutor, and a clear
             day-by-day roadmap — everything in one place.
           </p>
 
@@ -82,7 +82,7 @@ export function HeroDark({ megaProduct, isAdmin = false }: HeroDarkProps) {
           </div>
 
           <div className="flex flex-wrap gap-5 text-[13px] text-white/50">
-            {["Instant download", "Lifetime access", "Secure checkout"].map((t) => (
+            {["Learn online anytime", "Keep your progress", "Secure checkout"].map((t) => (
               <span key={t} className="flex items-center gap-1.5">
                 <span className="text-[#C8A35F]">✓</span> {t}
               </span>

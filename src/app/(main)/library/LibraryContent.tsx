@@ -196,7 +196,7 @@ export async function LibraryContent({ userEmail }: { userEmail: string }) {
       <section className="rounded-3xl border border-[var(--divider)] bg-white p-6 shadow-sm">
         <div className="border-b border-[var(--divider)] pb-4 mb-4">
           <h2 className="font-heading text-xl font-bold text-charcoal">Purchases</h2>
-          <p className="text-secondary text-sm">Purchased bundles and downloads remain available here.</p>
+          <p className="text-secondary text-sm">Your purchases and downloads remain available here.</p>
         </div>
 
         {products.length ? (
