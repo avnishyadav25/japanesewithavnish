@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth/admin";
 import { sql } from "@/lib/db";
 
-const VALID_TYPES = ["writing_canvas", "mcq", "fill_blank", "roleplay", "listening", "shadowing"];
+const VALID_TYPES = ["writing_canvas", "mcq", "fill_blank", "roleplay", "listening", "shadowing", "module_checkpoint", "level_assessment"];
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const admin = await getAdminSession();

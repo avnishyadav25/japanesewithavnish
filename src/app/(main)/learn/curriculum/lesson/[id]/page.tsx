@@ -9,6 +9,7 @@ import { canAccessLesson } from "@/lib/auth/access";
 import { Countdown } from "@/components/learn/Countdown";
 import { getResolvedLessonBlocks } from "@/lib/curriculum/getLessonBlocks";
 import { LessonBlockRenderer } from "@/components/curriculum/LessonBlockRenderer";
+import { LessonMaterialsSidebar } from "./LessonMaterialsSidebar";
 
 export default async function LearnCurriculumLessonPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -51,8 +52,10 @@ export default async function LearnCurriculumLessonPage({ params }: { params: Pr
             <h1 className="font-heading text-xl font-bold text-charcoal">Lesson Locked</h1>
             <p className="text-secondary text-sm mt-2 leading-relaxed">
               {lockReason === "daily_limit_reached"
-                ? "You have completed today's 2 free lessons. Your next lessons unlock tomorrow."
-                : "This lesson is currently locked in your curriculum path sequence. Please complete the previous lessons first to unlock."}
+                ? "You have completed today's free lessons. Your next lessons unlock tomorrow."
+                : lockReason === "premium_required"
+                  ? "This lesson requires an active Premium pass to access."
+                  : "This lesson is currently locked in your curriculum path sequence. Please complete the previous lessons first to unlock."}
             </p>
           </div>
 
@@ -428,89 +431,7 @@ export default async function LearnCurriculumLessonPage({ params }: { params: Pr
             </div>
 
             {/* Structured Materials Lists */}
-            <div id="lists" className="space-y-4">
-              <h3 className="font-heading font-bold text-xs uppercase tracking-wider text-secondary pl-1">
-                Lesson Materials
-              </h3>
-
-              {/* Vocabulary */}
-              <div className="bg-white border border-[var(--divider)] rounded-2xl p-4 shadow-sm">
-                <h4 className="font-heading font-semibold text-xs text-charcoal mb-2">Vocabulary</h4>
-                {vocab.length ? (
-                  <div className="space-y-2.5">
-                    {vocab.map((v) => (
-                      <div key={v.id} className="flex flex-col border-b border-[var(--divider)]/40 pb-2 last:border-0 last:pb-0">
-                        <Link href={`/learn/vocabulary/${v.slug}`} className="text-xs font-bold text-primary hover:underline">
-                          {v.word} ({v.reading})
-                        </Link>
-                        <span className="text-[11px] text-secondary mt-0.5">{v.meaning}</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-secondary text-xs italic">No vocabulary in this lesson.</p>
-                )}
-              </div>
-
-              {/* Grammar */}
-              <div className="bg-white border border-[var(--divider)] rounded-2xl p-4 shadow-sm">
-                <h4 className="font-heading font-semibold text-xs text-charcoal mb-2">Grammar</h4>
-                {grammar.length ? (
-                  <div className="space-y-2.5">
-                    {grammar.map((g) => (
-                      <div key={g.id} className="flex flex-col border-b border-[var(--divider)]/40 pb-2 last:border-0 last:pb-0">
-                        <Link href={`/learn/grammar/${g.slug}`} className="text-xs font-bold text-primary hover:underline">
-                          {g.pattern}
-                        </Link>
-                        <span className="text-[11px] text-secondary mt-0.5 font-mono">{g.structure}</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-secondary text-xs italic">No grammar rules in this lesson.</p>
-                )}
-              </div>
-
-              {/* Kanji */}
-              <div className="bg-white border border-[var(--divider)] rounded-2xl p-4 shadow-sm">
-                <h4 className="font-heading font-semibold text-xs text-charcoal mb-2">Kanji</h4>
-                {kanji.length ? (
-                  <div className="space-y-2.5">
-                    {kanji.map((k) => (
-                      <div key={k.id} className="flex flex-col border-b border-[var(--divider)]/40 pb-2 last:border-0 last:pb-0">
-                        <Link href={`/learn/kanji/${k.slug}`} className="text-xs font-bold text-primary hover:underline">
-                          {k.character} — {k.meaning}
-                        </Link>
-                        {k.onyomi && k.onyomi.length > 0 && (
-                          <span className="text-[10px] text-secondary mt-0.5">Onyomi: {k.onyomi.join(", ")}</span>
-                        )}
-                        {k.kunyomi && k.kunyomi.length > 0 && (
-                          <span className="text-[10px] text-secondary">Kunyomi: {k.kunyomi.join(", ")}</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-secondary text-xs italic">No kanji characters in this lesson.</p>
-                )}
-              </div>
-
-              {/* Kana */}
-              <div className="bg-white border border-[var(--divider)] rounded-2xl p-4 shadow-sm">
-                <h4 className="font-heading font-semibold text-xs text-charcoal mb-2">Kana</h4>
-                {kana.length ? (
-                  <div className="flex flex-wrap gap-1.5">
-                    {kana.map((k) => (
-                      <span key={k.id} className="px-2 py-0.5 rounded-full border border-[var(--divider)] text-charcoal bg-[var(--divider)]/10 text-[10px] font-semibold">
-                        {k.character} <span className="text-secondary text-[9px] font-mono">({k.romaji})</span>
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-secondary text-xs italic">No kana characters in this lesson.</p>
-                )}
-              </div>
-            </div>
+            <LessonMaterialsSidebar vocab={vocab} grammar={grammar} kanji={kanji} kana={kana} />
           </div>
         </div>
 

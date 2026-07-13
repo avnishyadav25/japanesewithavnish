@@ -6,6 +6,7 @@ import { LeadMagnetForm } from "@/components/LeadMagnetForm";
 import { RecentBlogSection } from "@/components/RecentBlogSection";
 import { NewsletterSection } from "@/components/NewsletterSection";
 import { HomePricingSection } from "@/components/HomePricingSection";
+import { OfferBannerBar } from "@/components/OfferBannerBar";
 import {
   StepsSection,
   NihongoNaviSection,
@@ -70,6 +71,7 @@ async function FullHomeView() {
 
   return (
     <div className="font-sans antialiased text-charcoal">
+      <OfferBannerBar />
       {/* Upgraded Premium Hero */}
       <section className="relative overflow-hidden py-24 px-4 sm:px-6 bg-[#1A1A1A]">
         {/* Glow Effects */}
@@ -98,6 +100,10 @@ async function FullHomeView() {
               The structured path<br />
               to <span className="text-[#FF6B6B]">Japanese fluency</span>
             </h1>
+
+            <p className="text-white/80 text-sm font-semibold tracking-wide">
+              Structured Japanese Learning from N5 to N1.
+            </p>
 
             <p className="text-white/70 text-sm leading-relaxed max-w-lg">
               Unlock unlimited Japanese learning with a premium pass. Get 150+ structured lessons from N5 to N1, interactive practice drills, community scoreboards, streaks, and badges.

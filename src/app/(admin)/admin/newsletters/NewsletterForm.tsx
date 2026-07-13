@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AdminCard } from "@/components/admin/AdminCard";
 import { GenerateContentButton } from "@/components/admin/GenerateContentButton";
+import { RichTextEditor } from "@/components/admin/RichTextEditor";
 
 type Newsletter = {
   id: string;
@@ -14,6 +15,7 @@ type Newsletter = {
   body_html: string;
   status: string;
   sent_at: string | null;
+  send_at?: string | null;
 };
 
 export function NewsletterForm({ newsletter }: { newsletter?: Newsletter | null }) {
@@ -24,6 +26,10 @@ export function NewsletterForm({ newsletter }: { newsletter?: Newsletter | null 
   const [subject, setSubject] = useState(newsletter?.subject ?? "");
   const [bodyHtml, setBodyHtml] = useState(newsletter?.body_html ?? "");
   const [status, setStatus] = useState(newsletter?.status ?? "draft");
+  const [sendAt, setSendAt] = useState(
+    newsletter?.send_at ? new Date(newsletter.send_at).toISOString().slice(0, 16) : ""
+  );
+  const [editorMode, setEditorMode] = useState<"rich" | "html">("rich");
   const [saveStatus, setSaveStatus] = useState<"idle" | "loading" | "saved" | "error">("idle");
   const [sendStatus, setSendStatus] = useState<"idle" | "loading" | "sent" | "error">("idle");
 
@@ -34,6 +40,7 @@ export function NewsletterForm({ newsletter }: { newsletter?: Newsletter | null 
       setSubject(newsletter.subject);
       setBodyHtml(newsletter.body_html);
       setStatus(newsletter.status);
+      setSendAt(newsletter.send_at ? new Date(newsletter.send_at).toISOString().slice(0, 16) : "");
     }
   }, [newsletter]);
 
@@ -41,11 +48,19 @@ export function NewsletterForm({ newsletter }: { newsletter?: Newsletter | null 
     e.preventDefault();
     setSaveStatus("loading");
     try {
+      const payload = {
+        slug,
+        title: title || null,
+        subject,
+        body_html: bodyHtml,
+        status,
+        send_at: sendAt ? new Date(sendAt).toISOString() : null,
+      };
       if (isEdit) {
         const res = await fetch(`/api/admin/newsletters/${newsletter!.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ slug, title: title || null, subject, body_html: bodyHtml, status }),
+          body: JSON.stringify(payload),
         });
         if (!res.ok) throw new Error("Failed");
         setSaveStatus("saved");
@@ -53,7 +68,7 @@ export function NewsletterForm({ newsletter }: { newsletter?: Newsletter | null 
         const res = await fetch("/api/admin/newsletters", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ slug, title: title || null, subject, body_html: bodyHtml, status }),
+          body: JSON.stringify(payload),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed");
@@ -115,25 +130,59 @@ export function NewsletterForm({ newsletter }: { newsletter?: Newsletter | null 
           </div>
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="block text-sm font-medium text-charcoal">Body (HTML)</label>
-              {!isEdit && (
-                <GenerateContentButton
-                  contentType="newsletter"
-                  context={{ topic: title || subject, description: "" }}
-                  onGenerated={(data) => {
-                    if (typeof data === "string") setBodyHtml(data);
-                    else if (typeof (data as { content?: string }).content === "string")
-                      setBodyHtml((data as { content: string }).content);
-                  }}
-                />
-              )}
+              <label className="block text-sm font-medium text-charcoal">Body</label>
+              <div className="flex items-center gap-3">
+                <div className="flex gap-1 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setEditorMode("rich")}
+                    className={`px-2 py-1 rounded ${editorMode === "rich" ? "bg-primary text-white" : "bg-base border border-[var(--divider)] text-secondary"}`}
+                  >
+                    Rich text
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditorMode("html")}
+                    className={`px-2 py-1 rounded ${editorMode === "html" ? "bg-primary text-white" : "bg-base border border-[var(--divider)] text-secondary"}`}
+                  >
+                    Raw HTML
+                  </button>
+                </div>
+                {!isEdit && (
+                  <GenerateContentButton
+                    contentType="newsletter"
+                    context={{ topic: title || subject, description: "" }}
+                    onGenerated={(data) => {
+                      if (typeof data === "string") setBodyHtml(data);
+                      else if (typeof (data as { content?: string }).content === "string")
+                        setBodyHtml((data as { content: string }).content);
+                    }}
+                  />
+                )}
+              </div>
             </div>
-            <textarea
-              value={bodyHtml}
-              onChange={(e) => setBodyHtml(e.target.value)}
-              rows={14}
-              className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal font-mono text-sm"
+            {editorMode === "rich" ? (
+              <RichTextEditor value={bodyHtml} onChange={setBodyHtml} rows={14} />
+            ) : (
+              <textarea
+                value={bodyHtml}
+                onChange={(e) => setBodyHtml(e.target.value)}
+                rows={14}
+                className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal font-mono text-sm"
+              />
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-charcoal mb-1">Schedule send (optional)</label>
+            <input
+              type="datetime-local"
+              value={sendAt}
+              onChange={(e) => setSendAt(e.target.value)}
+              className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
             />
+            <p className="text-secondary text-xs mt-1">
+              If set, this draft is sent automatically once the scheduled time passes (hourly check).
+            </p>
           </div>
           {isEdit && (
             <div>

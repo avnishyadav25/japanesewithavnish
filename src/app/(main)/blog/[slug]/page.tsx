@@ -55,8 +55,10 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
   const post = postRaw as {
     id: string; title: string; summary?: string | null; seo_description?: string | null; content?: string | null;
     published_at?: string | null; og_image_url?: string | null; jlpt_level?: unknown; tags?: string[];
+    author_name?: string | null;
     meta?: { jlpt_verification?: { verifiedAt?: string; source?: string; reviewedBy?: string } } | null;
   };
+  const authorName = post.author_name?.trim() || "Japanese with Avnish Editorial Team";
 
   const jlptLevels = Array.isArray(post.jlpt_level)
     ? post.jlpt_level
@@ -68,7 +70,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
   const topicTag = tags[0] || "Article";
 
   const allPostsRows = await sql`
-    SELECT id, slug, title, summary, seo_description, published_at, og_image_url, jlpt_level, tags
+    SELECT id, slug, title, summary, seo_description, published_at, og_image_url, jlpt_level, tags, author_name
     FROM posts WHERE status = 'published' AND (content_type IS NULL OR content_type = 'blog') AND id != ${post.id as string}
     ORDER BY published_at DESC LIMIT 50
   `;
@@ -129,6 +131,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
 
             {/* Meta */}
             <div className="flex flex-wrap gap-4 text-secondary text-sm mb-6">
+              <span className="font-semibold text-charcoal">By {authorName}</span>
               {post.published_at && (
                 <time>
                   {new Date(post.published_at).toLocaleDateString("en-US", {

@@ -24,6 +24,7 @@ export async function PUT(
       seo_description,
       og_image_url,
       image_prompt,
+      author_name,
     } = body;
 
     if (!slug || !title) {
@@ -50,6 +51,7 @@ export async function PUT(
           seo_description = ${seo_description ?? null},
           og_image_url = ${og_image_url || null},
           image_prompt = ${image_prompt ?? null},
+          author_name = ${author_name || null},
           updated_at = ${new Date().toISOString()}
         WHERE slug = ${oldSlug}
       `;

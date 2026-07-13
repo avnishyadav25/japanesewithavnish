@@ -1,0 +1,16 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/send-scheduled-newsletters",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/reengagement-nudge",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/leaderboard-monthly-reward",
+      "schedule": "0 6 1 * *"
+    }
+  ]
+}

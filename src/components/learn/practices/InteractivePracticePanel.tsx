@@ -49,6 +49,8 @@ export function InteractivePracticePanel({ practices, lessonTitle, lessonId, kan
       case "roleplay": return "💬";
       case "listening": return "🎧";
       case "shadowing": return "🔊";
+      case "module_checkpoint": return "🚩";
+      case "level_assessment": return "🏆";
       default: return "🎯";
     }
   };
@@ -61,6 +63,8 @@ export function InteractivePracticePanel({ practices, lessonTitle, lessonId, kan
       case "roleplay": return "Roleplay Dialogue";
       case "listening": return "Listening Practice";
       case "shadowing": return "Shadowing Drill";
+      case "module_checkpoint": return "Module Checkpoint";
+      case "level_assessment": return "Level Assessment";
       default: return "Interactive Drill";
     }
   };
@@ -69,8 +73,8 @@ export function InteractivePracticePanel({ practices, lessonTitle, lessonId, kan
   const getPracticeContent = (prac: Practice) => {
     const data = prac.content_data || {};
     
-    // MCQ fallback
-    if (prac.practice_type === "mcq") {
+    // MCQ fallback (module_checkpoint and level_assessment reuse the MCQ shape/scoring per curriculum design)
+    if (prac.practice_type === "mcq" || prac.practice_type === "module_checkpoint" || prac.practice_type === "level_assessment") {
       if (Array.isArray(data.questions) && data.questions.length > 0) return data.questions;
       // Dynamic fallback
       return [
@@ -253,7 +257,7 @@ export function InteractivePracticePanel({ practices, lessonTitle, lessonId, kan
             <strong className="text-charcoal font-semibold">{activePractice.title}</strong>
           </p>
 
-          {activePractice.practice_type === "mcq" || activePractice.practice_type === "fill_blank" ? (
+          {activePractice.practice_type === "mcq" || activePractice.practice_type === "fill_blank" || activePractice.practice_type === "module_checkpoint" || activePractice.practice_type === "level_assessment" ? (
             <div className="bg-primary/5 rounded-xl p-4 mb-6 border border-primary/10">
               <span className="text-xs text-secondary font-medium">Your Score</span>
               <p className="font-heading font-black text-3xl text-primary mt-1">
@@ -295,8 +299,8 @@ export function InteractivePracticePanel({ practices, lessonTitle, lessonId, kan
             </button>
           </div>
 
-          {/* 1. Multiple Choice Quiz (MCQ) */}
-          {activePractice.practice_type === "mcq" && (() => {
+          {/* 1. Multiple Choice Quiz (MCQ) — also used by module_checkpoint and level_assessment */}
+          {(activePractice.practice_type === "mcq" || activePractice.practice_type === "module_checkpoint" || activePractice.practice_type === "level_assessment") && (() => {
             const list = getPracticeContent(activePractice);
             const q = list[currentIndex];
             const chosen = userAnswers[currentIndex];

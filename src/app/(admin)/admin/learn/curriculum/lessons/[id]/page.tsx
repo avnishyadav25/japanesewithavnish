@@ -12,7 +12,7 @@ export default async function AdminCurriculumLessonPage({ params }: { params: Pr
   if (!sql) notFound();
   const rows = await sql`
     SELECT l.id, l.submodule_id, l.code, l.title, l.goal, l.introduction, l.sort_order, l.feature_image_url,
-           l.description, l.access_type, l.content_type, l.estimated_minutes,
+           l.description, l.access_type, l.access_policy, l.premium_bypass, l.content_type, l.estimated_minutes,
            sm.title AS submodule_title, m.title AS module_title, m.level_id, lv.code AS level_code
     FROM curriculum_lessons l
     JOIN curriculum_submodules sm ON sm.id = l.submodule_id
@@ -23,7 +23,7 @@ export default async function AdminCurriculumLessonPage({ params }: { params: Pr
   const row = (rows as {
     id: string; submodule_id: string; code: string; title: string; goal: string | null;
     introduction: string | null; sort_order: number; feature_image_url: string | null;
-    description: string | null; access_type: string; content_type: string | null;
+    description: string | null; access_type: string; access_policy: string; premium_bypass: boolean; content_type: string | null;
     estimated_minutes: number | null; submodule_title: string; module_title: string;
     level_id: string; level_code: string;
   }[])[0];
@@ -53,6 +53,8 @@ export default async function AdminCurriculumLessonPage({ params }: { params: Pr
               introduction: row.introduction ?? "",
               description: row.description ?? "",
               access_type: row.access_type ?? "premium",
+              access_policy: row.access_policy ?? "daily_free_eligible",
+              premium_bypass: row.premium_bypass ?? false,
               content_type: row.content_type ?? "",
               estimated_minutes: row.estimated_minutes ?? 0,
               sort_order: row.sort_order,

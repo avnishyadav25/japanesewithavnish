@@ -1,5 +1,11 @@
 import type { ModuleEntry } from "./types";
 
+// STALE: describes the pre-expansion 6-module/31-lesson N4 baseline only.
+// The live DB was restructured to 10 modules/75 lessons directly via SQL + the
+// AI-generation/review-gate pipeline (Curriculum V2 N4 expansion) and this file was
+// never updated to match. Do NOT run seed-full-curriculum.ts against N4 against
+// the live DB — its upsert (ON CONFLICT ... DO UPDATE) would revert module/lesson
+// titles and structure back to this baseline. Safe for a fresh/empty database only.
 export const n4Modules: ModuleEntry[] = [
   {
     code: "1",

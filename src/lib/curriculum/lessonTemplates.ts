@@ -51,6 +51,34 @@ const TEMPLATES: Record<string, TemplateBlock[]> = {
     { block_type: "dialogue", block_data: { lines: [] } },
     { block_type: "rich_text", block_data: { markdown: "" } },
   ],
+  orientation: [
+    { block_type: "section_heading", block_data: { title: "Orientation" } },
+    { block_type: "rich_text", block_data: { markdown: "" } },
+    { block_type: "summary", block_data: { items: [] } },
+  ],
+  pronunciation: [
+    { block_type: "section_heading", block_data: { title: "Pronunciation Focus" } },
+    { block_type: "rich_text", block_data: { markdown: "" } },
+    { block_type: "pronunciation", block_data: { targetSound: "", correctGuidance: "" } },
+    { block_type: "audio", block_data: { audioUrl: "" } },
+  ],
+  speaking: [
+    { block_type: "section_heading", block_data: { title: "Speaking Practice" } },
+    { block_type: "rich_text", block_data: { markdown: "" } },
+    { block_type: "dialogue", block_data: { lines: [] } },
+    { block_type: "tip", block_data: { text: "" } },
+  ],
+  culture: [
+    { block_type: "section_heading", block_data: { title: "Culture Note" } },
+    { block_type: "culture_note", block_data: { text: "" } },
+    { block_type: "rich_text", block_data: { markdown: "" } },
+  ],
+  strategy: [
+    { block_type: "section_heading", block_data: { title: "Exam Strategy" } },
+    { block_type: "rich_text", block_data: { markdown: "" } },
+    { block_type: "tip", block_data: { text: "" } },
+    { block_type: "summary", block_data: { items: [] } },
+  ],
 };
 
 /** Empty starter block set for a new lesson, keyed by content_type. Falls back to a

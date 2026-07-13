@@ -2,8 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AdminLogout } from "@/app/(admin)/AdminLogout";
+
+const UNREAD_BADGE_HREFS: Record<string, keyof UnreadCounts> = {
+  "/admin/comments": "comments",
+  "/admin/contact": "contact",
+  "/admin/feedback": "feedback",
+};
+
+type UnreadCounts = { comments: number; contact: number; feedback: number };
 
 const navGroups = [
   {
@@ -61,7 +69,8 @@ const navGroups = [
       { href: "/admin/learn/listening", label: "Listening" },
       { href: "/admin/learn/writing", label: "Writing" },
       { href: "/admin/learn/practice_test", label: "Mock Tests" },
-      { href: "/admin/blogs", label: "Blogs" }
+      { href: "/admin/blogs", label: "Blogs" },
+      { href: "/admin/guide", label: "Site Guide" }
     ]
   },
   {
@@ -71,7 +80,8 @@ const navGroups = [
       { href: "/admin/gamification/points", label: "Points" },
       { href: "/admin/gamification/badges", label: "Badges" },
       { href: "/admin/gamification/streaks", label: "Streaks" },
-      { href: "/admin/gamification/leaderboard", label: "Leaderboard" }
+      { href: "/admin/gamification/leaderboard", label: "Leaderboard" },
+      { href: "/admin/gamification/leaderboard/rewards", label: "Leaderboard Rewards" }
     ]
   },
   {
@@ -87,10 +97,12 @@ const navGroups = [
     items: [
       { href: "/admin/newsletter/subscribers", label: "Newsletter" },
       { href: "/admin/newsletter/notifications", label: "Notifications" },
+      { href: "/admin/newsletter/nudges", label: "Re-engagement Nudges" },
       { href: "/admin/newsletters", label: "Compose Newsletter" },
       { href: "/admin/emailtemplate", label: "Email Templates" },
       { href: "/admin/comments", label: "Comments" },
-      { href: "/admin/contact", label: "Contact Inbox" }
+      { href: "/admin/contact", label: "Contact Inbox" },
+      { href: "/admin/feedback", label: "Feedback" }
     ]
   },
   {
@@ -130,25 +142,49 @@ const navGroups = [
   }
 ];
 
-function NavLink({ href, label }: { href: string; label: string }) {
+function NavLink({ href, label, unreadCount }: { href: string; label: string; unreadCount?: number }) {
   const pathname = usePathname();
   const isActive = !!pathname && (pathname === href || (href !== "/admin" && pathname.startsWith(href)));
   return (
     <Link
       href={href}
-      className={`block py-1.5 px-3 text-xs transition border-l-2 ${
+      className={`flex items-center justify-between py-1.5 px-3 text-xs transition border-l-2 ${
         isActive
           ? "bg-[#FFF7F7] text-primary border-l-primary font-semibold"
           : "text-secondary border-l-transparent hover:text-primary hover:bg-[var(--base)]"
       }`}
     >
-      {label}
+      <span>{label}</span>
+      {!!unreadCount && (
+        <span className="ml-2 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-white text-[10px] font-bold">
+          {unreadCount > 99 ? "99+" : unreadCount}
+        </span>
+      )}
     </Link>
   );
 }
 
 export function AdminSidebar() {
   const [open, setOpen] = useState(false);
+  const [unreadCounts, setUnreadCounts] = useState<UnreadCounts>({ comments: 0, contact: 0, feedback: 0 });
+
+  useEffect(() => {
+    let cancelled = false;
+    function fetchCounts() {
+      fetch("/api/admin/unread-counts")
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (!cancelled && d) setUnreadCounts(d);
+        })
+        .catch(() => {});
+    }
+    fetchCounts();
+    const interval = setInterval(fetchCounts, 60000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
 
   return (
     <>
@@ -198,11 +234,14 @@ export function AdminSidebar() {
                 {group.label}
               </p>
               <ul className="space-y-1">
-                {group.items.map((item) => (
-                  <li key={`${item.href}-${item.label}`}>
-                    <NavLink href={item.href} label={item.label} />
-                  </li>
-                ))}
+                {group.items.map((item) => {
+                  const badgeKey = UNREAD_BADGE_HREFS[item.href];
+                  return (
+                    <li key={`${item.href}-${item.label}`}>
+                      <NavLink href={item.href} label={item.label} unreadCount={badgeKey ? unreadCounts[badgeKey] : undefined} />
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           ))}

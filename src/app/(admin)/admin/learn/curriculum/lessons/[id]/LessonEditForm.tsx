@@ -14,6 +14,8 @@ type Props = {
     introduction: string;
     description: string;
     access_type: string;
+    access_policy: string;
+    premium_bypass: boolean;
     content_type: string;
     estimated_minutes: number;
     sort_order: number;
@@ -29,6 +31,8 @@ export function LessonEditForm({ lessonId, levelCode = "N5", initial }: Props) {
   const [introduction, setIntroduction] = useState(initial.introduction);
   const [description, setDescription] = useState(initial.description);
   const [access_type, setAccessType] = useState(initial.access_type);
+  const [access_policy, setAccessPolicy] = useState(initial.access_policy);
+  const [premium_bypass, setPremiumBypass] = useState(initial.premium_bypass);
   const [content_type, setContentType] = useState(initial.content_type);
   const [estimated_minutes, setEstimatedMinutes] = useState(initial.estimated_minutes);
   const [sort_order, setSortOrder] = useState(initial.sort_order);
@@ -36,6 +40,7 @@ export function LessonEditForm({ lessonId, levelCode = "N5", initial }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [introLoading, setIntroLoading] = useState(false);
+  const [descLoading, setDescLoading] = useState(false);
   const [contentLLM, setContentLLM] = useState<"deepseek" | "gemini">("deepseek");
   const [imageModalOpen, setImageModalOpen] = useState(false);
 
@@ -54,6 +59,8 @@ export function LessonEditForm({ lessonId, levelCode = "N5", initial }: Props) {
           introduction: introduction || null,
           description: description || null,
           access_type,
+          access_policy,
+          premium_bypass,
           content_type: content_type || null,
           estimated_minutes: estimated_minutes || null,
           sort_order,
@@ -90,7 +97,7 @@ export function LessonEditForm({ lessonId, levelCode = "N5", initial }: Props) {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
-          <label className="block text-sm font-medium text-charcoal mb-1">Access Type</label>
+          <label className="block text-sm font-medium text-charcoal mb-1">Access Type <span className="text-[10px] text-secondary font-normal">(display badge only)</span></label>
           <select value={access_type} onChange={(e) => setAccessType(e.target.value)} className="w-full px-3 py-2 border border-[var(--divider)] rounded-bento text-sm bg-white">
             <option value="premium">Premium 🔒</option>
             <option value="free">Free 🆓</option>
@@ -100,6 +107,8 @@ export function LessonEditForm({ lessonId, levelCode = "N5", initial }: Props) {
           <label className="block text-sm font-medium text-charcoal mb-1">Content Type</label>
           <select value={content_type} onChange={(e) => setContentType(e.target.value)} className="w-full px-3 py-2 border border-[var(--divider)] rounded-bento text-sm bg-white">
             <option value="">-- Select type --</option>
+            <option value="orientation">Orientation 🧭</option>
+            <option value="pronunciation">Pronunciation 🔊</option>
             <option value="grammar">Grammar 📖</option>
             <option value="vocabulary">Vocabulary 📝</option>
             <option value="kanji">Kanji 漢</option>
@@ -107,7 +116,10 @@ export function LessonEditForm({ lessonId, levelCode = "N5", initial }: Props) {
             <option value="reading">Reading 📰</option>
             <option value="listening">Listening 👂</option>
             <option value="writing">Writing ✍️</option>
+            <option value="speaking">Speaking 🗣️</option>
             <option value="conversation">Conversation 💬</option>
+            <option value="culture">Culture 🎎</option>
+            <option value="strategy">Strategy 🎯</option>
             <option value="review">Review 🔄</option>
             <option value="mock_test">Mock Test 📋</option>
             <option value="mixed">Mixed 🧩</option>
@@ -119,13 +131,53 @@ export function LessonEditForm({ lessonId, levelCode = "N5", initial }: Props) {
         </div>
       </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+        <div>
+          <label className="block text-sm font-medium text-charcoal mb-1">Access Policy <span className="text-[10px] text-secondary font-normal">(actual gating)</span></label>
+          <select value={access_policy} onChange={(e) => setAccessPolicy(e.target.value)} className="w-full px-3 py-2 border border-[var(--divider)] rounded-bento text-sm bg-white">
+            <option value="daily_free_eligible">Daily Free Eligible (default sequential path)</option>
+            <option value="always_free">Always Free (never locked, no daily limit)</option>
+            <option value="premium_only">Premium Only</option>
+            <option value="trial_only">Trial Only</option>
+            <option value="admin_granted">Admin Granted Only</option>
+          </select>
+        </div>
+        <div className="flex items-center gap-2 pb-2">
+          <input type="checkbox" id="premium_bypass" checked={premium_bypass} onChange={(e) => setPremiumBypass(e.target.checked)} className="h-4 w-4 text-primary focus:ring-primary rounded" />
+          <label htmlFor="premium_bypass" className="text-sm text-charcoal">Premium bypass (always allow, overrides policy)</label>
+        </div>
+      </div>
+
       <div>
         <label className="block text-sm font-medium text-charcoal mb-1">Goal / Objective</label>
         <input type="text" value={goal} onChange={(e) => setGoal(e.target.value)} className="w-full px-3 py-2 border border-[var(--divider)] rounded-bento text-sm" placeholder="e.g. Learn あいうえお to なにぬねの with stroke order" />
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-charcoal mb-1">Short Description (for student path view)</label>
+        <div className="flex items-center gap-2 mb-1">
+          <label className="block text-sm font-medium text-charcoal">Short Description (for student path view)</label>
+          <button
+            type="button"
+            disabled={descLoading || !title}
+            onClick={async () => {
+              setDescLoading(true);
+              try {
+                const res = await fetch("/api/ai/curriculum/suggest-summary", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ entityType: "lesson", code, title, levelCode, goal: goal || undefined }),
+                });
+                const data = await res.json();
+                if (res.ok && typeof data.description === "string" && data.description) setDescription(data.description);
+              } finally {
+                setDescLoading(false);
+              }
+            }}
+            className="text-primary text-xs font-semibold hover:underline disabled:opacity-60"
+          >
+            {descLoading ? "Generating…" : "AI Suggest"}
+          </button>
+        </div>
         <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className="w-full px-3 py-2 border border-[var(--divider)] rounded-bento text-sm" placeholder="Brief 1-2 sentence description shown on the lesson timeline page." />
       </div>
 

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { TrialCodeRedeem } from "@/components/TrialCodeRedeem";
 
 type Profile = {
   email: string;
@@ -181,6 +182,10 @@ export default function AccountPage() {
             </Link>
           </div>
         </section>
+
+        <div className="mb-6">
+          <TrialCodeRedeem />
+        </div>
 
         <form onSubmit={handleSave} className="space-y-6">
           <section className="rounded-bento border border-[var(--divider)] bg-white p-6 space-y-4">

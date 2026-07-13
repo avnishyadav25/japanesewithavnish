@@ -93,6 +93,14 @@ export default function LearnHubPage() {
           Learn Japanese
         </h1>
         
+        <p className="text-secondary text-sm mt-3">
+          New here?{" "}
+          <Link href="/guide" className="text-primary font-semibold hover:underline">
+            Read the Site Guide
+          </Link>{" "}
+          for a quick tour of everything below.
+        </p>
+
         {/* Divider line matching user screenshot */}
         <div className="w-full h-[1px] bg-[#E2E8F0] my-8" />
 

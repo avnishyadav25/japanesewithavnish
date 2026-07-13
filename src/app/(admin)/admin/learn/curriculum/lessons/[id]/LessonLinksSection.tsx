@@ -3,9 +3,9 @@
 import { useState, useEffect, useCallback } from "react";
 
 type ContentLink = { id: string; content_slug: string; content_role: string; sort_order: number; title: string | null };
-type VocabLink = { id: string; vocabulary_id: string; word: string | null; reading: string | null; meaning: string | null };
-type GrammarLink = { id: string; grammar_id: string; pattern: string | null; structure: string | null };
-type KanjiLink = { id: string; kanji_id: string; character: string | null; meaning: string | null };
+type VocabLink = { id: string; vocabulary_id: string; word: string | null; reading: string | null; meaning: string | null; slug: string };
+type GrammarLink = { id: string; grammar_id: string; pattern: string | null; structure: string | null; slug: string };
+type KanjiLink = { id: string; kanji_id: string; character: string | null; meaning: string | null; slug: string };
 type KanaLink = { id: string; kana_id: string; character: string; type: string; romaji: string; row_label: string | null };
 type ExampleRow = { id: string; sentence_ja: string; sentence_romaji: string | null; sentence_en: string; notes: string | null };
 
@@ -351,7 +351,9 @@ export function LessonLinksSection({ lessonId, lessonTitle = "", levelCode = "N5
         <ul className="space-y-1 mb-2">
           {vocab.map((v) => (
             <li key={v.id} className="flex items-center gap-2 text-sm">
-              <span className="text-charcoal">{v.word ?? v.reading ?? v.vocabulary_id.slice(0, 8)}</span>
+              <a href={`/admin/blogs/${v.slug}/edit`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                {v.word ?? v.reading ?? v.vocabulary_id.slice(0, 8)}
+              </a>
               {v.meaning && <span className="text-secondary">— {v.meaning}</span>}
               <button type="button" onClick={() => removeLink("vocabulary", v.id)} className="text-red-600 hover:underline text-xs">
                 Remove
@@ -389,7 +391,9 @@ export function LessonLinksSection({ lessonId, lessonTitle = "", levelCode = "N5
         <ul className="space-y-1 mb-2">
           {grammar.map((g) => (
             <li key={g.id} className="flex items-center gap-2 text-sm">
-              <span className="text-charcoal">{g.pattern ?? g.structure ?? g.grammar_id.slice(0, 8)}</span>
+              <a href={`/admin/blogs/${g.slug}/edit`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                {g.pattern ?? g.structure ?? g.grammar_id.slice(0, 8)}
+              </a>
               <button type="button" onClick={() => removeLink("grammar", g.id)} className="text-red-600 hover:underline text-xs">Remove</button>
             </li>
           ))}
@@ -414,7 +418,9 @@ export function LessonLinksSection({ lessonId, lessonTitle = "", levelCode = "N5
         <ul className="space-y-1 mb-2">
           {kanji.map((k) => (
             <li key={k.id} className="flex items-center gap-2 text-sm">
-              <span className="text-charcoal">{k.character ?? k.kanji_id.slice(0, 8)}</span>
+              <a href={`/admin/blogs/${k.slug}/edit`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                {k.character ?? k.kanji_id.slice(0, 8)}
+              </a>
               {k.meaning && <span className="text-secondary">— {k.meaning}</span>}
               <button type="button" onClick={() => removeLink("kanji", k.id)} className="text-red-600 hover:underline text-xs">Remove</button>
             </li>

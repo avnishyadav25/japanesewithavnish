@@ -7,6 +7,7 @@ import remarkGfm from "remark-gfm";
 import { slugify } from "@/lib/slugify";
 import { TTSPlayButton, SoundsTableCellWithTTS } from "@/components/learn/LessonMetaContent";
 import { WritingPracticeModal } from "./WritingPracticeModal";
+import type { CharacterType } from "./WritingCanvas";
 
 type SectionAudio = Record<string, string>;
 type Meta = Record<string, unknown> | null | undefined;
@@ -190,6 +191,7 @@ export function LearnMarkdown({
           p: ({ children, ...props }) => (
             <p className="my-4 leading-8 text-[0.95rem]" {...props}>
               {children}
+              <JapaneseControls node={children} />
             </p>
           ),
           img: ({ alt, src, ...props }) => (
@@ -253,6 +255,7 @@ export function LearnMarkdown({
             ) : (
               <td className="border border-[var(--divider)] px-3 py-2 align-top" {...props}>
                 {children}
+                <JapaneseControls node={children} />
               </td>
             ),
           ul: ({ children, ...props }) =>
@@ -271,7 +274,14 @@ export function LearnMarkdown({
             </ol>
           ),
           li: ({ children, ...props }) => {
-            if (contentType !== "sounds") return <li {...props}>{children}</li>;
+            if (contentType !== "sounds") {
+              return (
+                <li {...props}>
+                  {children}
+                  <JapaneseControls node={children} />
+                </li>
+              );
+            }
             const nodes = Array.isArray(children) ? children : [children];
             const first = nodes[0];
             const rest = nodes.slice(1);
@@ -404,6 +414,51 @@ function flattenText(node: React.ReactNode): string {
 const JAPANESE_CHAR = /[\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf\u3000-\u303f\uff00-\uffef]/;
 function extractJapaneseFromNode(node: React.ReactNode): string | null {
   const s = flattenText(node).replace(/\*\*/g, "").trim();
-  const match = s.match(new RegExp(`[${JAPANESE_CHAR.source}]+`));
+  // JAPANESE_CHAR.source already includes its own [...] brackets \u2014 do not re-wrap in another [...].
+  const match = s.match(new RegExp(JAPANESE_CHAR.source + "+"));
   return match ? match[0] : null;
+}
+
+/** All Japanese-script characters in a node, concatenated (drops interspersed romaji/punctuation). */
+function extractAllJapanese(node: React.ReactNode): string {
+  const s = flattenText(node).replace(/\*\*/g, "");
+  const matches = s.match(new RegExp(JAPANESE_CHAR.source + "+", "g"));
+  return matches ? matches.join("") : "";
+}
+
+const KANJI_CHAR = /[\u4e00-\u9faf]/;
+
+/** Appended after paragraphs/table cells/list items that contain Japanese text: a play button
+ * plus one practice chip per distinct kanji found, reusing the same WritingPracticeModal used
+ * in the Lesson Materials sidebar and structured blocks. */
+function JapaneseControls({ node }: { node: React.ReactNode }) {
+  const [openChar, setOpenChar] = useState<{ char: string; type: CharacterType } | null>(null);
+  const japanese = extractAllJapanese(node);
+  if (!japanese) return null;
+  const kanjiChars = Array.from(new Set(japanese.match(new RegExp(KANJI_CHAR.source, "g")) ?? [])).slice(0, 6);
+
+  return (
+    <span className="inline-flex items-center gap-1 ml-1.5 align-middle flex-wrap">
+      <TTSPlayButton text={japanese} />
+      {kanjiChars.map((c) => (
+        <button
+          key={c}
+          type="button"
+          onClick={() => setOpenChar({ char: c, type: "kanji" })}
+          title={`Practice ${c}`}
+          className="text-[11px] leading-none px-1.5 py-1 rounded border border-primary/30 text-primary font-semibold hover:bg-primary/5 transition"
+        >
+          {c}
+        </button>
+      ))}
+      {openChar && (
+        <WritingPracticeModal
+          character={openChar.char}
+          characterType={openChar.type}
+          isOpen={!!openChar}
+          onClose={() => setOpenChar(null)}
+        />
+      )}
+    </span>
+  );
 }

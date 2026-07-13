@@ -1,11 +1,20 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 import type { JapaneseLearningTextData, KanaCharacterData, KanaGridData, VocabularySetData, GrammarRuleData, KanjiFocusData, ExampleSetData, ComparisonData } from "@/lib/curriculum/blockTypes";
 import type { VocabResolved, GrammarResolved, KanjiResolved, KanaResolved, ExampleResolved } from "@/lib/curriculum/getLessonBlocks";
+import { TTSPlayButton } from "@/components/learn/LessonMetaContent";
+import { WritingPracticeModal } from "@/components/learn/WritingPracticeModal";
+import type { CharacterType } from "@/components/learn/WritingCanvas";
 
 export function JapaneseLearningTextBlock({ data }: { data: JapaneseLearningTextData }) {
   return (
     <div className="bg-white border border-[var(--divider)] rounded-bento p-5">
-      <p className="text-charcoal text-lg font-semibold">{data.japanese}</p>
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-charcoal text-lg font-semibold">{data.japanese}</p>
+        {data.japanese && <TTSPlayButton text={data.japanese} />}
+      </div>
       {data.showFurigana !== false && data.furigana && <p className="text-secondary text-xs mt-1">{data.furigana}</p>}
       {data.showRomaji !== false && data.romaji && <p className="text-secondary text-xs font-mono mt-0.5">{data.romaji}</p>}
       <p className="text-charcoal text-sm mt-2">{data.meaning}</p>
@@ -15,19 +24,34 @@ export function JapaneseLearningTextBlock({ data }: { data: JapaneseLearningText
 }
 
 export function KanaCharacterBlock({ kana }: { data: KanaCharacterData; kana: KanaResolved[] }) {
+  const [practiceChar, setPracticeChar] = useState<{ character: string; characterType: CharacterType } | null>(null);
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
       {kana.map((k) => (
-        <div key={k.id} className="bg-white border border-[var(--divider)] rounded-bento p-4 text-center">
+        <button
+          key={k.id}
+          type="button"
+          onClick={() => setPracticeChar({ character: k.character, characterType: k.type === "katakana" ? "katakana" : "hiragana" })}
+          className="bg-white border border-[var(--divider)] rounded-bento p-4 text-center hover:border-primary/40 transition"
+        >
           <p className="text-3xl font-bold text-charcoal">{k.character}</p>
           <p className="text-secondary text-xs font-mono mt-1">{k.romaji}</p>
-        </div>
+        </button>
       ))}
+      {practiceChar && (
+        <WritingPracticeModal
+          character={practiceChar.character}
+          characterType={practiceChar.characterType}
+          isOpen={!!practiceChar}
+          onClose={() => setPracticeChar(null)}
+        />
+      )}
     </div>
   );
 }
 
 export function KanaGridBlock({ data, kana }: { data: KanaGridData; kana: KanaResolved[] }) {
+  const [practiceChar, setPracticeChar] = useState<{ character: string; characterType: CharacterType } | null>(null);
   const rows = new Map<string, KanaResolved[]>();
   for (const k of kana) {
     const key = k.rowLabel || "";
@@ -43,7 +67,13 @@ export function KanaGridBlock({ data, kana }: { data: KanaGridData; kana: KanaRe
               <td className="text-xs text-secondary font-semibold pr-3">{label}</td>
               {items.map((k) => (
                 <td key={k.id} className="p-2">
-                  <span className="text-xl font-bold text-charcoal block">{k.character}</span>
+                  <button
+                    type="button"
+                    onClick={() => setPracticeChar({ character: k.character, characterType: k.type === "katakana" ? "katakana" : "hiragana" })}
+                    className="text-xl font-bold text-charcoal block hover:text-primary transition"
+                  >
+                    {k.character}
+                  </button>
                   {data.showRomaji !== false && <span className="text-secondary text-[10px] font-mono">{k.romaji}</span>}
                 </td>
               ))}
@@ -51,6 +81,14 @@ export function KanaGridBlock({ data, kana }: { data: KanaGridData; kana: KanaRe
           ))}
         </tbody>
       </table>
+      {practiceChar && (
+        <WritingPracticeModal
+          character={practiceChar.character}
+          characterType={practiceChar.characterType}
+          isOpen={!!practiceChar}
+          onClose={() => setPracticeChar(null)}
+        />
+      )}
     </div>
   );
 }
@@ -61,12 +99,15 @@ export function VocabularySetBlock({ data, vocabulary }: { data: VocabularySetDa
       <h3 className="font-heading font-bold text-sm text-charcoal mb-3">Vocabulary</h3>
       <div className="grid sm:grid-cols-2 gap-3">
         {vocabulary.map((v) => (
-          <Link key={v.id} href={`/learn/vocabulary/${v.slug}`} className="border border-[var(--divider)] rounded-xl p-3 hover:border-primary/40 transition block">
-            <p className="text-charcoal font-semibold text-sm">
-              {v.word} {data.showRomaji !== false && v.reading ? `(${v.reading})` : ""}
-            </p>
-            {data.showMeaning !== false && <p className="text-secondary text-xs mt-0.5">{v.meaning}</p>}
-          </Link>
+          <div key={v.id} className="border border-[var(--divider)] rounded-xl p-3 hover:border-primary/40 transition flex items-start justify-between gap-2">
+            <Link href={`/learn/vocabulary/${v.slug}`} className="min-w-0 block">
+              <p className="text-charcoal font-semibold text-sm">
+                {v.word} {data.showRomaji !== false && v.reading ? `(${v.reading})` : ""}
+              </p>
+              {data.showMeaning !== false && <p className="text-secondary text-xs mt-0.5">{v.meaning}</p>}
+            </Link>
+            {v.word && <TTSPlayButton text={v.word} />}
+          </div>
         ))}
       </div>
     </div>
@@ -79,10 +120,13 @@ export function GrammarRuleBlock({ grammar }: { data: GrammarRuleData; grammar: 
       <h3 className="font-heading font-bold text-sm text-charcoal mb-3">Grammar</h3>
       <div className="space-y-3">
         {grammar.map((g) => (
-          <Link key={g.id} href={`/learn/grammar/${g.slug}`} className="block border-b border-[var(--divider)]/40 pb-3 last:border-0 last:pb-0">
-            <p className="text-primary font-bold text-sm hover:underline">{g.pattern}</p>
-            {g.structure && <p className="text-secondary text-xs font-mono mt-0.5">{g.structure}</p>}
-          </Link>
+          <div key={g.id} className="flex items-start justify-between gap-2 border-b border-[var(--divider)]/40 pb-3 last:border-0 last:pb-0">
+            <Link href={`/learn/grammar/${g.slug}`} className="min-w-0 block">
+              <p className="text-primary font-bold text-sm hover:underline">{g.pattern}</p>
+              {g.structure && <p className="text-secondary text-xs font-mono mt-0.5">{g.structure}</p>}
+            </Link>
+            {g.pattern && <TTSPlayButton text={g.pattern} />}
+          </div>
         ))}
       </div>
     </div>
@@ -90,20 +134,41 @@ export function GrammarRuleBlock({ grammar }: { data: GrammarRuleData; grammar: 
 }
 
 export function KanjiFocusBlock({ kanji }: { data: KanjiFocusData; kanji: KanjiResolved[] }) {
+  const [practiceChar, setPracticeChar] = useState<string | null>(null);
   return (
     <div className="grid sm:grid-cols-2 gap-3">
       {kanji.map((k) => (
-        <Link key={k.id} href={`/learn/kanji/${k.slug}`} className="bg-white border border-[var(--divider)] rounded-bento p-4 hover:border-primary/40 transition block">
-          <div className="flex items-baseline gap-3">
-            <span className="text-3xl font-bold text-charcoal">{k.character}</span>
-            <span className="text-secondary text-sm">{k.meaning}</span>
+        <div key={k.id} className="bg-white border border-[var(--divider)] rounded-bento p-4 hover:border-primary/40 transition">
+          <div className="flex items-baseline justify-between gap-2">
+            <div className="flex items-baseline gap-3">
+              <button
+                type="button"
+                onClick={() => setPracticeChar(k.character)}
+                className="text-3xl font-bold text-charcoal hover:text-primary transition"
+                title="Practice this kanji"
+              >
+                {k.character}
+              </button>
+              <Link href={`/learn/kanji/${k.slug}`} className="text-secondary text-sm hover:text-primary hover:underline">
+                {k.meaning}
+              </Link>
+            </div>
+            {k.character && <TTSPlayButton text={k.character} />}
           </div>
           <div className="text-[10px] text-secondary mt-2 space-y-0.5">
             {k.onyomi && k.onyomi.length > 0 && <p>On: {k.onyomi.join("、")}</p>}
             {k.kunyomi && k.kunyomi.length > 0 && <p>Kun: {k.kunyomi.join("、")}</p>}
           </div>
-        </Link>
+        </div>
       ))}
+      {practiceChar && (
+        <WritingPracticeModal
+          character={practiceChar}
+          characterType="kanji"
+          isOpen={!!practiceChar}
+          onClose={() => setPracticeChar(null)}
+        />
+      )}
     </div>
   );
 }
@@ -113,7 +178,10 @@ export function ExampleSetBlock({ data, examples }: { data: ExampleSetData; exam
     <div className="space-y-3">
       {examples.map((ex) => (
         <div key={ex.id} className="bg-white border border-[var(--divider)] rounded-bento p-4">
-          <p className="text-charcoal text-sm font-semibold">{ex.sentenceJa}</p>
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-charcoal text-sm font-semibold">{ex.sentenceJa}</p>
+            {ex.sentenceJa && <TTSPlayButton text={ex.sentenceJa} />}
+          </div>
           {!data.hideRomaji && ex.sentenceRomaji && <p className="text-secondary text-xs mt-1 font-mono">{ex.sentenceRomaji}</p>}
           <p className="text-secondary text-xs mt-1">{ex.sentenceEn}</p>
           {ex.notes && <p className="text-secondary text-xs mt-1 italic">{ex.notes}</p>}

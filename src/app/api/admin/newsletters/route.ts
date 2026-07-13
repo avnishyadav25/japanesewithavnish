@@ -29,10 +29,11 @@ export async function POST(req: Request) {
     const subject = String(body.subject ?? "").trim() || "Newsletter";
     const body_html = String(body.body_html ?? "");
     const status = body.status === "sent" ? "sent" : "draft";
+    const sendAt = body.send_at ? new Date(body.send_at).toISOString() : null;
 
     const rows = await sql`
-      INSERT INTO newsletters (slug, title, subject, body_html, status, updated_at)
-      VALUES (${slug}, ${title}, ${subject}, ${body_html}, ${status}, ${new Date().toISOString()})
+      INSERT INTO newsletters (slug, title, subject, body_html, status, send_at, updated_at)
+      VALUES (${slug}, ${title}, ${subject}, ${body_html}, ${status}, ${sendAt}, ${new Date().toISOString()})
       RETURNING id, slug, title, subject, status, created_at
     ` as { id: string; slug: string; title: string | null; subject: string; status: string; created_at: string }[];
     const row = rows[0];

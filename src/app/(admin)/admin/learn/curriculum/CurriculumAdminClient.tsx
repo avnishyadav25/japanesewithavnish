@@ -18,7 +18,15 @@ type LevelStats = {
   freeLessons: number;
   premiumLessons: number;
   descriptionCoverage: number;
+  pendingBlocks: number;
+  approvedBlocks: number;
+  rejectedBlocks: number;
+  draftBlocks: number;
+  publishedBlocks: number;
+  lessonsWithPendingReview: number;
 };
+
+type BlockStatus = { pending: number; approved: number; rejected: number; draft: number; published: number; total: number };
 
 // Tree shape (from /api/learn/curriculum?path=1) for list view
 type TreeExercise = { id: string; content_slug: string; post_id: string | null; sort_order: number; title?: string | null };
@@ -76,6 +84,9 @@ export function CurriculumAdminClient() {
   const [collapsedSubmoduleIds, setCollapsedSubmoduleIds] = useState<Set<string>>(new Set());
   const [collapsedLessonIds, setCollapsedLessonIds] = useState<Set<string>>(new Set());
   const [stats, setStats] = useState<LevelStats[]>([]);
+  const [blockStatus, setBlockStatus] = useState<Record<string, BlockStatus>>({});
+  const [listLevelFilter, setListLevelFilter] = useState<string>("all");
+  const [pendingOnly, setPendingOnly] = useState(false);
 
   const loadLevels = useCallback(async () => {
     const data = await fetchJson<Level[]>("/api/admin/curriculum/levels");
@@ -85,7 +96,8 @@ export function CurriculumAdminClient() {
   useEffect(() => {
     Promise.all([
       loadLevels(),
-      fetchJson<LevelStats[]>("/api/admin/curriculum/stats").then(setStats).catch(() => {})
+      fetchJson<LevelStats[]>("/api/admin/curriculum/stats").then(setStats).catch(() => {}),
+      fetchJson<Record<string, BlockStatus>>("/api/admin/curriculum/block-status").then(setBlockStatus).catch(() => {}),
     ]).catch((e) => setError(e.message)).finally(() => setLoading(false));
   }, [loadLevels]);
 
@@ -258,28 +270,88 @@ export function CurriculumAdminClient() {
   if (loading) return <p className="text-secondary">Loading…</p>;
   if (error) return <p className="text-red-600">{error}</p>;
 
+  const totalPending = stats.reduce((sum, s) => sum + s.pendingBlocks, 0);
+  const totalDraft = stats.reduce((sum, s) => sum + s.draftBlocks, 0);
+  const totalLive = stats.reduce((sum, s) => sum + s.publishedBlocks, 0);
+
   return (
     <div className="space-y-4 w-full">
+      {/* Global review status banner */}
+      {stats.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 p-4 bg-white rounded-bento border border-[var(--divider)] shadow-xs">
+          <span className="font-heading font-semibold text-charcoal text-sm mr-1">Content status:</span>
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold">
+            🕓 {totalPending} pending review
+          </span>
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-50 border border-gray-200 text-gray-600 text-xs font-semibold">
+            📝 {totalDraft} draft blocks
+          </span>
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-50 border border-green-200 text-green-700 text-xs font-semibold">
+            🟢 {totalLive} live blocks
+          </span>
+          {totalPending > 0 && (
+            <Link
+              href="/admin/learn/curriculum/review-queue"
+              className="ml-auto px-3 py-1.5 bg-primary text-white text-xs font-bold rounded-bento hover:bg-primary/95 transition shrink-0"
+            >
+              Go to review queue →
+            </Link>
+          )}
+        </div>
+      )}
+
       {stats.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-4">
-          {stats.map((s) => (
-            <div key={s.level} className="p-4 bg-white rounded-bento border border-[var(--divider)] shadow-xs flex flex-col justify-between">
-              <div>
-                <span className="text-[10px] font-semibold text-primary uppercase tracking-wide">{s.level} Course</span>
-                <h3 className="font-heading font-bold text-lg text-charcoal mt-0.5">{s.lessons} Lessons</h3>
-                <p className="text-[11px] text-secondary mt-1">
-                  📄 {s.lessonsWithDescription} descriptions ({s.descriptionCoverage}%)
-                </p>
-                <p className="text-[11px] text-secondary mt-0.5">
-                  🎯 {s.totalPractices} practices total
-                </p>
-              </div>
-              <div className="mt-3 pt-2 border-t border-[var(--divider)]/40 flex items-center justify-between text-[10px] font-semibold text-secondary">
-                <span className="text-green-700">🆓 {s.freeLessons} Free</span>
-                <span className="text-amber-700">🔒 {s.premiumLessons} Prem</span>
-              </div>
-            </div>
-          ))}
+          {stats.map((s) => {
+            const levelObj = levels.find((l) => l.code === s.level);
+            const isSelected = levelObj && selectedLevelId === levelObj.id;
+            return (
+              <button
+                key={s.level}
+                type="button"
+                onClick={() => {
+                  if (!levelObj) return;
+                  setSelectedLevelId(levelObj.id);
+                  setSelectedModuleId(null);
+                  setSelectedSubmoduleId(null);
+                  setListLevelFilter(s.level);
+                }}
+                className={`text-left p-4 bg-white rounded-bento border shadow-xs flex flex-col justify-between transition hover:shadow-sm hover:border-primary/50 ${
+                  isSelected ? "border-primary ring-1 ring-primary/20" : "border-[var(--divider)]"
+                }`}
+              >
+                <div>
+                  <span className="text-[10px] font-semibold text-primary uppercase tracking-wide">{s.level} Course</span>
+                  <h3 className="font-heading font-bold text-lg text-charcoal mt-0.5">{s.lessons} Lessons</h3>
+                  <p className="text-[11px] text-secondary mt-1">
+                    📄 {s.lessonsWithDescription} descriptions ({s.descriptionCoverage}%)
+                  </p>
+                  <p className="text-[11px] text-secondary mt-0.5">
+                    🎯 {s.totalPractices} practices total
+                  </p>
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  {s.pendingBlocks > 0 && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-semibold">
+                      🕓 {s.pendingBlocks} pending
+                    </span>
+                  )}
+                  {s.draftBlocks > 0 && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-50 text-gray-600 border border-gray-200 font-semibold">
+                      📝 {s.draftBlocks} draft
+                    </span>
+                  )}
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200 font-semibold">
+                    🟢 {s.publishedBlocks} live
+                  </span>
+                </div>
+                <div className="mt-3 pt-2 border-t border-[var(--divider)]/40 flex items-center justify-between text-[10px] font-semibold text-secondary">
+                  <span className="text-green-700">🆓 {s.freeLessons} Free</span>
+                  <span className="text-amber-700">🔒 {s.premiumLessons} Prem</span>
+                </div>
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -480,11 +552,41 @@ export function CurriculumAdminClient() {
             </button>
           </div>
         </div>
+        <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-[var(--divider)] bg-white">
+          <span className="text-xs font-semibold text-secondary uppercase tracking-wide mr-1">Level:</span>
+          <button
+            type="button"
+            onClick={() => setListLevelFilter("all")}
+            className={`px-3 py-1 rounded-full text-xs font-semibold border transition ${
+              listLevelFilter === "all" ? "bg-primary border-primary text-white" : "bg-white border-[var(--divider)] text-secondary hover:border-primary/50"
+            }`}
+          >
+            All levels
+          </button>
+          {stats.map((s) => (
+            <button
+              key={s.level}
+              type="button"
+              onClick={() => setListLevelFilter(s.level)}
+              className={`px-3 py-1 rounded-full text-xs font-semibold border transition ${
+                listLevelFilter === s.level ? "bg-primary border-primary text-white" : "bg-white border-[var(--divider)] text-secondary hover:border-primary/50"
+              }`}
+            >
+              {s.level}
+            </button>
+          ))}
+          <label className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-secondary cursor-pointer">
+            <input type="checkbox" checked={pendingOnly} onChange={(e) => setPendingOnly(e.target.checked)} className="h-3.5 w-3.5" />
+            Only show lessons with pending review
+          </label>
+        </div>
         {treeLoading ? (
           <p className="p-4 text-secondary text-sm">Loading…</p>
         ) : treeData?.levels?.length ? (
           <div className="p-4 space-y-0">
-            {treeData.levels.map((level) => {
+            {treeData.levels
+              .filter((level) => listLevelFilter === "all" || level.code === listLevelFilter)
+              .map((level) => {
               const levelCollapsed = collapsedLevelIds.has(level.id);
               return (
                 <div key={level.id} className="py-0.5">
@@ -502,7 +604,9 @@ export function CurriculumAdminClient() {
                   </div>
                   {!levelCollapsed && (
                     <div className="pl-6 ml-2 border-l-2 border-[var(--divider)] space-y-0">
-                      {level.modules.map((mod) => {
+                      {level.modules
+                        .filter((mod) => !pendingOnly || mod.submodules.some((sub) => sub.lessons.some((les) => (blockStatus[les.id]?.pending ?? 0) > 0)))
+                        .map((mod) => {
                         const modCollapsed = collapsedModuleIds.has(mod.id);
                         return (
                           <div key={mod.id} className="py-0.5">
@@ -521,8 +625,13 @@ export function CurriculumAdminClient() {
                             </div>
                             {!modCollapsed && (
                               <div className="pl-4 ml-2 border-l-2 border-[var(--divider)]/70 space-y-0">
-                                {mod.submodules.map((sub) => {
+                                {mod.submodules
+                                  .filter((sub) => !pendingOnly || sub.lessons.some((les) => (blockStatus[les.id]?.pending ?? 0) > 0))
+                                  .map((sub) => {
                                   const subCollapsed = collapsedSubmoduleIds.has(sub.id);
+                                  const visibleLessons = pendingOnly
+                                    ? sub.lessons.filter((les) => (blockStatus[les.id]?.pending ?? 0) > 0)
+                                    : sub.lessons;
                                   return (
                                     <div key={sub.id} className="py-0.5">
                                       <div className="flex items-center gap-2">
@@ -540,8 +649,12 @@ export function CurriculumAdminClient() {
                                       </div>
                                       {!subCollapsed && (
                                         <div className="pl-4 ml-2 border-l-2 border-[var(--divider)]/50 space-y-0">
-                                          {sub.lessons.map((les) => {
+                                          {visibleLessons.length === 0 && (
+                                            <p className="text-secondary text-xs italic py-2 pl-3">No lessons match the current filter.</p>
+                                          )}
+                                          {visibleLessons.map((les) => {
                                             const lessonCollapsed = collapsedLessonIds.has(les.id);
+                                            const bs = blockStatus[les.id];
                                             return (
                                               <div key={les.id} className="py-0.5">
                                                 <div className="flex items-center gap-2">
@@ -555,6 +668,31 @@ export function CurriculumAdminClient() {
                                                   </button>
                                                   <ListViewCircleIcon size={5} imageUrl={les.feature_image_url} />
                                                   <span className="flex-1">Lesson {les.code} — {les.title}</span>
+                                                  {bs && bs.total > 0 && (
+                                                    <span
+                                                      className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border shrink-0 ${
+                                                        bs.published > 0 && bs.draft === 0
+                                                          ? "bg-green-50 text-green-700 border-green-200"
+                                                          : "bg-gray-50 text-gray-600 border-gray-200"
+                                                      }`}
+                                                      title={`${bs.published} published block(s), ${bs.draft} draft block(s)`}
+                                                    >
+                                                      {bs.published > 0 && bs.draft === 0 ? "🟢 Live" : "📝 Draft"}
+                                                    </span>
+                                                  )}
+                                                  {bs && bs.pending > 0 && (
+                                                    <Link
+                                                      href="/admin/learn/curriculum/review-queue"
+                                                      className="text-[10px] px-2 py-0.5 rounded-full font-semibold border shrink-0 bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 transition"
+                                                    >
+                                                      🕓 {bs.pending} pending
+                                                    </Link>
+                                                  )}
+                                                  {bs && bs.rejected > 0 && (
+                                                    <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold border shrink-0 bg-red-50 text-red-600 border-red-200">
+                                                      ✕ {bs.rejected} rejected
+                                                    </span>
+                                                  )}
                                                   <Link href={`/admin/learn/curriculum/lessons/${les.id}`} className="text-primary text-xs hover:underline">Edit</Link>
                                                 </div>
                                                 {!lessonCollapsed && (

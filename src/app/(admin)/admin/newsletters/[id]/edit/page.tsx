@@ -11,6 +11,7 @@ type Row = {
   body_html: string;
   status: string;
   sent_at: string | null;
+  send_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -21,7 +22,7 @@ export default async function EditNewsletterPage({ params }: { params: Promise<{
   let newsletter: Row | null = null;
   try {
     const rows = await sql`
-      SELECT id, slug, title, subject, body_html, status, sent_at, created_at, updated_at
+      SELECT id, slug, title, subject, body_html, status, sent_at, send_at, created_at, updated_at
       FROM newsletters WHERE id = ${id} LIMIT 1
     ` as Row[];
     newsletter = rows[0] ?? null;

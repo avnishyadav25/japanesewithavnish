@@ -12,6 +12,7 @@ type Post = {
   published_at?: string | null;
   og_image_url?: string | null;
   content_type?: string | null;
+  author_name?: string | null;
 };
 
 interface BlogPostCardProps {
@@ -90,10 +91,11 @@ export function BlogPostCard({ post, size = "small" }: BlogPostCardProps) {
           </span>
         ))}
       </div>
-      {post.published_at && (
-        <time className="text-xs text-secondary block mb-2">
-          {new Date(post.published_at).toLocaleDateString()}
-        </time>
+      {(post.published_at || post.author_name) && (
+        <p className="text-xs text-secondary mb-2">
+          {post.author_name?.trim() || "Japanese with Avnish Editorial Team"}
+          {post.published_at && <> · {new Date(post.published_at).toLocaleDateString()}</>}
+        </p>
       )}
       <span className="text-primary text-sm font-medium">Read →</span>
     </Link>

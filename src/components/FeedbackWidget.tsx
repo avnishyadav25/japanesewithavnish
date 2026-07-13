@@ -43,7 +43,7 @@ export function FeedbackWidget() {
   }
 
   return (
-    <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end gap-3">
+    <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end gap-3 max-md:bottom-20">
       {open && (
         <div className="w-80 bg-white rounded-xl shadow-2xl border border-[#EEEEEE] p-5">
           <div className="flex items-center justify-between mb-4">

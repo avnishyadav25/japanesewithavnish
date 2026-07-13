@@ -5,6 +5,7 @@ import { Footer } from "@/components/Footer";
 import { AnnouncementBar } from "@/components/AnnouncementBar";
 import { ChatPanel } from "@/components/ChatPanel";
 import { FeedbackWidget } from "@/components/FeedbackWidget";
+import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { PageAnalytics } from "@/components/PageAnalytics";
 import { getAdminSession } from "@/lib/auth/admin";
 
@@ -31,7 +32,7 @@ export default async function MainLayout({
           <Header isAdmin={isAdmin} />
         </>
       )}
-      <main className="flex-1">{children}</main>
+      <main className={`flex-1 ${!isComingSoon && !isTutorRoute ? "pb-16 md:pb-0" : ""}`}>{children}</main>
       {!isComingSoon && (
         <Suspense fallback={null}>
           <PageAnalytics />
@@ -41,6 +42,7 @@ export default async function MainLayout({
         <>
           <Footer />
           <ChatPanel />
+          <MobileBottomNav />
         </>
       )}
       <FeedbackWidget />

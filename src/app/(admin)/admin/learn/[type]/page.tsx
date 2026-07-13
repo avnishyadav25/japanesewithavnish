@@ -10,6 +10,35 @@ import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
 import { GenerateLearnListButton } from "@/components/admin/GenerateLearnListButton";
 import { LearnContentRowActions } from "@/components/admin/LearnContentRowActions";
 
+type UsageLessonBadge = { lesson_id: string; lesson_title: string; lesson_code: string; module_title: string; level_code: string };
+
+function UsedInBadge({ usage }: { usage: UsageLessonBadge[] }) {
+  if (usage.length === 0) {
+    return <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-50 text-gray-500 border border-gray-200 font-semibold">Unused</span>;
+  }
+  if (usage.length === 1) {
+    const u = usage[0];
+    return (
+      <Link
+        href={`/admin/learn/curriculum/lessons/${u.lesson_id}`}
+        className="text-[10px] px-2 py-0.5 rounded-full bg-primary/5 text-primary border border-primary/20 font-semibold hover:bg-primary/10 transition"
+        title={`${u.level_code} — ${u.module_title} — ${u.lesson_title}`}
+      >
+        {u.level_code} {u.lesson_code}
+      </Link>
+    );
+  }
+  return (
+    <Link
+      href={`/admin/learn/curriculum/lessons/${usage[0].lesson_id}`}
+      className="text-[10px] px-2 py-0.5 rounded-full bg-primary/5 text-primary border border-primary/20 font-semibold hover:bg-primary/10 transition"
+      title={usage.map((u) => `${u.level_code} — ${u.module_title} — ${u.lesson_title}`).join("\n")}
+    >
+      {usage.length} lessons
+    </Link>
+  );
+}
+
 export default async function AdminLearnPage({
   params,
   searchParams,
@@ -35,16 +64,23 @@ export default async function AdminLearnPage({
     sort_order: number;
     meta: Record<string, unknown> | null;
     og_image_url?: string | null;
+    vocabulary_id?: string;
     vocabulary_word?: string | null;
     vocabulary_reading?: string | null;
     vocabulary_romaji?: string | null;
     vocabulary_meaning?: string | null;
+    kanji_id?: string;
     kanji_character?: string | null;
     kanji_meaning?: string | null;
     kanji_onyomi?: string[] | null;
     kanji_kunyomi?: string[] | null;
     kanji_stroke_count?: number | null;
+    grammar_id?: string;
+    grammar_pattern?: string | null;
+    grammar_structure?: string | null;
   };
+
+  type UsageLesson = { lesson_id: string; lesson_title: string; lesson_code: string; module_title: string; level_code: string };
 
   let items: Row[] = [];
   let levelCounts: Record<string, number> = {
@@ -85,6 +121,7 @@ export default async function AdminLearnPage({
             p.sort_order,
             p.meta,
             p.og_image_url,
+            v.id AS vocabulary_id,
             v.word AS vocabulary_word,
             v.reading AS vocabulary_reading,
             v.romaji AS vocabulary_romaji,
@@ -106,6 +143,7 @@ export default async function AdminLearnPage({
             p.sort_order,
             p.meta,
             p.og_image_url,
+            v.id AS vocabulary_id,
             v.word AS vocabulary_word,
             v.reading AS vocabulary_reading,
             v.romaji AS vocabulary_romaji,
@@ -146,6 +184,7 @@ export default async function AdminLearnPage({
             p.sort_order,
             p.meta,
             p.og_image_url,
+            k.id AS kanji_id,
             k.character AS kanji_character,
             k.meaning AS kanji_meaning,
             k.onyomi AS kanji_onyomi,
@@ -168,6 +207,7 @@ export default async function AdminLearnPage({
             p.sort_order,
             p.meta,
             p.og_image_url,
+            k.id AS kanji_id,
             k.character AS kanji_character,
             k.meaning AS kanji_meaning,
             k.onyomi AS kanji_onyomi,
@@ -178,6 +218,65 @@ export default async function AdminLearnPage({
           WHERE p.content_type = 'kanji'
             AND (k.jlpt_level = ${selectedLevel} OR (p.jlpt_level)[1] = ${selectedLevel})
           ORDER BY k.character
+        `;
+        items = (rows ?? []) as Row[];
+      }
+    } else if (normalized === "grammar") {
+      const countRows = (await sql`
+        SELECT coalesce(g.level, (p.jlpt_level)[1], 'ALL') AS level, COUNT(*)::int AS count
+        FROM posts p
+        JOIN grammar g ON g.post_id = p.id
+        WHERE p.content_type = 'grammar'
+        GROUP BY 1
+      `) as { level: string; count: number }[];
+
+      const counts = { ...levelCounts };
+      for (const row of countRows ?? []) {
+        const key = String(row.level || "ALL").toUpperCase();
+        if (key in counts) counts[key] = Number(row.count) || 0;
+        counts.ALL += Number(row.count) || 0;
+      }
+      levelCounts = counts;
+
+      if (selectedLevel === "ALL") {
+        const rows = await sql`
+          SELECT
+            p.id,
+            p.slug,
+            p.title,
+            coalesce(g.level, (p.jlpt_level)[1]) AS jlpt_level,
+            p.status,
+            p.sort_order,
+            p.meta,
+            p.og_image_url,
+            g.id AS grammar_id,
+            g.pattern AS grammar_pattern,
+            g.structure AS grammar_structure
+          FROM posts p
+          JOIN grammar g ON g.post_id = p.id
+          WHERE p.content_type = 'grammar'
+          ORDER BY coalesce(g.level, (p.jlpt_level)[1]), g.pattern
+        `;
+        items = (rows ?? []) as Row[];
+      } else {
+        const rows = await sql`
+          SELECT
+            p.id,
+            p.slug,
+            p.title,
+            coalesce(g.level, (p.jlpt_level)[1]) AS jlpt_level,
+            p.status,
+            p.sort_order,
+            p.meta,
+            p.og_image_url,
+            g.id AS grammar_id,
+            g.pattern AS grammar_pattern,
+            g.structure AS grammar_structure
+          FROM posts p
+          JOIN grammar g ON g.post_id = p.id
+          WHERE p.content_type = 'grammar'
+            AND (g.level = ${selectedLevel} OR (p.jlpt_level)[1] = ${selectedLevel})
+          ORDER BY g.pattern
         `;
         items = (rows ?? []) as Row[];
       }
@@ -214,6 +313,36 @@ export default async function AdminLearnPage({
       }
     }
   }
+
+  // Reverse-lookup: which curriculum lessons use each vocab/kanji/grammar item, batched in one query.
+  const usageKeyField = normalized === "vocabulary" ? "vocabulary_id" : normalized === "kanji" ? "kanji_id" : normalized === "grammar" ? "grammar_id" : null;
+  const usageByItem: Record<string, UsageLesson[]> = {};
+  if (sql && usageKeyField) {
+    const ids = items.map((i) => i[usageKeyField as keyof Row]).filter((v): v is string => typeof v === "string");
+    if (ids.length > 0) {
+      const joinTable = normalized === "vocabulary" ? "curriculum_lesson_vocabulary" : normalized === "kanji" ? "curriculum_lesson_kanji" : "curriculum_lesson_grammar";
+      const joinColumn = usageKeyField;
+      const usageRows = (await sql.query(
+        `SELECT j."${joinColumn}" AS item_id, l.id AS lesson_id, l.title AS lesson_title, l.code AS lesson_code,
+                m.title AS module_title, lv.code AS level_code
+         FROM ${joinTable} j
+         JOIN curriculum_lessons l ON l.id = j.lesson_id
+         JOIN curriculum_submodules sm ON sm.id = l.submodule_id
+         JOIN curriculum_modules m ON m.id = sm.module_id
+         JOIN curriculum_levels lv ON lv.id = m.level_id
+         WHERE j."${joinColumn}" = ANY($1::uuid[])`,
+        [ids]
+      )) as unknown as (UsageLesson & { item_id: string })[];
+      for (const r of usageRows) {
+        if (!usageByItem[r.item_id]) usageByItem[r.item_id] = [];
+        usageByItem[r.item_id].push({ lesson_id: r.lesson_id, lesson_title: r.lesson_title, lesson_code: r.lesson_code, module_title: r.module_title, level_code: r.level_code });
+      }
+    }
+  }
+  const itemUsage = (item: Row): UsageLesson[] => {
+    const key = item[usageKeyField as keyof Row];
+    return typeof key === "string" ? (usageByItem[key] ?? []) : [];
+  };
 
   const featureImageUrl = (item: Row) =>
     item.og_image_url ?? (item.meta && typeof item.meta.feature_image_url === "string" ? item.meta.feature_image_url : null);
@@ -332,9 +461,11 @@ export default async function AdminLearnPage({
               <AdminTable
                 headers={
                   normalized === "vocabulary"
-                    ? ["#", "Kanji / Kana", "Furigana", "Romaji", "Meaning", "JLPT", "Status", "Actions"]
+                    ? ["#", "Kanji / Kana", "Furigana", "Romaji", "Meaning", "JLPT", "Used In", "Status", "Actions"]
                     : normalized === "kanji"
-                    ? ["#", "Kanji", "Meaning", "On-yomi", "Kun-yomi", "Strokes", "JLPT", "Status", "Actions"]
+                    ? ["#", "Kanji", "Meaning", "On-yomi", "Kun-yomi", "Strokes", "JLPT", "Used In", "Status", "Actions"]
+                    : normalized === "grammar"
+                    ? ["#", "Pattern", "Structure", "JLPT", "Used In", "Status", "Actions"]
                     : ["Image", "Title", "JLPT", "Status", "Actions"]
                 }
               >
@@ -348,6 +479,7 @@ export default async function AdminLearnPage({
                         <td className="py-2 px-2 text-secondary text-sm">{vocabularyRomaji(item) || "—"}</td>
                         <td className="py-2 px-2 text-secondary text-sm max-w-[360px]">{vocabularyMeaning(item) || "—"}</td>
                         <td className="py-2 px-2 text-secondary text-sm">{item.jlpt_level ?? "—"}</td>
+                        <td className="py-2 px-2"><UsedInBadge usage={itemUsage(item)} /></td>
                         <td className="py-2 px-2">
                           <StatusBadge
                             status={item.status}
@@ -367,6 +499,24 @@ export default async function AdminLearnPage({
                         <td className="py-2 px-2 text-secondary text-sm">{kanjiKunyomi(item).join(", ") || "—"}</td>
                         <td className="py-2 px-2 text-secondary text-sm tabular-nums">{kanjiStrokeCount(item) ?? "—"}</td>
                         <td className="py-2 px-2 text-secondary text-sm">{item.jlpt_level ?? "—"}</td>
+                        <td className="py-2 px-2"><UsedInBadge usage={itemUsage(item)} /></td>
+                        <td className="py-2 px-2">
+                          <StatusBadge
+                            status={item.status}
+                            variant={item.status === "published" ? "published" : "draft"}
+                          />
+                        </td>
+                        <td className="py-2 px-2">
+                          <LearnContentRowActions contentType={normalized} slug={item.slug} status={item.status} />
+                        </td>
+                      </>
+                    ) : normalized === "grammar" ? (
+                      <>
+                        <td className="py-2 px-2 text-secondary text-xs tabular-nums">{items.indexOf(item) + 1}</td>
+                        <td className="py-2 px-2 font-semibold text-charcoal">{item.grammar_pattern || "—"}</td>
+                        <td className="py-2 px-2 text-secondary text-sm font-mono max-w-[320px]">{item.grammar_structure || "—"}</td>
+                        <td className="py-2 px-2 text-secondary text-sm">{item.jlpt_level ?? "—"}</td>
+                        <td className="py-2 px-2"><UsedInBadge usage={itemUsage(item)} /></td>
                         <td className="py-2 px-2">
                           <StatusBadge
                             status={item.status}

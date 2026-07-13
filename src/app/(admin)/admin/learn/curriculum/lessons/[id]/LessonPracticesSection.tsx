@@ -22,6 +22,8 @@ const PRACTICE_TYPES = [
   { value: "roleplay", label: "Roleplay Dialogue 💬" },
   { value: "listening", label: "Listening Drill 🎧" },
   { value: "shadowing", label: "Shadowing / Voice drill 🔊" },
+  { value: "module_checkpoint", label: "Module Checkpoint 🚩" },
+  { value: "level_assessment", label: "Level Assessment 🏆" },
 ];
 
 export function LessonPracticesSection({ lessonId }: { lessonId: string }) {

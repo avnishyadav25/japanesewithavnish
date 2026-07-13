@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth/admin";
 import { sql } from "@/lib/db";
-import { sendCommunityGuidelinesEmail } from "@/lib/email";
+import { sendCommunityGuidelinesEmail, sendAdminReplyEmail } from "@/lib/email";
 import {
   emailWrapper,
   communityGuidelinesContent,
   productListHtml,
   type EmailProduct,
 } from "@/lib/email-templates";
+import { draftAdminReply } from "@/lib/ai/reply";
+import { insertAiLog } from "@/lib/ai-logs";
+
+const COMMENT_REPLY_FALLBACK_PROMPT =
+  "You are a warm, encouraging moderator replying to a comment on a Japanese with Avnish blog post. Draft a short, helpful reply that engages with what the commenter said, encourages their learning, and stays under 100 words. Output ONLY the reply body text, no labels.";
 
 export async function GET(
   req: NextRequest,
@@ -84,11 +89,49 @@ export async function POST(
     const body = await req.json().catch(() => ({}));
     const action = body?.action;
 
+    if (!sql) return NextResponse.json({ error: "Failed" }, { status: 503 });
+
+    if (action === "ai_draft_reply") {
+      const commentRows = await sql`SELECT id, author_name, content FROM post_comments WHERE id = ${id} LIMIT 1`;
+      const comment = commentRows[0] as { id: string; author_name: string; content: string } | undefined;
+      if (!comment) return NextResponse.json({ error: "Comment not found" }, { status: 404 });
+
+      const result = await draftAdminReply({
+        promptKey: "comment_reply",
+        fallbackSystemPrompt: COMMENT_REPLY_FALLBACK_PROMPT,
+        userContext: `Comment from ${comment.author_name}:\n\n${comment.content}`,
+      });
+      if ("error" in result) return NextResponse.json({ error: result.error }, { status: 502 });
+
+      await insertAiLog({
+        log_type: "comment_reply",
+        content_type: "comment",
+        entity_type: "post_comment",
+        entity_id: comment.id,
+        model_used: "deepseek",
+        prompt_sent: result.systemPrompt,
+        result_preview: result.draft.slice(0, 500),
+        admin_email: admin?.email,
+      });
+
+      return NextResponse.json({ draft: result.draft });
+    }
+
+    if (action === "send_reply") {
+      const replyBody = typeof body?.reply === "string" ? body.reply.trim() : "";
+      if (!replyBody) return NextResponse.json({ error: "Reply body required" }, { status: 400 });
+
+      const commentRows = await sql`SELECT author_email FROM post_comments WHERE id = ${id} LIMIT 1`;
+      const comment = commentRows[0] as { author_email: string } | undefined;
+      if (!comment) return NextResponse.json({ error: "Comment not found" }, { status: 404 });
+
+      await sendAdminReplyEmail(comment.author_email, "Re: your comment — Japanese with Avnish", replyBody);
+      return NextResponse.json({ success: true });
+    }
+
     if (action !== "send_guidelines") {
       return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }
-
-    if (!sql) return NextResponse.json({ error: "Failed" }, { status: 503 });
 
     const commentRows = await sql`SELECT id, author_name, author_email, post_id FROM post_comments WHERE id = ${id} LIMIT 1`;
     const comment = commentRows[0] as { author_name: string; author_email: string; post_id: string } | undefined;

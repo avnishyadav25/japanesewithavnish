@@ -14,6 +14,13 @@ export const ALLOWED_PROMPT_KEYS = [
   "curriculum_suggest_summary",
   "curriculum_suggest_next",
   "curriculum_feature_image",
+  "contact_reply",
+  "comment_reply",
+  "feedback_reply",
+  "reengagement_nudge",
+  "content_gen_brand",
+  "content_gen_tone_rules",
+  "content_gen_lesson_style",
 ] as const;
 
 export type PromptKey = (typeof ALLOWED_PROMPT_KEYS)[number];
@@ -24,7 +31,13 @@ export function isAllowedPromptKey(key: string): key is PromptKey {
 
 // Text-generation prompts (not image prompts) get the shared accuracy/content policy
 // prepended automatically, so it only needs to be maintained in one place.
-const POLICY_EXCLUDED_KEYS = new Set<string>(["shared_content_policy", "curriculum_feature_image"]);
+const POLICY_EXCLUDED_KEYS = new Set<string>([
+  "shared_content_policy",
+  "curriculum_feature_image",
+  "content_gen_brand",
+  "content_gen_tone_rules",
+  "content_gen_lesson_style",
+]);
 
 async function getRawPromptContent(key: string): Promise<string | null> {
   if (!sql) return null;

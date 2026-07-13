@@ -22,6 +22,50 @@ export function CommentsManager({ comments }: CommentsManagerProps) {
   const [previewCommentId, setPreviewCommentId] = useState<string | null>(null);
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [drafting, setDrafting] = useState<string | null>(null);
+  const [sending, setSending] = useState<string | null>(null);
+  const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
+  const [replyOpenId, setReplyOpenId] = useState<string | null>(null);
+
+  async function handleDraftReply(id: string) {
+    setDrafting(id);
+    try {
+      const res = await fetch(`/api/admin/comments/${id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "ai_draft_reply" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to draft reply");
+      setReplyDrafts((d) => ({ ...d, [id]: data.draft }));
+      setReplyOpenId(id);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to draft reply");
+    } finally {
+      setDrafting(null);
+    }
+  }
+
+  async function handleSendReply(id: string) {
+    const reply = (replyDrafts[id] || "").trim();
+    if (!reply) return;
+    setSending(id);
+    try {
+      const res = await fetch(`/api/admin/comments/${id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "send_reply", reply }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to send reply");
+      setReplyOpenId(null);
+      alert("Reply sent.");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to send reply");
+    } finally {
+      setSending(null);
+    }
+  }
 
   async function handleRemove(id: string) {
     if (!confirm("Remove this comment? It will no longer be visible on the blog.")) return;
@@ -116,6 +160,42 @@ export function CommentsManager({ comments }: CommentsManagerProps) {
               >
                 {loading === c.id ? "Sending…" : "Send guidelines email"}
               </button>
+              <button
+                type="button"
+                onClick={() => handleDraftReply(c.id)}
+                disabled={drafting !== null}
+                className="text-sm text-secondary hover:text-primary hover:underline disabled:opacity-50"
+              >
+                {drafting === c.id ? "Drafting…" : "AI Draft Reply"}
+              </button>
+            </div>
+          )}
+          {replyOpenId === c.id && (
+            <div className="mt-3 p-3 bg-base/50 rounded-bento border border-[var(--divider)]">
+              <textarea
+                value={replyDrafts[c.id] || ""}
+                onChange={(e) => setReplyDrafts((d) => ({ ...d, [c.id]: e.target.value }))}
+                rows={4}
+                className="w-full px-3 py-2 border border-[var(--divider)] rounded-bento text-charcoal text-sm mb-2"
+                placeholder="Write or AI-draft a reply…"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleSendReply(c.id)}
+                  disabled={sending !== null || !(replyDrafts[c.id] || "").trim()}
+                  className="btn-primary text-sm py-1.5 px-3 disabled:opacity-50"
+                >
+                  {sending === c.id ? "Sending…" : "Send Reply"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReplyOpenId(null)}
+                  className="text-sm text-secondary hover:text-charcoal"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           )}
         </div>

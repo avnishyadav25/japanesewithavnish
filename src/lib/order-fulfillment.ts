@@ -68,11 +68,19 @@ export async function fulfillOrder(
   `;
 
   if (order.coupon_code) {
-    await sql`
+    const couponRows = await sql`
       UPDATE coupons
       SET used_count = COALESCE(used_count, 0) + 1
       WHERE code = ${order.coupon_code}
-    `;
+      RETURNING id
+    ` as { id: string }[];
+    const couponId = couponRows[0]?.id;
+    if (couponId) {
+      await sql`
+        INSERT INTO coupon_redemptions (coupon_id, user_email, order_id)
+        VALUES (${couponId}, ${order.user_email}, ${orderId})
+      `;
+    }
   }
 
   const userEmail = order.user_email;

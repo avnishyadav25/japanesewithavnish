@@ -20,6 +20,7 @@ export async function POST(req: Request) {
       seo_description,
       og_image_url,
       image_prompt,
+      author_name,
     } = body;
 
     if (!slug || !title) {
@@ -35,8 +36,8 @@ export async function POST(req: Request) {
 
     try {
       const rows = await sql`
-        INSERT INTO posts (slug, title, summary, content, jlpt_level, tags, status, published_at, seo_title, seo_description, og_image_url, image_prompt)
-        VALUES (${slugVal}, ${titleVal}, ${summary ?? null}, ${content ?? null}, ${Array.isArray(jlpt_level) ? jlpt_level : []}, ${Array.isArray(tags) ? tags : []}, ${statusVal}, ${publishedAtVal}, ${seo_title ?? null}, ${seo_description ?? null}, ${og_image_url || null}, ${image_prompt ?? null})
+        INSERT INTO posts (slug, title, summary, content, jlpt_level, tags, status, published_at, seo_title, seo_description, og_image_url, image_prompt, author_name)
+        VALUES (${slugVal}, ${titleVal}, ${summary ?? null}, ${content ?? null}, ${Array.isArray(jlpt_level) ? jlpt_level : []}, ${Array.isArray(tags) ? tags : []}, ${statusVal}, ${publishedAtVal}, ${seo_title ?? null}, ${seo_description ?? null}, ${og_image_url || null}, ${image_prompt ?? null}, ${author_name || null})
         RETURNING id
       `;
       const id = (rows[0] as { id: string })?.id;

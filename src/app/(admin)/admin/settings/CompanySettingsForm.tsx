@@ -197,6 +197,25 @@ export function CompanySettingsForm({
         <HomepageSettingsForm initial={homepageInitial} onChange={update} />
       </SettingsSection>
 
+      <SettingsSection title="About Page">
+        <label className="flex items-start gap-3">
+          <input
+            type="checkbox"
+            checked={String(settings.about_show_educator_review ?? "false") === "true"}
+            onChange={(e) => update("about_show_educator_review", e.target.checked ? "true" : "false")}
+            className="mt-1"
+          />
+          <span>
+            <span className="block text-sm font-medium text-charcoal">
+              Show &quot;Reviewed by Japanese-language educators&quot; on the About page
+            </span>
+            <span className="block text-secondary text-xs mt-0.5">
+              Only enable once a real educator-review process is in place — this claim is off by default.
+            </span>
+          </span>
+        </label>
+      </SettingsSection>
+
       <ChatbotContextCard />
 
       <div className="flex items-center gap-4">

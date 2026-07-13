@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import { DM_Sans, DM_Serif_Display } from "next/font/google";
 import "./globals.css";
@@ -21,9 +21,15 @@ const dmSerif = DM_Serif_Display({
 });
 
 export const metadata: Metadata = {
-  title: "Japanese with Avnish | Learn Japanese JLPT N5-N1",
-  description: "Premium Japanese learning resources. JLPT bundles, placement quiz, and lessons.",
+  title: "Japanese with Avnish | Structured Japanese Learning from N5 to N1",
+  description: "Structured Japanese learning from N5 to N1. Premium JLPT curriculum, placement quiz, and daily lessons.",
   icons: { icon: "/favicon.ico" },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 const ADSENSE_CLIENT = process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID;

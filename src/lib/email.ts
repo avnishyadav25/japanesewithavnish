@@ -10,6 +10,7 @@ import {
 } from "./email-templates";
 import { sql } from "@/lib/db";
 import { getDriveUrlForSlug } from "@/lib/drive-url";
+import { renderDbEmailTemplate } from "@/lib/email-template-db";
 
 const FROM_EMAIL = process.env.EMAIL_FROM || "Japanese with Avnish <noreply@japanesewithavnish.com>";
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://japanesewithavnish.com";
@@ -69,6 +70,8 @@ export async function getProductsForEmail(): Promise<EmailProduct[]> {
 }
 
 export async function sendMagicLink(email: string, magicLinkUrl: string) {
+  const dbTemplate = await renderDbEmailTemplate("magic-link", { magicLinkUrl });
+  if (dbTemplate) return sendMail(email, dbTemplate.subject, dbTemplate.bodyHtml);
   return sendMail(
     email,
     "Login to Japanese with Avnish",
@@ -127,6 +130,12 @@ export async function sendOrderConfirmation(
   const accessUrl = driveUrl || libraryUrl;
   const orderDetailUrl = `${SITE_URL}/order/${orderId}?token=${accessToken}`;
 
+  const products = await getProductsForEmail();
+  const productList = productListHtml(products, SITE_URL);
+
+  const dbTemplate = await renderDbEmailTemplate("order-confirmation", { name, accessUrl, orderDetailUrl, orderId });
+  if (dbTemplate) return sendMail(email, dbTemplate.subject, emailWrapper(dbTemplate.bodyHtml, productList));
+
   const content = `
     <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">Hi ${name},</p>
     <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">Thank you for your purchase! Your access is ready.</p>
@@ -136,8 +145,6 @@ export async function sendOrderConfirmation(
     <p style="font-size:14px;line-height:1.6;margin:8px 0 0;color:#555;">You can return to your library anytime using the link above (it stays valid for 30 days).</p>
     <p style="font-size:14px;line-height:1.6;margin:16px 0 0;">— Japanese with Avnish</p>
   `;
-  const products = await getProductsForEmail();
-  const productList = productListHtml(products, SITE_URL);
   return sendMail(email, "Your purchase is ready — Japanese with Avnish", emailWrapper(content, productList));
 }
 
@@ -156,20 +163,28 @@ export async function sendQuizResults(
   level: string,
   pricingUrl: string
 ) {
+  const products = await getProductsForEmail();
+  const productList = productListHtml(products, SITE_URL);
+
+  const dbTemplate = await renderDbEmailTemplate("quiz-results", { level, pricingUrl });
+  if (dbTemplate) return sendMail(email, dbTemplate.subject, emailWrapper(dbTemplate.bodyHtml, productList));
+
   const content = `
     <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">Based on your quiz results, we recommend the <strong>${level}</strong> level.</p>
     <p style="margin:0 0 24px;"><a href="${pricingUrl}" style="background:#D0021B;color:white;padding:12px 26px;text-decoration:none;border-radius:8px;display:inline-block;font-weight:600;">Explore Premium</a></p>
     <p style="font-size:14px;line-height:1.6;margin:0;color:#555;">— Japanese with Avnish</p>
   `;
-  const products = await getProductsForEmail();
-  const productList = productListHtml(products, SITE_URL);
   return sendMail(email, `Your JLPT level: ${level} — Japanese with Avnish`, emailWrapper(content, productList));
 }
 
 export async function sendWelcomeNewsletter(email: string, name?: string) {
-  const content = welcomeNewsletterContent(name || "");
   const products = await getProductsForEmail();
   const productList = productListHtml(products, SITE_URL);
+
+  const dbTemplate = await renderDbEmailTemplate("welcome-newsletter", { name: name || "there" });
+  if (dbTemplate) return sendMail(email, dbTemplate.subject, emailWrapper(dbTemplate.bodyHtml, productList));
+
+  const content = welcomeNewsletterContent(name || "");
   return sendMail(email, "Welcome to Japanese with Avnish — JLPT tips & updates", emailWrapper(content, productList));
 }
 
@@ -193,6 +208,12 @@ export async function sendNewCommentNotification(
   commenterName: string,
   commentPreview: string
 ) {
+  const products = await getProductsForEmail();
+  const productList = productListHtml(products, SITE_URL);
+
+  const dbTemplate = await renderDbEmailTemplate("new-comment", { name, postTitle, postUrl, commenterName, commentPreview });
+  if (dbTemplate) return sendMail(email, dbTemplate.subject, emailWrapper(dbTemplate.bodyHtml, productList));
+
   const content = newCommentNotificationContent(
     name,
     postTitle,
@@ -200,8 +221,6 @@ export async function sendNewCommentNotification(
     commenterName,
     commentPreview
   );
-  const products = await getProductsForEmail();
-  const productList = productListHtml(products, SITE_URL);
   return sendMail(
     email,
     `New comment on "${postTitle}" — Japanese with Avnish`,
@@ -215,9 +234,13 @@ export async function sendCommunityGuidelinesEmail(
   postTitle: string,
   postUrl: string
 ) {
-  const content = communityGuidelinesContent(name, postTitle, postUrl);
   const products = await getProductsForEmail();
   const productList = productListHtml(products, SITE_URL);
+
+  const dbTemplate = await renderDbEmailTemplate("community-guidelines", { name, postTitle, postUrl });
+  if (dbTemplate) return sendMail(email, dbTemplate.subject, emailWrapper(dbTemplate.bodyHtml, productList));
+
+  const content = communityGuidelinesContent(name, postTitle, postUrl);
   return sendMail(email, "Community guidelines — Japanese with Avnish", emailWrapper(content, productList));
 }
 
@@ -277,4 +300,15 @@ export async function sendFeedbackNotification(
     <p>${escapedMessage}</p>
   `;
   return sendMail(to, `New feedback from ${escapedName} — Japanese with Avnish`, html);
+}
+
+/** Generic admin-to-user reply, used by the Contact/Comments/Feedback admin reply flows. */
+export async function sendAdminReplyEmail(
+  to: string,
+  subject: string,
+  replyBody: string
+): Promise<{ id?: string } | null> {
+  const escapedBody = escapeHtml(replyBody).replace(/\n/g, "<br>");
+  const html = `<p>${escapedBody}</p>`;
+  return sendMail(to, subject, emailWrapper(html));
 }

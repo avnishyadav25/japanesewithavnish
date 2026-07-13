@@ -11,9 +11,9 @@ export async function GET(
   if (!sql) return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
   const { id } = await params;
   const rows = await sql`
-    SELECT id, slug, title, subject, body_html, status, sent_at, created_at, updated_at
+    SELECT id, slug, title, subject, body_html, status, sent_at, send_at, created_at, updated_at
     FROM newsletters WHERE id = ${id} LIMIT 1
-  ` as { id: string; slug: string; title: string | null; subject: string; body_html: string; status: string; sent_at: string | null; created_at: string; updated_at: string }[];
+  ` as { id: string; slug: string; title: string | null; subject: string; body_html: string; status: string; sent_at: string | null; send_at: string | null; created_at: string; updated_at: string }[];
   const newsletter = rows[0];
   if (!newsletter) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(newsletter);
@@ -33,6 +33,7 @@ export async function PUT(
   const subject = String(body.subject ?? "").trim();
   const body_html = String(body.body_html ?? "");
   const status = body.status === "sent" ? "sent" : "draft";
+  const sendAt = body.send_at ? new Date(body.send_at).toISOString() : null;
   const updatedAt = new Date().toISOString();
 
   await sql`
@@ -42,6 +43,7 @@ export async function PUT(
       subject = ${subject},
       body_html = ${body_html},
       status = ${status},
+      send_at = ${sendAt},
       updated_at = ${updatedAt}
     WHERE id = ${id}
   `;

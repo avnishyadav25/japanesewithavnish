@@ -30,6 +30,8 @@ const quickLinks = [
   { href: "/quiz", label: "Quiz" },
   { href: "/pricing", label: "Pricing" },
   { href: "/blog", label: "Blog" },
+  { href: "/guide", label: "Site Guide" },
+  { href: "/about", label: "About" },
   { href: "/contact", label: "Contact" },
 ];
 

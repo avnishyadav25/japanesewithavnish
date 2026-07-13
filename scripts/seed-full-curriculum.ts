@@ -88,11 +88,12 @@ async function seedLevel(levelCode: string, levelName: string, levelSort: number
         for (const les of sub.lessons) {
           const [lesRow] = (await sql`
             INSERT INTO curriculum_lessons
-              (submodule_id, code, title, description, access_type, content_type, estimated_minutes, sort_order)
+              (submodule_id, code, title, description, access_type, access_policy, content_type, estimated_minutes, sort_order)
             VALUES (
               ${submoduleId}, ${les.code}, ${les.title},
               ${les.description ?? null},
               ${les.access_type},
+              ${les.access_policy ?? "daily_free_eligible"},
               ${les.content_type},
               ${les.estimated_minutes ?? null},
               ${lesSort}
@@ -101,6 +102,7 @@ async function seedLevel(levelCode: string, levelName: string, levelSort: number
               title = EXCLUDED.title,
               description = EXCLUDED.description,
               access_type = EXCLUDED.access_type,
+              access_policy = COALESCE(curriculum_lessons.access_policy, EXCLUDED.access_policy),
               content_type = EXCLUDED.content_type,
               estimated_minutes = EXCLUDED.estimated_minutes,
               sort_order = EXCLUDED.sort_order,

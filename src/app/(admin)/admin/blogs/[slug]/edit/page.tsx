@@ -17,7 +17,7 @@ export default async function AdminBlogsEditPage({
   if (!sql) notFound();
 
   const rows = await sql`
-    SELECT id, slug, title, content, summary, (jlpt_level)[1] AS jlpt_level, jlpt_level AS jlpt_level_arr, tags, meta, status, sort_order, content_type, published_at, seo_title, seo_description, og_image_url, image_prompt
+    SELECT id, slug, title, content, summary, (jlpt_level)[1] AS jlpt_level, jlpt_level AS jlpt_level_arr, tags, meta, status, sort_order, content_type, published_at, seo_title, seo_description, og_image_url, image_prompt, author_name
     FROM posts
     WHERE slug = ${slug}
     LIMIT 1
@@ -82,6 +82,7 @@ export default async function AdminBlogsEditPage({
     seo_description: String(row.seo_description ?? ""),
     og_image_url: row.og_image_url != null ? String(row.og_image_url) : null,
     image_prompt: row.image_prompt != null ? String(row.image_prompt) : null,
+    author_name: row.author_name != null ? String(row.author_name) : null,
   };
 
   return (

@@ -25,6 +25,9 @@ export default async function AdminBlogCommentsPage({
   `;
   const comments = (commentsRows ?? []) as { id: string; author_name: string; author_email: string; content: string; status: string; created_at: string }[];
 
+  // Viewing this page marks its comments as read, for the admin sidebar unread badge.
+  await sql`UPDATE post_comments SET is_read = true WHERE post_id = ${post.id} AND is_read = false`;
+
   return (
     <div>
       <AdminPageHeader

@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { sql } from "@/lib/db";
 import { PricingClient } from "./PricingClient";
+import { OfferBannerBar } from "@/components/OfferBannerBar";
 
 export const metadata = {
   title: "Pricing | Japanese with Avnish",
@@ -21,5 +22,10 @@ export default async function PricingPage() {
       `
     : [];
 
-  return <PricingClient plans={plans as any} defaultCurrency={defaultCurrency} />;
+  return (
+    <>
+      <OfferBannerBar />
+      <PricingClient plans={plans as any} defaultCurrency={defaultCurrency} />
+    </>
+  );
 }

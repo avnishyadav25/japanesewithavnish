@@ -1,7 +1,21 @@
 import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth/admin";
-import { getPrompt, getListPrompt, type ContentType } from "@/lib/ai/prompts";
+import { getPrompt, getListPrompt, type ContentType, type StyleOverrides } from "@/lib/ai/prompts";
 import { insertAiLog } from "@/lib/ai-logs";
+import { getPromptContent } from "@/lib/ai/load-prompts";
+
+async function loadStyleOverrides(): Promise<StyleOverrides> {
+  const [baseBrand, toneRules, lessonStyleRules] = await Promise.all([
+    getPromptContent("content_gen_brand"),
+    getPromptContent("content_gen_tone_rules"),
+    getPromptContent("content_gen_lesson_style"),
+  ]);
+  return {
+    baseBrand: baseBrand ?? undefined,
+    toneRules: toneRules ?? undefined,
+    lessonStyleRules: lessonStyleRules ?? undefined,
+  };
+}
 
 const DEEPSEEK_API = "https://api.deepseek.com/v1/chat/completions";
 const GEMINI_TEXT_MODEL = "gemini-2.0-flash";
@@ -38,9 +52,10 @@ export async function POST(req: Request) {
     const customPrompt = typeof body.customPrompt === "string" ? body.customPrompt.trim() : "";
     const generateList = body.generateList === true || body.mode === "list";
 
+    const styleOverrides = customPrompt ? {} : await loadStyleOverrides();
     const systemPrompt = generateList
-      ? customPrompt || getListPrompt(contentType, context as Parameters<typeof getListPrompt>[1])
-      : customPrompt || getPrompt(contentType, context as Parameters<typeof getPrompt>[1]);
+      ? customPrompt || getListPrompt(contentType, context as Parameters<typeof getListPrompt>[1], styleOverrides)
+      : customPrompt || getPrompt(contentType, context as Parameters<typeof getPrompt>[1], styleOverrides);
     const isBlog = contentType === "blog";
     const isProduct = contentType === "product";
     const isLearn =

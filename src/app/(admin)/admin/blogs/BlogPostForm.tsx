@@ -35,6 +35,7 @@ type Post = {
   seo_description: string;
   og_image_url: string | null;
   image_prompt?: string | null;
+  author_name?: string | null;
 };
 
 export function BlogPostForm({ post }: { post?: Post }) {
@@ -59,6 +60,7 @@ export function BlogPostForm({ post }: { post?: Post }) {
     seo_description: post?.seo_description ?? "",
     og_image_url: post?.og_image_url ?? "",
     image_prompt: post?.image_prompt ?? "",
+    author_name: post?.author_name ?? "",
     section_image_prompts: [] as { placeholder: string; section: string; prompt: string }[],
   });
 
@@ -91,6 +93,7 @@ export function BlogPostForm({ post }: { post?: Post }) {
             seo_description: form.seo_description,
             og_image_url: form.og_image_url || null,
             image_prompt: form.image_prompt || null,
+            author_name: form.author_name || null,
           }),
         }
       );
@@ -250,6 +253,18 @@ export function BlogPostForm({ post }: { post?: Post }) {
                 </div>
               </div>
             )}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-charcoal mb-1">Author</label>
+              <input
+                type="text"
+                value={form.author_name}
+                onChange={(e) => update("author_name", e.target.value)}
+                placeholder="Leave blank for “Japanese with Avnish Editorial Team”"
+                className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
+              />
+            </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>

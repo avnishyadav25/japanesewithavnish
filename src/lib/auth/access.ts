@@ -39,9 +39,33 @@ export function getISTNextMidnight(date = new Date()): Date {
   return new Date(midnightIST.getTime() - offsetDiff);
 }
 
+/** IST-midnight day boundary as a UTC instant, for "already accessed today" checks.
+ * Previously these checks used UTC midnight while the daily quota counter used IST midnight
+ * (getISTDateKey) — a real mismatch that could under/over-count near the day boundary. */
+function getISTDayStartUTC(date = new Date()): string {
+  const dateKey = getISTDateKey(date);
+  return new Date(`${dateKey}T00:00:00.000+05:30`).toISOString();
+}
+
+/** Reads the admin-configurable daily free-lesson quota from site_settings.
+ * Previously this setting was saved by the admin UI but never actually read — the limit was
+ * hardcoded to 2 everywhere. */
+async function getFreeDailyLimit(): Promise<number> {
+  if (!sql) return 2;
+  try {
+    const rows = await sql`SELECT value FROM site_settings WHERE key = 'free_daily_limit' LIMIT 1` as { value: unknown }[];
+    const n = Number(rows[0]?.value);
+    return Number.isFinite(n) && n > 0 ? n : 2;
+  } catch {
+    return 2;
+  }
+}
+
+export type AccessPolicy = "always_free" | "daily_free_eligible" | "premium_only" | "trial_only" | "admin_granted";
+
 export type AccessCheckResult =
-  | { allowed: true; reason: "premium" | "free_daily" | "completed" }
-  | { allowed: false; reason: "sequential_lock" | "daily_limit_reached"; resetAt: string };
+  | { allowed: true; reason: "premium" | "free_daily" | "completed" | "always_free" | "admin_override" }
+  | { allowed: false; reason: "sequential_lock" | "daily_limit_reached" | "premium_required"; resetAt: string };
 
 /**
  * Validates if the user is allowed to access a specific lesson.
@@ -64,12 +88,35 @@ export async function canAccessLesson(
     return { allowed: false, reason: "sequential_lock", resetAt: new Date().toISOString() };
   }
 
-  // 2. If Premium/Lifetime, full unlimited access
+  // 2. Fetch the target lesson's access policy
+  const lessonRows = await sql`
+    SELECT access_policy, premium_bypass FROM curriculum_lessons WHERE id = ${lessonId} LIMIT 1
+  ` as { access_policy: AccessPolicy; premium_bypass: boolean }[];
+  const lesson = lessonRows[0];
+
+  // 3. Explicit admin override always wins
+  if (lesson?.premium_bypass) {
+    return { allowed: true, reason: "admin_override" };
+  }
+
+  // 4. always_free lessons never consume a daily slot and are always reachable
+  if (lesson?.access_policy === "always_free") {
+    return { allowed: true, reason: "always_free" };
+  }
+
+  // 5. If Premium/Lifetime, full unlimited access
   if (hasActivePremium(profile)) {
     return { allowed: true, reason: "premium" };
   }
 
-  // 3. Find if lesson is already completed
+  // 6. Lessons explicitly gated away from the free-daily path require an active premium
+  //    grant. Today there is a single premium tier (premium_until/is_lifetime) — trial and
+  //    admin-granted access both work through that same mechanism, so they share this check.
+  if (lesson && (["premium_only", "trial_only", "admin_granted"] as AccessPolicy[]).includes(lesson.access_policy)) {
+    return { allowed: false, reason: "premium_required", resetAt: getISTNextMidnight().toISOString() };
+  }
+
+  // 7. Find if lesson is already completed
   const progressRows = await sql`
     SELECT status FROM user_lesson_progress
     WHERE user_email = ${email} AND lesson_id = ${lessonId} LIMIT 1
@@ -78,7 +125,9 @@ export async function canAccessLesson(
     return { allowed: true, reason: "completed" };
   }
 
-  // 4. Fetch all lessons in active target level in path order
+  // 8. Fetch all lessons in active target level in path order, excluding ones explicitly
+  //    gated away from the free-daily sequential pool (premium_only/trial_only/admin_granted).
+  //    daily_sequence_position overrides sort_order for ordering when an admin has set it.
   const targetLevel = profile.target_level || "N5";
   const levelLessons = await sql`
     SELECT l.id FROM curriculum_lessons l
@@ -86,7 +135,9 @@ export async function canAccessLesson(
     JOIN curriculum_modules m ON m.id = sm.module_id
     JOIN curriculum_levels lv ON lv.id = m.level_id
     WHERE lv.code = ${targetLevel}
-    ORDER BY lv.sort_order, m.sort_order, sm.sort_order, l.sort_order, l.code
+      AND l.access_policy NOT IN ('premium_only', 'trial_only', 'admin_granted')
+    ORDER BY lv.sort_order, m.sort_order, sm.sort_order,
+             COALESCE(l.daily_sequence_position, l.sort_order), l.sort_order, l.code
   ` as { id: string }[];
 
   // Fetch completed lessons of active target level
@@ -110,20 +161,23 @@ export async function canAccessLesson(
     };
   }
 
-  // 5. Daily Limit check (2 lessons per day reset at midnight IST)
+  // 9. Daily limit check (reset at midnight IST), quota read from site_settings.free_daily_limit
+  //    (previously hardcoded to 2 and the admin setting was dead configuration).
   const dateKey = getISTDateKey();
+  const freeDailyLimit = await getFreeDailyLimit();
   const dailyAccessRows = await sql`
     SELECT lessons_consumed, lessons_allowed FROM daily_lesson_access
     WHERE user_email = ${email} AND date_key = ${dateKey} LIMIT 1
   ` as { lessons_consumed: number; lessons_allowed: number }[];
 
-  const dailyAccess = dailyAccessRows[0] || { lessons_consumed: 0, lessons_allowed: 2 };
+  const dailyAccess = dailyAccessRows[0] || { lessons_consumed: 0, lessons_allowed: freeDailyLimit };
 
-  // Check if this lesson has already been logged as accessed today
+  // Check if this lesson has already been logged as accessed today (IST day boundary,
+  // consistent with the daily quota's own day boundary — previously this check used UTC).
   const logRows = await sql`
     SELECT id FROM lesson_access_logs
     WHERE user_email = ${email} AND lesson_id = ${lessonId}
-      AND accessed_at >= ${new Date().toISOString().substring(0, 10) + "T00:00:00.000Z"}
+      AND accessed_at >= ${getISTDayStartUTC()}
     LIMIT 1
   ` as { id: string }[];
 
@@ -151,19 +205,21 @@ export async function recordLessonAccess(email: string, lessonId: string): Promi
     throw new Error(`Access Denied: ${access.reason}`);
   }
 
-  // Only track limits for free users
-  if (access.reason === "premium" || access.reason === "completed") {
+  // Only the free-daily mechanism consumes a slot — premium/completed/always_free/admin_override
+  // are all unlimited and shouldn't be tracked against the quota.
+  if (access.reason !== "free_daily") {
     return;
   }
 
   const dateKey = getISTDateKey();
   const resetAt = getISTNextMidnight();
+  const freeDailyLimit = await getFreeDailyLimit();
 
-  // Check if already logged today
+  // Check if already logged today (IST day boundary, consistent with canAccessLesson).
   const logRows = await sql`
     SELECT id FROM lesson_access_logs
     WHERE user_email = ${email} AND lesson_id = ${lessonId}
-      AND accessed_at >= ${new Date().toISOString().substring(0, 10) + "T00:00:00.000Z"}
+      AND accessed_at >= ${getISTDayStartUTC()}
     LIMIT 1
   ` as { id: string }[];
 
@@ -181,7 +237,7 @@ export async function recordLessonAccess(email: string, lessonId: string): Promi
   // Increment daily consumption count
   await sql`
     INSERT INTO daily_lesson_access (user_email, date_key, lessons_allowed, lessons_consumed, reset_at, updated_at)
-    VALUES (${email}, ${dateKey}, 2, 1, ${resetAt}, NOW())
+    VALUES (${email}, ${dateKey}, ${freeDailyLimit}, 1, ${resetAt}, NOW())
     ON CONFLICT (user_email, date_key) DO UPDATE SET
       lessons_consumed = daily_lesson_access.lessons_consumed + 1,
       updated_at = NOW()

@@ -4,7 +4,8 @@ import { sql } from "@/lib/db";
 import { getLessonTemplateBlocks } from "@/lib/curriculum/lessonTemplates";
 
 const VALID_ACCESS = ["free", "premium"];
-const VALID_CONTENT_TYPES = ["grammar", "vocabulary", "kanji", "kana", "reading", "listening", "writing", "conversation", "review", "mock_test", "mixed"];
+const VALID_ACCESS_POLICIES = ["always_free", "daily_free_eligible", "premium_only", "trial_only", "admin_granted"];
+const VALID_CONTENT_TYPES = ["grammar", "vocabulary", "kanji", "kana", "reading", "listening", "writing", "conversation", "review", "mock_test", "mixed", "orientation", "pronunciation", "speaking", "culture", "strategy"];
 
 export async function GET(req: NextRequest) {
   const admin = await getAdminSession();
@@ -15,7 +16,7 @@ export async function GET(req: NextRequest) {
   try {
     const rows = await sql`
       SELECT id, submodule_id, code, title, goal, introduction,
-             description, access_type, content_type, estimated_minutes,
+             description, access_type, access_policy, content_type, estimated_minutes,
              sort_order, feature_image_url, created_at, updated_at
       FROM curriculum_lessons
       WHERE submodule_id = ${submoduleId}
@@ -36,25 +37,26 @@ export async function POST(req: Request) {
     const body = await req.json();
     const {
       submodule_id, code, title, goal, introduction,
-      description, access_type, content_type, estimated_minutes, sort_order,
+      description, access_type, access_policy, content_type, estimated_minutes, sort_order,
     } = body;
     if (!submodule_id || typeof submodule_id !== "string" || !code || typeof code !== "string" || !title || typeof title !== "string") {
       return NextResponse.json({ error: "submodule_id, code, title required" }, { status: 400 });
     }
     const accessVal = VALID_ACCESS.includes(access_type) ? access_type : "premium";
+    const accessPolicyVal = VALID_ACCESS_POLICIES.includes(access_policy) ? access_policy : "daily_free_eligible";
     const contentTypeVal = VALID_CONTENT_TYPES.includes(content_type) ? content_type : null;
     const sort = typeof sort_order === "number" ? sort_order : 0;
     const rows = await sql`
       INSERT INTO curriculum_lessons
-        (submodule_id, code, title, goal, introduction, description, access_type, content_type, estimated_minutes, sort_order)
+        (submodule_id, code, title, goal, introduction, description, access_type, access_policy, content_type, estimated_minutes, sort_order)
       VALUES (
         ${submodule_id}, ${code.trim()}, ${title.trim()},
         ${goal?.trim() || null}, ${introduction?.trim() || null},
-        ${description?.trim() || null}, ${accessVal}, ${contentTypeVal},
+        ${description?.trim() || null}, ${accessVal}, ${accessPolicyVal}, ${contentTypeVal},
         ${estimated_minutes ?? null}, ${sort}
       )
       RETURNING id, submodule_id, code, title, goal, introduction,
-                description, access_type, content_type, estimated_minutes,
+                description, access_type, access_policy, content_type, estimated_minutes,
                 sort_order, feature_image_url, created_at, updated_at
     `;
     const lesson = (rows as { id: string }[])[0];

@@ -8,13 +8,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (!sql) return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
   const { id: lessonId } = await params;
   const rows = await sql`
-    SELECT clg.id, clg.lesson_id, clg.grammar_id, clg.sort_order, g.pattern, g.structure
+    SELECT clg.id, clg.lesson_id, clg.grammar_id, clg.sort_order, g.pattern, g.structure, p.slug
     FROM curriculum_lesson_grammar clg
     JOIN grammar g ON g.id = clg.grammar_id
+    JOIN posts p ON p.id = g.post_id
     WHERE clg.lesson_id = ${lessonId}
     ORDER BY clg.sort_order, g.pattern
   `;
-  return NextResponse.json(rows as { id: string; lesson_id: string; grammar_id: string; sort_order: number; pattern: string | null; structure: string | null }[]);
+  return NextResponse.json(rows as { id: string; lesson_id: string; grammar_id: string; sort_order: number; pattern: string | null; structure: string | null; slug: string }[]);
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
