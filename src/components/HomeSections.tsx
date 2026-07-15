@@ -211,8 +211,8 @@ export function NihongoNaviSection() {
 // ── Quiz CTA Section ──────────────────────────────────────────────────────────
 
 const QUIZ_STATS = [
-  { n: "10", l: "Questions" },
-  { n: "3 min", l: "Duration" },
+  { n: "25", l: "Questions" },
+  { n: "5 min", l: "Duration" },
   { n: "N5→N1", l: "Coverage" },
 ];
 
@@ -232,7 +232,7 @@ export function QuizCTASection() {
               {"We'll tell you in 3 minutes."}
             </h2>
             <p className="text-[15px] text-[#555] leading-[1.7]">
-              Answer 10 questions on grammar, kanji, and vocabulary — get an instant recommended
+              Answer few questions on grammar, kanji, and vocabulary — get an instant recommended
               JLPT level and learning path for you.
             </p>
           </div>
