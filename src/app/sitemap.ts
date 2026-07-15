@@ -23,6 +23,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { path: "/policies/refunds", priority: 0.4, changeFrequency: "monthly" },
     { path: "/policies/cookies", priority: 0.4, changeFrequency: "monthly" },
     { path: "/jlpt", priority: 0.8, changeFrequency: "weekly" },
+    { path: "/guide", priority: 0.6, changeFrequency: "monthly" },
   ];
 
   const staticEntries: MetadataRoute.Sitemap = staticPages.map(({ path, priority, changeFrequency }) => ({
@@ -70,6 +71,23 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           lastModified: row.updated_at ? new Date(row.updated_at) : new Date(),
           changeFrequency: "weekly" as const,
           priority: 0.7 as number,
+        }))
+      );
+    } catch {
+      // ignore
+    }
+    try {
+      const guideRows = await sql`
+        SELECT slug, updated_at FROM platform_guide_sections
+        WHERE published = true AND slug IS NOT NULL
+        ORDER BY updated_at DESC
+      ` as { slug: string; updated_at: string }[];
+      learnEntries.push(
+        ...(guideRows || []).map((row) => ({
+          url: `${BASE}/guide/${row.slug}`,
+          lastModified: row.updated_at ? new Date(row.updated_at) : new Date(),
+          changeFrequency: "monthly" as const,
+          priority: 0.5 as number,
         }))
       );
     } catch {

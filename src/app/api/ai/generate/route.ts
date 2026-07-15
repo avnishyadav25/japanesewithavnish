@@ -43,6 +43,7 @@ export async function POST(req: Request) {
       "study_guide",
       "practice_test",
       "product",
+      "guide_section",
     ];
     if (!contentType || !validTypes.includes(contentType)) {
       return NextResponse.json({ error: "Invalid contentType" }, { status: 400 });

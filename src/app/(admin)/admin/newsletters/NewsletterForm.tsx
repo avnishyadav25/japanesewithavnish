@@ -32,6 +32,8 @@ export function NewsletterForm({ newsletter }: { newsletter?: Newsletter | null 
   const [editorMode, setEditorMode] = useState<"rich" | "html">("rich");
   const [saveStatus, setSaveStatus] = useState<"idle" | "loading" | "saved" | "error">("idle");
   const [sendStatus, setSendStatus] = useState<"idle" | "loading" | "sent" | "error">("idle");
+  const [testSendStatus, setTestSendStatus] = useState<"idle" | "loading" | "sent" | "error">("idle");
+  const [testSendResult, setTestSendResult] = useState<{ sent: number; failed: number; skipped: number; total: number } | null>(null);
 
   useEffect(() => {
     if (newsletter) {
@@ -91,6 +93,21 @@ export function NewsletterForm({ newsletter }: { newsletter?: Newsletter | null 
       router.refresh();
     } catch {
       setSendStatus("error");
+    }
+  }
+
+  async function handleSendTest() {
+    if (!isEdit) return;
+    setTestSendStatus("loading");
+    setTestSendResult(null);
+    try {
+      const res = await fetch(`/api/admin/newsletters/${newsletter!.id}/send-test`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      setTestSendStatus("sent");
+      setTestSendResult({ sent: data.sent, failed: data.failed, skipped: data.skipped, total: data.total });
+    } catch {
+      setTestSendStatus("error");
     }
   }
 
@@ -226,6 +243,26 @@ export function NewsletterForm({ newsletter }: { newsletter?: Newsletter | null 
             </button>
             {sendStatus === "sent" && <span className="text-emerald-600 text-sm">Sent.</span>}
             {sendStatus === "error" && <span className="text-red-600 text-sm">Send failed.</span>}
+          </>
+        )}
+        {isEdit && (
+          <>
+            <button
+              type="button"
+              onClick={handleSendTest}
+              disabled={testSendStatus === "loading"}
+              className="border border-[var(--divider)] text-charcoal px-4 py-2 rounded-bento text-sm hover:border-primary disabled:opacity-50"
+            >
+              {testSendStatus === "loading" ? "Sending test…" : "Send test to test users"}
+            </button>
+            {testSendStatus === "sent" && testSendResult && (
+              <span className="text-emerald-600 text-sm">
+                Test sent: {testSendResult.sent}/{testSendResult.total} delivered
+                {testSendResult.failed > 0 ? `, ${testSendResult.failed} failed` : ""}
+                {testSendResult.total === 0 ? " (no test users found)" : ""}.
+              </span>
+            )}
+            {testSendStatus === "error" && <span className="text-red-600 text-sm">Test send failed.</span>}
           </>
         )}
         <Link href="/admin/newsletters" className="text-secondary hover:text-primary text-sm">

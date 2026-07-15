@@ -58,23 +58,37 @@ function StatusDot({ status }: { status: string }) {
 
 export function BlogListClient({
     posts,
-    stats,
 }: {
     posts: Post[];
-    stats: { total: number; published: number; draft: number; thisMonth: number };
 }) {
     const [view, setView] = useState<View>("table");
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState<"all" | "published" | "draft">("all");
     const [levelFilter, setLevelFilter] = useState("all");
-    const [contentTypeFilter, setContentTypeFilter] = useState<string>("all");
+    const [contentTypeFilter, setContentTypeFilter] = useState<string>("blog");
     const [selected, setSelected] = useState<Set<string>>(new Set());
     const [bulkLoading, setBulkLoading] = useState(false);
     const [sortBy, setSortBy] = useState<SortBy>("created_at");
     const [sortDir, setSortDir] = useState<SortDir>("desc");
 
+    const byType = useMemo(() => {
+        if (contentTypeFilter === "all") return posts;
+        if (contentTypeFilter === "blog") return posts.filter((x) => !x.content_type || x.content_type === "blog");
+        return posts.filter((x) => (x.content_type ?? "").toLowerCase() === contentTypeFilter.toLowerCase());
+    }, [posts, contentTypeFilter]);
+
+    const stats = useMemo(() => {
+        const total = byType.length;
+        const published = byType.filter((p) => p.status === "published").length;
+        const draft = total - published;
+        const now = new Date();
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+        const thisMonth = byType.filter((p) => p.published_at && new Date(p.published_at).getTime() >= monthStart).length;
+        return { total, published, draft, thisMonth };
+    }, [byType]);
+
     const filtered = useMemo(() => {
-        let p = posts;
+        let p = byType;
         if (statusFilter !== "all") p = p.filter((x) => x.status === statusFilter);
         if (levelFilter !== "all") {
             p = p.filter((x) => {
@@ -82,19 +96,12 @@ export function BlogListClient({
                 return levels.includes(levelFilter);
             });
         }
-        if (contentTypeFilter !== "all") {
-            if (contentTypeFilter === "blog") {
-                p = p.filter((x) => !x.content_type || x.content_type === "blog");
-            } else {
-                p = p.filter((x) => (x.content_type ?? "").toLowerCase() === contentTypeFilter.toLowerCase());
-            }
-        }
         if (search.trim()) {
             const q = search.toLowerCase();
             p = p.filter((x) => x.title.toLowerCase().includes(q) || x.slug.includes(q));
         }
         return p;
-    }, [posts, statusFilter, levelFilter, contentTypeFilter, search]);
+    }, [byType, statusFilter, levelFilter, search]);
 
     const sorted = useMemo(() => {
         const list = [...filtered];
@@ -309,7 +316,8 @@ export function BlogListClient({
             {/* Results count */}
             <p className="text-secondary text-xs mb-3">
                 {filtered.length} post{filtered.length !== 1 ? "s" : ""}
-                {search || statusFilter !== "all" || levelFilter !== "all" || contentTypeFilter !== "all" ? " matching filters" : ""}
+                {search || statusFilter !== "all" || levelFilter !== "all" ? " matching filters" : ""}
+                {contentTypeFilter !== "all" && ` · ${contentTypeFilter}`}
             </p>
 
             {/* Views */}
@@ -317,7 +325,7 @@ export function BlogListClient({
                 <div className="card text-center py-12">
                     <p className="text-secondary mb-4">No posts match your filters.</p>
                     <button
-                        onClick={() => { setSearch(""); setStatusFilter("all"); setLevelFilter("all"); setContentTypeFilter("all"); }}
+                        onClick={() => { setSearch(""); setStatusFilter("all"); setLevelFilter("all"); setContentTypeFilter("blog"); }}
                         className="text-primary hover:underline text-sm"
                     >
                         Clear filters

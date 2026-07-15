@@ -25,6 +25,7 @@ type UserRow = {
   subscription_status: string | null;
   email_verified_at: string | null;
   verification_sent_at: string | null;
+  is_test_user: boolean;
 };
 
 function isMissingVerificationColumnError(error: unknown) {
@@ -39,13 +40,14 @@ function isMissingVerificationColumnError(error: unknown) {
 export default async function AdminUsersPage({
   searchParams,
 }: {
-  searchParams?: { plan?: string; status?: string; level?: string; q?: string; verified?: string };
+  searchParams?: { plan?: string; status?: string; level?: string; q?: string; verified?: string; test?: string };
 }) {
   const planFilter = searchParams?.plan || "";
   const statusFilter = searchParams?.status || "";
   const levelFilter = searchParams?.level || "";
   const searchQuery = searchParams?.q || "";
   const verifiedFilter = searchParams?.verified || "";
+  const testFilter = searchParams?.test || "";
 
   let users: UserRow[] = [];
   let total = 0;
@@ -79,6 +81,12 @@ export default async function AdminUsersPage({
         conditions.push(`ua.email_verified_at IS NOT NULL`);
       } else if (verifiedFilter === "unverified") {
         conditions.push(`ua.email IS NOT NULL AND ua.email_verified_at IS NULL`);
+      }
+
+      if (testFilter === "test") {
+        conditions.push(`p.is_test_user = TRUE`);
+      } else if (testFilter === "real") {
+        conditions.push(`p.is_test_user = FALSE`);
       }
 
       if (searchQuery) {
@@ -115,6 +123,7 @@ export default async function AdminUsersPage({
           p.subscription_status,
           ua.email_verified_at::text,
           ua.verification_sent_at::text,
+          COALESCE(p.is_test_user, FALSE) AS is_test_user,
           (SELECT COUNT(*)::int FROM user_learning_progress u WHERE u.user_email = p.email AND u.status = 'learned') AS learned_count
         FROM profiles p
         LEFT JOIN user_auth ua ON ua.email = p.email
@@ -184,6 +193,7 @@ export default async function AdminUsersPage({
               p.subscription_status,
               NULL::text AS email_verified_at,
               NULL::text AS verification_sent_at,
+              COALESCE(p.is_test_user, FALSE) AS is_test_user,
               (SELECT COUNT(*)::int FROM user_learning_progress u WHERE u.user_email = p.email AND u.status = 'learned') AS learned_count
             FROM profiles p
             ${whereClause}
@@ -211,7 +221,7 @@ export default async function AdminUsersPage({
 
       {/* Filter and Search Bar */}
       <AdminCard>
-        <form method="GET" className="grid grid-cols-1 sm:grid-cols-5 gap-4">
+        <form method="GET" className="grid grid-cols-1 sm:grid-cols-6 gap-4">
           <div>
             <label className="block text-[10px] font-bold uppercase text-secondary mb-1">Search User</label>
             <input
@@ -258,20 +268,32 @@ export default async function AdminUsersPage({
               <option value="unverified">Unverified</option>
             </select>
           </div>
+          <div>
+            <label className="block text-[10px] font-bold uppercase text-secondary mb-1">JLPT Target</label>
+            <select
+              name="level"
+              defaultValue={levelFilter}
+              className="w-full h-10 px-3 border border-[var(--divider)] rounded-xl text-xs text-charcoal bg-white"
+            >
+              <option value="">All Levels</option>
+              <option value="N5">N5 (Beginner)</option>
+              <option value="N4">N4 (Elementary)</option>
+              <option value="N3">N3 (Intermediate)</option>
+              <option value="N2">N2 (Upper)</option>
+              <option value="N1">N1 (Advanced)</option>
+            </select>
+          </div>
           <div className="flex items-end gap-2">
             <div className="flex-1">
-              <label className="block text-[10px] font-bold uppercase text-secondary mb-1">JLPT Target</label>
+              <label className="block text-[10px] font-bold uppercase text-secondary mb-1">User Type</label>
               <select
-                name="level"
-                defaultValue={levelFilter}
+                name="test"
+                defaultValue={testFilter}
                 className="w-full h-10 px-3 border border-[var(--divider)] rounded-xl text-xs text-charcoal bg-white"
               >
-                <option value="">All Levels</option>
-                <option value="N5">N5 (Beginner)</option>
-                <option value="N4">N4 (Elementary)</option>
-                <option value="N3">N3 (Intermediate)</option>
-                <option value="N2">N2 (Upper)</option>
-                <option value="N1">N1 (Advanced)</option>
+                <option value="">All Users</option>
+                <option value="real">Real Users Only</option>
+                <option value="test">Test Users Only</option>
               </select>
             </div>
             <button type="submit" className="btn-primary h-10 px-4 rounded-xl text-xs font-bold font-heading shrink-0">
@@ -305,7 +327,12 @@ export default async function AdminUsersPage({
               return (
                 <tr key={u.email} className="border-b border-[var(--divider)] hover:bg-[var(--base)] transition-colors">
                   <td className="py-3 px-2">
-                    <div className="font-semibold text-charcoal text-xs">{name}</div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-semibold text-charcoal text-xs">{name}</span>
+                      {u.is_test_user && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-secondary/15 text-secondary">TEST</span>
+                      )}
+                    </div>
                     <div className="text-[10px] text-secondary">{u.email}</div>
                   </td>
                   <td className="py-3 px-2">

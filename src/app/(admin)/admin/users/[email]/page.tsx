@@ -26,6 +26,7 @@ type UserDetail = {
   email_verified_at: string | null;
   verification_sent_at: string | null;
   learned_count: number;
+  is_test_user: boolean;
 };
 
 export default function AdminUserDetailPage() {
@@ -376,6 +377,23 @@ export default function AdminUserDetailPage() {
                     Award Badge
                   </button>
                 </div>
+              </div>
+
+              {/* Test user flag */}
+              <div className="border-t border-[var(--divider)] pt-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!!user.is_test_user}
+                    disabled={updating}
+                    onChange={(e) => handleUpdate({ is_test_user: e.target.checked })}
+                    className="accent-primary"
+                  />
+                  <span className="text-xs font-semibold text-charcoal">Test user</span>
+                </label>
+                <p className="text-[10px] text-secondary mt-1">
+                  Excluded from the public scoreboard and from winning the monthly top-3 leaderboard reward. Still reachable via newsletter test-sends.
+                </p>
               </div>
 
               {/* Safety & Login tools */}

@@ -83,7 +83,7 @@ export function WritingCanvas({
   }, []);
 
   const drawStrokes = useCallback((ctx: CanvasRenderingContext2D, strokesToDraw: Stroke[], current: Point[]) => {
-    ctx.strokeStyle = "var(--charcoal, #1a1a1a)";
+    ctx.strokeStyle = "#1a1a1a";
     ctx.lineWidth = 4;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";

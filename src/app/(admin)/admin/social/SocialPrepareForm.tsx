@@ -305,6 +305,7 @@ export function SocialPrepareForm() {
       twitter: `https://twitter.com/intent/tweet?text=${encoded}`,
       linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(base)}&summary=${encoded}`,
       facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(base)}&quote=${encoded}`,
+      threads: `https://www.threads.net/intent/post?text=${encoded}`,
     };
     const url = urls[platform];
     if (url) window.open(url, "_blank", "noopener,noreferrer");
@@ -605,6 +606,12 @@ function PackSections({
   const pinterestText = pinterestPin ? `${pinterestPin.title || ""}\n${pinterestPin.description || ""}`.trim() : "";
   const pinterestImagePrompt = pinterestPin?.image_prompt || `${topic} Pinterest pin image`;
 
+  // --- Facebook / Threads ---
+  const facebookPost = (payload.facebook as { post?: { text?: string; cta_line?: string } })?.post;
+  const facebookText = facebookPost ? [facebookPost.text, facebookPost.cta_line].filter(Boolean).join("\n\n") : "";
+  const facebookImagePrompt = `${topic} Facebook share image`;
+  const threadsText = (payload.threads as { post?: { text?: string } })?.post?.text || "";
+
   function SectionBox({
     sectionKey,
     label,
@@ -864,6 +871,55 @@ function PackSections({
             <img src={imageUrls.twitter_image} alt="" className="max-h-32 rounded-bento border border-[var(--divider)]" />
           </a>
         )}
+      </SectionBox>
+
+      {/* Facebook */}
+      <SectionBox
+        sectionKey="facebook"
+        label="Facebook"
+        sectionData={payload.facebook || {}}
+        textToCopy={facebookText}
+        actions={
+          <>
+            {facebookText && (
+              <button type="button" onClick={() => onOpenTab("facebook", facebookText)} className="text-sm text-primary hover:underline">Open in new tab</button>
+            )}
+            <button type="button" onClick={() => onCopy(facebookText)} className="text-sm text-primary hover:underline">Copy</button>
+            <button
+              type="button"
+              onClick={() => onGenerateImage("facebook_image", facebookImagePrompt, { aspectRatio: "1:1", referenceImageUrl })}
+              disabled={imageGenLoading === "facebook_image"}
+              className="text-sm text-primary hover:underline disabled:opacity-50"
+            >
+              {imageGenLoading === "facebook_image" ? "Generating…" : imageUrls.facebook_image ? "Regenerate image" : "Generate image"}
+            </button>
+          </>
+        }
+      >
+        <pre className="text-secondary text-sm whitespace-pre-wrap break-words">{facebookText || "—"}</pre>
+        {imageUrls.facebook_image && (
+          <a href={imageUrls.facebook_image} target="_blank" rel="noopener noreferrer" className="inline-block mt-2">
+            <img src={imageUrls.facebook_image} alt="" className="max-h-32 rounded-bento border border-[var(--divider)]" />
+          </a>
+        )}
+      </SectionBox>
+
+      {/* Threads */}
+      <SectionBox
+        sectionKey="threads"
+        label="Threads"
+        sectionData={payload.threads || {}}
+        textToCopy={threadsText}
+        actions={
+          <>
+            {threadsText && (
+              <button type="button" onClick={() => onOpenTab("threads", threadsText)} className="text-sm text-primary hover:underline">Open in new tab</button>
+            )}
+            <button type="button" onClick={() => onCopy(threadsText)} className="text-sm text-primary hover:underline">Copy</button>
+          </>
+        }
+      >
+        <pre className="text-secondary text-sm whitespace-pre-wrap break-words">{threadsText || "—"}</pre>
       </SectionBox>
 
       {/* LinkedIn */}

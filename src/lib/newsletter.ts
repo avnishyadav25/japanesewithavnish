@@ -47,3 +47,44 @@ export async function sendNewsletterById(id: string) {
 
   return { ok: true as const, sent, failed, skipped, total: subscribers.length };
 }
+
+/** Sends a newsletter to a small test audience without marking it "sent" or requiring
+ * draft status — reuses the same rendering/send path as sendNewsletterById. Defaults to
+ * every profile flagged is_test_user when no explicit recipient list is given. Does not
+ * write to newsletter_send_logs (that table's status is constrained to sent/failed/skipped
+ * for real sends), so test sends stay out of production delivery reporting. */
+export async function sendNewsletterTestById(id: string, recipientEmails?: string[]) {
+  if (!sql) return { error: "Database unavailable" as const };
+
+  const newsletterRows = (await sql`
+    SELECT id, subject, body_html FROM newsletters WHERE id = ${id} LIMIT 1
+  `) as { id: string; subject: string; body_html: string }[];
+  const newsletter = newsletterRows[0];
+  if (!newsletter) return { error: "Newsletter not found" as const };
+
+  let recipients: { email: string; name: string | null }[];
+  if (recipientEmails && recipientEmails.length > 0) {
+    recipients = recipientEmails.map((email) => ({ email, name: null }));
+  } else {
+    const testUserRows = (await sql`
+      SELECT email, display_name AS name FROM profiles WHERE is_test_user = TRUE
+    `) as { email: string; name: string | null }[];
+    recipients = testUserRows ?? [];
+  }
+
+  let sent = 0;
+  let failed = 0;
+  let skipped = 0;
+  for (const r of recipients) {
+    try {
+      const result = await sendNewsletter(r.email, r.name ?? undefined, `[TEST] ${newsletter.subject}`, newsletter.body_html);
+      if (result) sent++;
+      else skipped++;
+    } catch (e) {
+      console.error("Newsletter test send to", r.email, e);
+      failed++;
+    }
+  }
+
+  return { ok: true as const, sent, failed, skipped, total: recipients.length };
+}

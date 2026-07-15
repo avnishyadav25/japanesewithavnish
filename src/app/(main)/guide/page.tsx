@@ -4,6 +4,7 @@ import { sql } from "@/lib/db";
 type GuideSection = {
   id: string;
   title: string;
+  slug: string | null;
   short_description: string;
   body: string | null;
   icon: string | null;
@@ -20,7 +21,7 @@ export default async function GuidePage() {
   let sections: GuideSection[] = [];
   if (sql) {
     const rows = await sql`
-      SELECT id, title, short_description, body, icon, link_href, link_label
+      SELECT id, title, slug, short_description, body, icon, link_href, link_label
       FROM platform_guide_sections
       WHERE published = true
       ORDER BY sort_order, created_at
@@ -69,12 +70,18 @@ export default async function GuidePage() {
                   <p className="text-secondary text-sm leading-relaxed">{s.short_description}</p>
 
                   {s.body && (
-                    <details className="mt-3 group">
-                      <summary className="text-primary text-xs font-bold cursor-pointer hover:underline list-none">
-                        Read more <span className="inline-block transition-transform group-open:rotate-90">→</span>
-                      </summary>
-                      <p className="text-secondary text-sm leading-relaxed mt-2 whitespace-pre-line">{s.body}</p>
-                    </details>
+                    s.slug ? (
+                      <Link href={`/guide/${s.slug}`} className="text-primary text-xs font-bold hover:underline mt-3 inline-block">
+                        Read more →
+                      </Link>
+                    ) : (
+                      <details className="mt-3 group">
+                        <summary className="text-primary text-xs font-bold cursor-pointer hover:underline list-none">
+                          Read more <span className="inline-block transition-transform group-open:rotate-90">→</span>
+                        </summary>
+                        <p className="text-secondary text-sm leading-relaxed mt-2 whitespace-pre-line">{s.body}</p>
+                      </details>
+                    )
                   )}
 
                   {s.link_href && (

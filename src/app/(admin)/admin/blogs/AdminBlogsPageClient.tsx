@@ -12,12 +12,10 @@ type PostRow = { id: string; slug: string; title: string; status: string; publis
 
 export function AdminBlogsPageClient({
   posts,
-  stats,
   blogViews = 0,
   blogAvgSeconds = null,
 }: {
   posts: PostRow[];
-  stats: { total: number; published: number; draft: number; thisMonth: number };
   blogViews?: number;
   blogAvgSeconds?: number | null;
 }) {
@@ -73,7 +71,7 @@ export function AdminBlogsPageClient({
           )}
         </p>
       </div>
-      <BlogListClient posts={posts} stats={stats} />
+      <BlogListClient posts={posts} />
       <NewPostModal open={modalOpen} onClose={() => setModalOpen(false)} />
       <GenerateListModal open={generateListOpen} onClose={() => setGenerateListOpen(false)} posts={posts} />
     </div>

@@ -56,6 +56,7 @@ export async function GET(req: NextRequest) {
           COALESCE(p.points, 0)::int AS points
         FROM profiles p
         WHERE p.show_on_scoreboard = TRUE
+          AND p.is_test_user = FALSE
           AND (COALESCE(p.current_streak, 0) > 0 OR COALESCE(p.points, 0) > 0)
         ORDER BY streak DESC, points DESC
         LIMIT ${limit}
@@ -74,6 +75,7 @@ export async function GET(req: NextRequest) {
           COALESCE(p.points, 0)::int AS points
         FROM profiles p
         WHERE p.show_on_scoreboard = TRUE
+          AND p.is_test_user = FALSE
           AND (COALESCE(p.current_streak, 0) > 0 OR COALESCE(p.points, 0) > 0)
         ORDER BY points DESC, streak DESC
         LIMIT ${limit}
@@ -94,6 +96,7 @@ export async function GET(req: NextRequest) {
             SELECT COUNT(*)::int + 1
             FROM profiles other
             WHERE other.show_on_scoreboard = TRUE
+              AND other.is_test_user = FALSE
               AND (COALESCE(other.current_streak, 0), COALESCE(other.points, 0), other.email)
                 > (COALESCE(p.current_streak, 0), COALESCE(p.points, 0), p.email)
           ) AS streak_rank,
@@ -101,6 +104,7 @@ export async function GET(req: NextRequest) {
             SELECT COUNT(*)::int + 1
             FROM profiles other
             WHERE other.show_on_scoreboard = TRUE
+              AND other.is_test_user = FALSE
               AND (COALESCE(other.points, 0), COALESCE(other.current_streak, 0), other.email)
                 > (COALESCE(p.points, 0), COALESCE(p.current_streak, 0), p.email)
           ) AS points_rank

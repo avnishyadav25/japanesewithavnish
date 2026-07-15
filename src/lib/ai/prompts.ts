@@ -11,7 +11,8 @@ export type ContentType =
   | "sounds"
   | "study_guide"
   | "practice_test"
-  | "product";
+  | "product"
+  | "guide_section";
 
 export type PromptContext = {
   topic?: string;
@@ -594,6 +595,23 @@ Structure:
 
 Tone: Calm, authoritative, actionable. No fluff.
 Output: Clean Markdown.
+${toneRules}`;
+    }
+
+    case "guide_section": {
+      return `${baseBrand}
+Write the explanatory body text for a "Site Guide" section on JapaneseWithAvnish.com. This text helps a new student understand one specific feature of the site.
+
+Feature: "${topic}"
+${tags}${desc}
+
+Structure:
+1. 2-4 short paragraphs explaining what this feature is and why it's useful for a JLPT learner.
+2. Mention concretely what the student will find or be able to do (be specific, not vague marketing language).
+3. If relevant, briefly note how this feature connects to other parts of the site (curriculum, dashboard, etc.).
+
+Tone: Calm, clear, helpful — written directly to the student ("you"). No hype, no emojis, no headers needed (this is a short explanatory block, not a full article).
+Output: Plain text or minimal Markdown (short paragraphs only, no H1/H2 headers).
 ${toneRules}`;
     }
 

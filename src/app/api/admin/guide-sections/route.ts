@@ -9,7 +9,7 @@ export async function GET() {
 
   try {
     const sections = await sql`
-      SELECT id, title, short_description, body, icon, link_href, link_label, sort_order, published
+      SELECT id, title, slug, short_description, body, icon, feature_image_url, link_href, link_label, sort_order, published
       FROM platform_guide_sections
       ORDER BY sort_order, created_at
     `;
@@ -26,18 +26,25 @@ export async function POST(req: NextRequest) {
   if (!sql) return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
 
   try {
-    const { title, short_description, body, icon, link_href, link_label, sort_order, published } = await req.json();
+    const { title, slug, short_description, body, icon, feature_image_url, link_href, link_label, sort_order, published } = await req.json();
     if (!title || !short_description) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
+    const finalSlug = (slug || title)
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, "")
+      .trim()
+      .replace(/\s+/g, "-");
 
     const rows = await sql`
-      INSERT INTO platform_guide_sections (title, short_description, body, icon, link_href, link_label, sort_order, published, created_at, updated_at)
+      INSERT INTO platform_guide_sections (title, slug, short_description, body, icon, feature_image_url, link_href, link_label, sort_order, published, created_at, updated_at)
       VALUES (
         ${title},
+        ${finalSlug},
         ${short_description},
         ${body || null},
         ${icon || null},
+        ${feature_image_url || null},
         ${link_href || null},
         ${link_label || null},
         ${sort_order != null ? Number(sort_order) : 0},
@@ -51,7 +58,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, id: (rows as { id: string }[])[0]?.id });
   } catch (error) {
     console.error("Admin guide-sections POST error:", error);
-    return NextResponse.json({ error: "Failed to create guide section" }, { status: 500 });
+    const message = error instanceof Error && error.message.includes("idx_platform_guide_sections_slug")
+      ? "A section with this slug already exists"
+      : "Failed to create guide section";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 

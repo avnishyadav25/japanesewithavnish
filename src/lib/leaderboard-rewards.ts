@@ -35,6 +35,7 @@ async function computeMonthlyTop3(periodStart: string, periodEnd: string): Promi
     FROM xp_transactions xt
     LEFT JOIN profiles p ON p.email = xt.user_email
     WHERE xt.created_at::date BETWEEN ${periodStart}::date AND ${periodEnd}::date
+      AND COALESCE(p.is_test_user, FALSE) = FALSE
     GROUP BY xt.user_email, p.display_name
     HAVING SUM(xt.xp_amount) > 0
     ORDER BY xp_total DESC

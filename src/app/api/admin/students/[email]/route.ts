@@ -57,6 +57,7 @@ export async function GET(
         us.trial_ends_at::text,
         p.xp,
         p.points,
+        COALESCE(p.is_test_user, FALSE) AS is_test_user,
         ua.email_verified_at::text,
         ua.verification_sent_at::text,
         (SELECT COUNT(*)::int FROM user_learning_progress u WHERE u.user_email = p.email AND u.status = 'learned') AS learned_count,
@@ -99,6 +100,7 @@ export async function GET(
         us.trial_ends_at::text,
         p.xp,
         p.points,
+        COALESCE(p.is_test_user, FALSE) AS is_test_user,
         NULL::text AS email_verified_at,
         NULL::text AS verification_sent_at,
         (SELECT COUNT(*)::int FROM user_learning_progress u WHERE u.user_email = p.email AND u.status = 'learned') AS learned_count,
@@ -146,10 +148,12 @@ export async function PATCH(
   const is_lifetime = typeof body.is_lifetime === "boolean" ? body.is_lifetime : undefined;
   const xp = typeof body.xp === "number" ? body.xp : undefined;
   const points = typeof body.points === "number" ? body.points : undefined;
+  const is_test_user = typeof body.is_test_user === "boolean" ? body.is_test_user : undefined;
 
   const rows = await sql`
     SELECT first_name, last_name, display_name, is_active, recommended_level, avatar_url, address, phone,
-           linkedin_url, instagram_url, facebook_url, twitter_url, website, role, premium_until, is_lifetime, xp, points
+           linkedin_url, instagram_url, facebook_url, twitter_url, website, role, premium_until, is_lifetime, xp, points,
+           COALESCE(is_test_user, FALSE) AS is_test_user
     FROM profiles WHERE email = ${email} LIMIT 1
   ` as Record<string, unknown>[];
   const current = rows?.[0];
@@ -198,6 +202,7 @@ export async function PATCH(
   const il = is_lifetime !== undefined ? is_lifetime : (current.is_lifetime as boolean | null);
   const x = xp !== undefined ? xp : (current.xp as number | null);
   const pts = points !== undefined ? points : (current.points as number | null);
+  const tu = is_test_user !== undefined ? is_test_user : (current.is_test_user as boolean);
 
   await sql`
     UPDATE profiles SET
@@ -219,6 +224,7 @@ export async function PATCH(
       is_lifetime = ${il},
       xp = ${x},
       points = ${pts},
+      is_test_user = ${tu},
       updated_at = NOW()
     WHERE email = ${email}
   `;
