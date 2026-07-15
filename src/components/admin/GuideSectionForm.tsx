@@ -33,9 +33,6 @@ export function GuideSectionForm({ section }: { section?: GuideSection }) {
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [imageModalOpen, setImageModalOpen] = useState(false);
-  const [screenshotLoading, setScreenshotLoading] = useState(false);
-  const [screenshotUrl, setScreenshotUrl] = useState<string | null>(null);
-  const [screenshotError, setScreenshotError] = useState<string | null>(null);
   const [form, setForm] = useState({
     title: section?.title ?? "",
     slug: section?.slug ?? "",
@@ -91,24 +88,6 @@ export function GuideSectionForm({ section }: { section?: GuideSection }) {
       setStatus("error");
     }
   }
-
-  async function handlePreviewScreenshot() {
-    if (!section?.id) return;
-    setScreenshotLoading(true);
-    setScreenshotError(null);
-    try {
-      const res = await fetch(`/api/admin/guide-sections/${section.id}/screenshot`, { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to capture screenshot");
-      setScreenshotUrl(data.screenshotUrl);
-    } catch (err) {
-      setScreenshotError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setScreenshotLoading(false);
-    }
-  }
-
-  const canPreview = Boolean(section?.id) && form.published;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -285,37 +264,6 @@ export function GuideSectionForm({ section }: { section?: GuideSection }) {
               }}
             />
           </div>
-        </div>
-      </AdminCard>
-
-      <AdminCard>
-        <h2 className="font-heading font-bold text-charcoal mb-4">Live Preview</h2>
-        <div className="space-y-3">
-          {!canPreview ? (
-            <p className="text-sm text-secondary">
-              {section?.id
-                ? "Publish and save this section to enable a live screenshot preview."
-                : "Save this section first, then publish it to enable a live screenshot preview."}
-            </p>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={handlePreviewScreenshot}
-                disabled={screenshotLoading}
-                className="btn-secondary disabled:opacity-50"
-              >
-                {screenshotLoading ? "Capturing…" : "📸 Preview screenshot"}
-              </button>
-              {screenshotError && <p className="text-sm text-red-600">{screenshotError}</p>}
-              {screenshotUrl && (
-                <div className="mt-2 rounded-bento overflow-hidden border border-[var(--divider)] bg-[var(--base)] max-w-md">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={screenshotUrl} alt="Live page screenshot" className="w-full" />
-                </div>
-              )}
-            </>
-          )}
         </div>
       </AdminCard>
 

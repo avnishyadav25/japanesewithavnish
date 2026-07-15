@@ -19,10 +19,6 @@ const nextConfig = {
   },
   experimental: {
     missingSuspenseWithCSRBailout: false,
-    // playwright-core's full server bundle pulls in optional Electron/BiDi browser
-    // support (chromium-bidi, electron) that we never use — leaving it unbundled
-    // avoids webpack trying to statically resolve those missing optional deps.
-    serverComponentsExternalPackages: ["playwright-core", "@sparticuz/chromium"],
   },
 };
 
