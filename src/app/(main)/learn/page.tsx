@@ -32,8 +32,8 @@ export default function LearnHubPage() {
       badge: "Characters",
     },
     {
-      title: "Kanji Tracing Sheets",
-      desc: "Stroke order practice sheets for all 2,000+ standard Kanji.",
+      title: "Kanji Study & Writing Practice",
+      desc: "Explore an expanding library of Kanji with readings, meanings, and writing practice.",
       href: "/learn/kana/kanji",
       image: "/images/hub/kanji.jpg",
       badge: "Kanji",
@@ -52,7 +52,7 @@ export default function LearnHubPage() {
     },
     {
       title: "Listening Comprehension",
-      desc: "Native audio dialogue scenarios with comprehension questions.",
+      desc: "Japanese pronunciation audio dialogue scenarios with comprehension questions.",
       href: "/learn/listening",
       image: "/images/hub/listening.jpg",
       badge: "Audio",
@@ -78,7 +78,7 @@ export default function LearnHubPage() {
     },
     {
       title: "Adaptive Placement Quiz",
-      desc: "Take the 20-30 question adaptive test to determine your JLPT level.",
+      desc: "Take the 25-question adaptive test (approximately 5 minutes) to determine your JLPT level.",
       href: "/quiz",
       image: "/images/hub/quiz.jpg",
       badge: "Quiz",

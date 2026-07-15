@@ -7,7 +7,7 @@ const STEPS = [
   {
     n: "01",
     title: "Take the Quiz",
-    sub: "Know your JLPT level in 3 minutes. Get an instant recommended JLPT level and learning path.",
+    sub: "25 questions, approximately 5 minutes. Get an instant recommended JLPT level and learning path.",
     cta: "Start Quiz →",
     href: "/quiz",
   },
@@ -114,7 +114,8 @@ export function NihongoNaviSection() {
           </h2>
           <p className="text-[16px] text-white/65 leading-[1.75] mb-8 max-w-[420px]">
             Ask anything — grammar questions, vocab lookups, sentence correction, kanji
-            breakdown. Available 24/7, included with Premium access.
+            breakdown. Ask Nihongo Navi five questions free every day. Premium learners
+            receive unlimited AI tutoring.
           </p>
           <div className="flex flex-col gap-3 mb-8">
             {NAVI_FEATURES.map((f) => (
@@ -229,7 +230,7 @@ export function QuizCTASection() {
             <h2 className="font-serif text-[32px] font-normal text-[#1A1A1A] mb-3 leading-[1.2]">
               Not sure which level?
               <br />
-              {"We'll tell you in 3 minutes."}
+              {"25 questions • approximately 5 minutes."}
             </h2>
             <p className="text-[15px] text-[#555] leading-[1.7]">
               Answer few questions on grammar, kanji, and vocabulary — get an instant recommended
@@ -273,7 +274,7 @@ const WHY_FEATURES = [
   },
   {
     title: "Progressive grammar, vocab, and kanji",
-    sub: "Learn smarter, not more — spaced repetition built in.",
+    sub: "Save learning items and return to them through your review queue.",
   },
   {
     title: "AI tutor available 24/7",
@@ -290,14 +291,14 @@ export function WhyAvnishSection() {
           <div className="w-[220px] h-[280px] rounded-[20px] bg-[var(--divider)] mx-auto flex items-center justify-center overflow-hidden">
             <Image
               src="/logo.png"
-              alt="Avnish — JLPT educator"
+              alt="Avnish — Founder & Japanese learner"
               width={220}
               height={280}
               className="object-cover w-full h-full"
             />
           </div>
           <div className="mt-4 text-[17px] font-bold text-[#1A1A1A]">Avnish</div>
-          <div className="text-[13px] text-[var(--subtle)]">JLPT educator & creator</div>
+          <div className="text-[13px] text-[var(--subtle)]">Founder, platform creator & Japanese learner</div>
         </div>
 
         {/* Content */}
@@ -334,6 +335,89 @@ export function WhyAvnishSection() {
           >
             Read my story →
           </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ── Explore the Learning System Section ───────────────────────────────────────
+
+const EXPLORE_CARDS = [
+  { icon: "🗺️", title: "Structured Curriculum", href: "/learn/curriculum" },
+  { icon: "📖", title: "Grammar & Vocabulary", href: "/learn/grammar" },
+  { icon: "漢", title: "Kanji & Writing", href: "/learn/kana/kanji" },
+  { icon: "👂", title: "Reading & Listening", href: "/learn/reading" },
+  { icon: "🎯", title: "Practice & Review", href: "/learn/grammar-drills" },
+  { icon: "🤖", title: "Nihongo Navi AI Tutor", href: "/tutor" },
+];
+
+export function ExploreLearningSystemSection() {
+  return (
+    <section className="bg-[var(--background)] py-[60px] px-4 sm:px-6 border-b border-[var(--divider)]">
+      <div className="max-w-[1100px] mx-auto">
+        <div className="text-center mb-10">
+          <div className="text-[11px] font-bold tracking-[.1em] uppercase text-[var(--subtle)] mb-2">
+            What you get
+          </div>
+          <h2 className="font-serif text-[30px] font-normal text-[#1A1A1A]">
+            Explore the learning system
+          </h2>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          {EXPLORE_CARDS.map((c) => (
+            <Link
+              key={c.title}
+              href={c.href}
+              className="bg-white rounded-xl border border-[var(--divider)] p-5 text-center hover:border-primary/40 hover:shadow-sm transition group"
+            >
+              <div className="text-2xl mb-2">{c.icon}</div>
+              <div className="text-[13px] font-bold text-[#1A1A1A] group-hover:text-primary transition-colors">
+                {c.title}
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ── Popular Beginner Lessons Section ──────────────────────────────────────────
+
+export type PopularLesson = {
+  title: string;
+  href: string;
+  typeLabel: string;
+  level: string;
+};
+
+export function PopularBeginnerLessonsSection({ lessons }: { lessons: PopularLesson[] }) {
+  if (lessons.length === 0) return null;
+  return (
+    <section className="py-20 px-4 sm:px-6 bg-[#FAF8F5] border-t border-[var(--divider)]">
+      <div className="max-w-5xl mx-auto space-y-8">
+        <div className="flex items-center justify-between">
+          <h2 className="font-heading text-xl sm:text-2xl font-black text-charcoal">Popular Beginner Lessons</h2>
+          <Link href="/learn" className="text-primary font-bold text-xs hover:underline">
+            View Learn Hub →
+          </Link>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {lessons.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="block bg-white border border-[var(--divider)] rounded-2xl p-5 hover:border-primary/30 transition shadow-sm group"
+            >
+              <h3 className="font-bold text-xs text-charcoal group-hover:text-primary transition mb-1 leading-snug">
+                {item.title}
+              </h3>
+              <span className="text-[10px] text-secondary font-semibold uppercase tracking-wider">
+                {item.typeLabel} • {item.level}
+              </span>
+            </Link>
+          ))}
         </div>
       </div>
     </section>

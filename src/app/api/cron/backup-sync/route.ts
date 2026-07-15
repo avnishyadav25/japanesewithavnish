@@ -4,11 +4,12 @@ import { runBackupSyncBatch } from "@/lib/db-backup";
 const CRON_SECRET = process.env.CRON_SECRET;
 
 /**
- * Call on a schedule (n8n Schedule Trigger -> HTTP Request, every few minutes) with
- * ?key=CRON_SECRET (or the Authorization: Bearer <CRON_SECRET> header). Processes one
- * batch of tables per call, resuming from backup_sync_state's cursor, until the full
- * database sync (Neon -> Supabase / Turso / R2) completes, then idles until the next
- * run naturally starts on the following call after completion.
+ * Called hourly by Vercel Cron (see vercel.json), which sends the
+ * Authorization: Bearer <CRON_SECRET> header automatically. Can also be pinged manually
+ * with ?key=CRON_SECRET (e.g. from an external scheduler like n8n, if preferred instead).
+ * Processes one batch of tables per call, resuming from backup_sync_state's cursor, until
+ * the full database sync (Neon -> Supabase / Turso / R2) completes, then idles (20h
+ * cooldown) until the next day's cycle starts naturally on a later hourly call.
  */
 export async function GET(req: Request) {
   const url = new URL(req.url);

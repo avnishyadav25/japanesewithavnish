@@ -3,7 +3,7 @@ import { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Kana & Kanji Practice Portal | Japanese with Avnish",
-  description: "Learn and practice writing Hiragana, Katakana, and Kanji characters with stroke-by-stroke guides, native audio, and interactive drawing canvases.",
+  description: "Learn and practice writing Hiragana, Katakana, and Kanji characters with stroke-by-stroke guides, Japanese pronunciation audio, and interactive drawing canvases.",
 };
 
 export default function KanaPortalPage() {
@@ -12,7 +12,7 @@ export default function KanaPortalPage() {
       title: "Hiragana Practice",
       japanese: "平仮名",
       romaji: "Hiragana Chart & Stroke Order",
-      desc: "Master the 46 primary Japanese phonetic characters. Interactive tracing, native pronunciation, and stroke order verification.",
+      desc: "Master the 46 primary Japanese phonetic characters. Interactive tracing, Japanese pronunciation audio, and guided writing feedback.",
       href: "/learn/kana/hiragana",
       characterBg: "あ",
       colorClasses: "from-rose-500/10 to-orange-500/10 hover:shadow-rose-500/10 border-rose-500/20",
@@ -22,7 +22,7 @@ export default function KanaPortalPage() {
       title: "Katakana Practice",
       japanese: "片仮名",
       romaji: "Katakana Chart & Stroke Order",
-      desc: "Learn the character set used for foreign loanwords. Interactive tracing, native audio, and stroke count verification.",
+      desc: "Learn the character set used for foreign loanwords. Interactive tracing, Japanese pronunciation audio, and guided writing feedback.",
       href: "/learn/kana/katakana",
       characterBg: "ア",
       colorClasses: "from-blue-500/10 to-indigo-500/10 hover:shadow-indigo-500/10 border-indigo-500/20",
@@ -48,7 +48,7 @@ export default function KanaPortalPage() {
           Kana & Kanji Practice Portal
         </h1>
         <p className="text-secondary text-base sm:text-lg max-w-2xl mx-auto mb-12">
-          Select a character set below to study stroke orders, listen to native pronunciation, and practice writing on our interactive canvas with real-time feedback.
+          Select a character set below to study stroke orders, listen to Japanese pronunciation audio, and practice writing on our interactive canvas with guided feedback.
         </p>
 
         {/* Grid */}

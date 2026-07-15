@@ -52,15 +52,18 @@ async function duplicateGroups(kind) {
     return rows;
   }
   if (kind === "grammar") {
+    // Normalize wave dash (U+301C) vs fullwidth tilde (U+FF5E) and whitespace —
+    // the same grammar point was seeded twice using different placeholder characters.
     const { rows } = await client.query(
       `
-        SELECT lower(trim(pattern)) AS key,
+        SELECT lower(regexp_replace(regexp_replace(pattern, '[〜～]', '~', 'g'), '\\s+', '', 'g')) AS key,
+               level,
                array_agg(id ORDER BY updated_at DESC NULLS LAST, created_at DESC NULLS LAST) AS ids,
                array_agg(post_id ORDER BY updated_at DESC NULLS LAST, created_at DESC NULLS LAST) AS post_ids,
                count(*)::int AS count
         FROM grammar
         WHERE pattern IS NOT NULL AND trim(pattern) <> ''
-        GROUP BY 1
+        GROUP BY 1, 2
         HAVING count(*) > 1
         ORDER BY count(*) DESC, key
         LIMIT $1

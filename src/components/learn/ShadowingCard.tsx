@@ -64,7 +64,7 @@ export function ShadowingCard({ audioUrl, title, transcript, className = "" }: S
       <div className="flex flex-wrap items-center gap-3">
         <audio ref={audioRef} src={audioUrl} preload="metadata" className="hidden" />
         <button type="button" onClick={playNative} className="btn-primary text-sm py-2 px-4">
-          Play native audio
+          Play pronunciation audio
         </button>
         {!recording ? (
           <button type="button" onClick={startRecording} className="px-4 py-2 border border-[var(--divider)] rounded-bento text-sm font-medium hover:bg-[var(--divider)]/20">

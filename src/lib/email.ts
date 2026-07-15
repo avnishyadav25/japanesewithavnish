@@ -84,6 +84,21 @@ export async function sendMagicLink(email: string, magicLinkUrl: string) {
   );
 }
 
+export async function sendCreatePasswordEmail(email: string, resetLink: string) {
+  const content = `
+    <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">Hi there,</p>
+    <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">Your Premium access is active. Your account doesn't have a password yet — set one now so you can log in directly next time, instead of only via email links.</p>
+    <p style="margin:0 0 20px;"><a href="${resetLink}" style="background:#D0021B;color:white;padding:12px 26px;text-decoration:none;border-radius:8px;display:inline-block;font-weight:700;">Create your password</a></p>
+    <p style="font-size:14px;line-height:1.6;margin:0 0 12px;color:#555;">This secure link expires in 1 hour.</p>
+    <p style="font-size:14px;line-height:1.6;margin:18px 0 0;">— Japanese with Avnish</p>
+  `;
+  return sendMail(
+    email,
+    "Create your password — Japanese with Avnish",
+    emailWrapper(content, "")
+  );
+}
+
 export async function sendPasswordResetEmail(email: string, resetLink: string) {
   const content = `
     <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">Hi there,</p>

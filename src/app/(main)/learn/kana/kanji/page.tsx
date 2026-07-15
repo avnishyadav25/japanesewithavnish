@@ -16,7 +16,7 @@ export default async function KanjiPracticePage() {
   if (sql) {
     try {
       const rows = (await sql`
-        SELECT k.id, k.character, k.meaning, k.stroke_count, k.onyomi, k.kunyomi, (p.jlpt_level)[1] as level
+        SELECT k.id, k.character, k.meaning, k.meaning_extended, k.stroke_count, k.onyomi, k.kunyomi, (p.jlpt_level)[1] as level
         FROM kanji k
         JOIN posts p ON k.post_id = p.id
         ORDER BY k.character ASC

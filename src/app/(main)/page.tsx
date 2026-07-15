@@ -4,15 +4,29 @@ import { sql } from "@/lib/db";
 import { HomeFaq } from "@/components/HomeFaq";
 import { LeadMagnetForm } from "@/components/LeadMagnetForm";
 import { RecentBlogSection } from "@/components/RecentBlogSection";
-import { NewsletterSection } from "@/components/NewsletterSection";
 import { HomePricingSection } from "@/components/HomePricingSection";
 import { OfferBannerBar } from "@/components/OfferBannerBar";
 import {
   StepsSection,
+  ExploreLearningSystemSection,
   NihongoNaviSection,
   QuizCTASection,
   WhyAvnishSection,
+  PopularBeginnerLessonsSection,
+  type PopularLesson,
 } from "@/components/HomeSections";
+
+// Curated, fixed picks — deliberately not a recency query, and restricted to
+// content that isn't behind the daily-free-lesson gate so anonymous visitors
+// can always open what they click.
+const POPULAR_BEGINNER_LESSONS: PopularLesson[] = [
+  { title: "Hiragana A–N Rows", href: "/learn/curriculum/lesson/n5-hiragana-an-rows", typeLabel: "Kana", level: "N5" },
+  { title: "A は B です", href: "/learn/grammar/n5-grammar-a-b-5fs6s8", typeLabel: "Grammar", level: "N5" },
+  { title: "Greetings and Introductions", href: "/learn/listening/n5-practice-listening-55a1277e-4216-4872-b272-d2c9f5c3265b", typeLabel: "Listening", level: "N5" },
+  { title: "My Day", href: "/learn/reading/watashi-no-ichinichi", typeLabel: "Reading", level: "N5" },
+  { title: "Numbers and Time", href: "/learn/curriculum/lesson/4425b37e-800d-4882-8b96-4b75d9adf63d", typeLabel: "Vocabulary", level: "N5" },
+  { title: "Basic Kanji Numbers", href: "/learn/kanji/n5-kanji-9u8f3a", typeLabel: "Kanji", level: "N5" },
+];
 
 const isComingSoon = process.env.COMING_SOON === "true" || process.env.COMING_SOON === "1";
 
@@ -41,11 +55,10 @@ async function FullHomeView() {
   const settingsKeys = ["homepage_faq"];
   let plans: any[] = [];
   let settings: Record<string, unknown> = {};
-  let lessons: { id: string; slug: string; title: string; content_type: string; jlpt_level: string | null }[] = [];
 
   try {
     if (sql) {
-      const [plansRows, settingsRows, lessonRows] = await Promise.all([
+      const [plansRows, settingsRows] = await Promise.all([
         sql`
           SELECT id, name, slug, billing_type, price_inr, price_usd, features, is_popular, sort_order
           FROM subscription_plans
@@ -53,21 +66,13 @@ async function FullHomeView() {
           ORDER BY sort_order
         `,
         sql`SELECT key, value FROM site_settings WHERE key = ANY(${settingsKeys})`,
-        sql`SELECT id, slug, title, content_type, (jlpt_level)[1] AS jlpt_level FROM posts WHERE status = 'published' AND content_type IN ('grammar', 'vocabulary', 'kanji') ORDER BY created_at DESC LIMIT 6`,
       ]);
       plans = plansRows ?? [];
       (settingsRows as { key: string; value: unknown }[]).forEach((r) => { settings[r.key] = r.value; });
-      lessons = (lessonRows as { id: string; slug: string; title: string; content_type: string; jlpt_level: string | null }[]) ?? [];
     }
   } catch (e) {
     console.error("Homepage queries failed:", e);
   }
-
-  const TYPE_LABELS: Record<string, string> = {
-    grammar: "Grammar",
-    vocabulary: "Vocabulary",
-    kanji: "Kanji",
-  };
 
   return (
     <div className="font-sans antialiased text-charcoal">
@@ -180,8 +185,8 @@ async function FullHomeView() {
       {/* How it works — 3 steps */}
       <StepsSection />
 
-      {/* Subscription Pricing Grid */}
-      <HomePricingSection plans={plans} defaultCurrency={defaultCurrency} />
+      {/* Explore the learning system */}
+      <ExploreLearningSystemSection />
 
       {/* Nihongo Navi — dark section */}
       <NihongoNaviSection />
@@ -192,36 +197,11 @@ async function FullHomeView() {
       {/* Why Avnish */}
       <WhyAvnishSection />
 
-      {/* Latest lessons — hide if empty */}
-      {lessons.length > 0 && (
-        <section className="py-20 px-4 sm:px-6 bg-[#FAF8F5] border-t border-[var(--divider)]">
-          <div className="max-w-5xl mx-auto space-y-8">
-            <div className="flex items-center justify-between">
-              <h2 className="font-heading text-xl sm:text-2xl font-black text-charcoal">Latest Curriculum Lessons</h2>
-              <Link href="/learn" className="text-primary font-bold text-xs hover:underline">
-                View Learn Hub →
-              </Link>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {lessons.map((item) => (
-                <Link
-                  key={item.id}
-                  href={`/learn/${item.content_type}/${item.slug}`}
-                  className="block bg-white border border-[var(--divider)] rounded-2xl p-5 hover:border-primary/30 transition shadow-sm group"
-                >
-                  <h3 className="font-bold text-xs text-charcoal group-hover:text-primary transition mb-1 leading-snug">
-                    {item.title}
-                  </h3>
-                  <span className="text-[10px] text-secondary font-semibold uppercase tracking-wider">
-                    {TYPE_LABELS[item.content_type] || item.content_type}
-                    {item.jlpt_level ? ` • ${item.jlpt_level}` : ""}
-                  </span>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
+      {/* Popular beginner lessons — curated, not recency-based */}
+      <PopularBeginnerLessonsSection lessons={POPULAR_BEGINNER_LESSONS} />
+
+      {/* Subscription Pricing Grid — after value props, before the ask */}
+      <HomePricingSection plans={plans} defaultCurrency={defaultCurrency} />
 
       {/* Recent blog */}
       <RecentBlogSection />
@@ -233,15 +213,12 @@ async function FullHomeView() {
         </div>
       </section>
 
-      {/* Lead magnet */}
+      {/* Single lead-capture section — footer keeps its own small newsletter form */}
       <section id="free-pack" className="py-20 px-4 sm:px-6 bg-[#FAF8F5] border-t border-[var(--divider)]">
         <div className="max-w-md mx-auto">
           <LeadMagnetForm />
         </div>
       </section>
-
-      {/* Newsletter */}
-      <NewsletterSection source="site" />
     </div>
   );
 }

@@ -181,7 +181,7 @@ export function PricingClient({ plans, defaultCurrency = "INR" }: { plans: Plan[
             <p className="text-secondary text-sm leading-relaxed max-w-xl">
               {currency === "USD"
                 ? "Global Premium Passes are one-time purchases through Razorpay international checkout. PayPal may appear when enabled for your account."
-                : "Monthly and Yearly passes are one-time purchases for 30-day and 365-day access. No automatic renewal or cancellation workflow needed."}
+                : "Monthly and Yearly passes are one-time purchases for 30-day and 365-day access. One-time payment. Your Premium Pass will not renew automatically."}
             </p>
           </div>
           <div className="flex flex-col gap-1 items-center shrink-0">

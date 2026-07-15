@@ -120,6 +120,11 @@ export function LearnMarkdown({
                 {metaStr(meta, "type")}
               </span>
             )}
+            {metaStr(meta, "transitivity") && (
+              <span className="text-xs text-secondary border border-[var(--divider)] px-2 py-0.5 rounded">
+                {metaStr(meta, "transitivity")}
+              </span>
+            )}
           </div>
           {metaStr(meta, "meaning") && <p className="text-charcoal mb-2 font-medium">{metaStr(meta, "meaning")}</p>}
         </div>
@@ -182,6 +187,12 @@ export function LearnMarkdown({
               </span>
             )}
           </div>
+          {metaStr(meta, "meaning_extended") && (
+            <details className="mt-3 text-xs text-secondary text-left max-w-md mx-auto">
+              <summary className="cursor-pointer hover:text-primary text-center">Advanced dictionary information</summary>
+              <p className="mt-1.5 leading-relaxed">{metaStr(meta, "meaning_extended")}</p>
+            </details>
+          )}
         </div>
       )}
 

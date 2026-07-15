@@ -6,6 +6,7 @@ import {
   type LearnLevel,
 } from "@/lib/learn-filters";
 import { getCompleteListeningPostIds } from "@/lib/learn/listeningPublishGate";
+import { getPassageReadingPostIds } from "@/lib/learn/readingPublishGate";
 
 const PER_PAGE = 12;
 
@@ -75,6 +76,12 @@ export async function getLearnCatalog({
       if (!contentType || contentType === "listening") {
         const completeIds = await getCompleteListeningPostIds();
         allItems = allItems.filter((item) => item.content_type !== "listening" || completeIds.has(item.id));
+      }
+
+      // Hide reading posts that are actually kana/grammar-in-context lesson drills, not real passages.
+      if (!contentType || contentType === "reading") {
+        const passageIds = await getPassageReadingPostIds();
+        allItems = allItems.filter((item) => item.content_type !== "reading" || passageIds.has(item.id));
       }
 
       const settingsRow = (Array.isArray(settingsRows) ? settingsRows[0] : settingsRows) as

@@ -8,6 +8,7 @@ import {
 import { LearnContent } from "@/components/learn/LearnContent";
 import { getLearnCatalog } from "@/lib/learn/getLearnCatalog";
 import { getDirectoryItems } from "@/lib/learn/getDirectoryItems";
+import { getSession } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -39,8 +40,9 @@ export default async function LearnTypePage({
     respectCuratedLevel: false,
   });
 
+  const session = normalizedType === "vocabulary" ? await getSession() : null;
   const directoryItems = level !== "all" && ["grammar", "vocabulary", "kanji", "listening", "writing"].includes(normalizedType)
-    ? await getDirectoryItems(normalizedType as "grammar" | "vocabulary" | "kanji" | "listening" | "writing", level)
+    ? await getDirectoryItems(normalizedType as "grammar" | "vocabulary" | "kanji" | "listening" | "writing", level, session?.email)
     : [];
 
   const label = LEARN_TYPE_LABELS[normalizedType as LearnContentType] || normalizedType;

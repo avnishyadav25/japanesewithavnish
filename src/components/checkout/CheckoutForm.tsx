@@ -155,11 +155,6 @@ export function CheckoutForm({ product, compact = false, isPlan = false, currenc
     setSubmitting(true);
     setError("");
     try {
-      const checkoutLoaded = await (scriptPromise.current || loadRazorpayCheckout());
-      if (!checkoutLoaded || !window.Razorpay) {
-        throw new Error("Payment checkout could not load. Please refresh and try again.");
-      }
-
       const res = await fetch("/api/checkout/create-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -180,9 +175,19 @@ export function CheckoutForm({ product, compact = false, isPlan = false, currenc
       }
       if (!res.ok) throw new Error(data.error || "Failed");
 
+      if (data.free) {
+        window.location.href = data.redirectUrl || PAYMENT_SUCCESS_REDIRECT;
+        return;
+      }
+
       if (data.paymentMethod === "manual" || !data.razorpayOrderId) {
         window.location.href = `/order/${data.orderId}/pay`;
         return;
+      }
+
+      const checkoutLoaded = await (scriptPromise.current || loadRazorpayCheckout());
+      if (!checkoutLoaded || !window.Razorpay) {
+        throw new Error("Payment checkout could not load. Please refresh and try again.");
       }
 
       const options = {

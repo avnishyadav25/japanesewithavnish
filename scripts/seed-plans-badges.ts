@@ -25,7 +25,7 @@ async function run() {
       is_active: true,
       is_popular: false,
       sort_order: 10,
-      features: ["30 Days Unlimited access", "Sequential lesson lock bypass", "Unlimited practice drills", "Listening generator access", "Scoreboard & leaderboards"]
+      features: ["30 Days Unlimited access", "Unlimited N5-N1 curriculum access", "Learn any lesson without waiting", "Unlimited practice drills", "Unlimited listening practice", "Unlimited Nihongo Navi", "Full progress and review tools", "Leaderboards, XP, badges and streaks"]
     },
     {
       name: "Yearly Premium Pass",
@@ -38,7 +38,7 @@ async function run() {
       is_active: true,
       is_popular: true,
       sort_order: 20,
-      features: ["365 Days Unlimited access", "Includes all N5-N1 lessons", "Sequential lesson lock bypass", "Unlimited practice drills", "Listening generator access", "Scoreboard & leaderboards"]
+      features: ["365 Days Unlimited access", "Unlimited N5-N1 curriculum access", "Learn any lesson without waiting", "Unlimited practice drills", "Unlimited listening practice", "Unlimited Nihongo Navi", "Full progress and review tools", "Leaderboards, XP, badges and streaks"]
     },
     {
       name: "Lifetime Premium Pass",
@@ -51,7 +51,7 @@ async function run() {
       is_active: true,
       is_popular: false,
       sort_order: 30,
-      features: ["Permanent Unlimited access", "Never pay again", "Includes all future updates & levels", "Unlimited practice drills", "Scoreboard & leaderboards"]
+      features: ["Permanent Unlimited access", "Never pay again", "Unlimited N5-N1 curriculum access", "Learn any lesson without waiting", "Unlimited practice drills", "Unlimited listening practice", "Unlimited Nihongo Navi", "Full progress and review tools", "Leaderboards, XP, badges and streaks"]
     }
   ];
 

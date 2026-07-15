@@ -2,15 +2,18 @@ import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 
 /**
- * GET /api/learn/grammar-drills?lessonId=... or ?grammarId=...
- * Returns drill items for the lesson or grammar.
+ * GET /api/learn/grammar-drills?lessonId=... or ?grammarId=... or ?sample=N
+ * Returns drill items for the lesson/grammar, or N random items across the bank for guest previews.
  */
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const lessonId = url.searchParams.get("lessonId")?.trim();
   const grammarId = url.searchParams.get("grammarId")?.trim();
-  if (!lessonId && !grammarId) {
-    return NextResponse.json({ error: "lessonId or grammarId required" }, { status: 400 });
+  const sampleParam = url.searchParams.get("sample")?.trim();
+  const sampleCount = sampleParam ? Math.min(10, Math.max(1, parseInt(sampleParam, 10) || 0)) : 0;
+
+  if (!lessonId && !grammarId && !sampleCount) {
+    return NextResponse.json({ error: "lessonId, grammarId, or sample required" }, { status: 400 });
   }
   if (!sql) return NextResponse.json({ items: [] });
   try {
@@ -21,11 +24,18 @@ export async function GET(req: Request) {
           WHERE lesson_id = ${lessonId}
           ORDER BY sort_order, id
         `
-      : await sql`
+      : grammarId
+      ? await sql`
           SELECT id, lesson_id, grammar_id, sentence_ja, correct_answers, distractors, hint, sort_order
           FROM grammar_drill_items
           WHERE grammar_id = ${grammarId}
           ORDER BY sort_order, id
+        `
+      : await sql`
+          SELECT id, lesson_id, grammar_id, sentence_ja, correct_answers, distractors, hint, sort_order
+          FROM grammar_drill_items
+          ORDER BY RANDOM()
+          LIMIT ${sampleCount}
         `;
     const items = (rows as { id: string; lesson_id: string | null; grammar_id: string | null; sentence_ja: string; correct_answers: unknown; distractors: unknown; hint: string | null; sort_order: number }[]).map((r) => ({
       id: r.id,

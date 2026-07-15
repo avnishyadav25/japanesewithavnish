@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/leaderboard-monthly-reward",
       "schedule": "0 6 1 * *"
+    },
+    {
+      "path": "/api/cron/backup-sync",
+      "schedule": "0 * * * *"
     }
   ]
 }

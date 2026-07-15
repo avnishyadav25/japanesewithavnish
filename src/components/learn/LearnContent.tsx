@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { LearnLevelTabs } from "./LearnLevelTabs";
@@ -60,6 +60,34 @@ export function LearnContent({
   useEffect(() => {
     setSearchInput(searchFromUrl);
   }, [searchFromUrl]);
+
+  // Vocabulary-only directory filters (client-side — the directory query already
+  // fetches every item for the level in one shot, so no extra round-trip is needed).
+  const [posFilter, setPosFilter] = useState("all");
+  const [learnedFilter, setLearnedFilter] = useState<"all" | "learned" | "not_learned">("all");
+  const [scriptFilter, setScriptFilter] = useState<"all" | "kana_word" | "kanji_word">("all");
+  const [reviewDueOnly, setReviewDueOnly] = useState(false);
+
+  const partsOfSpeech = useMemo(() => {
+    if (lockCategory !== "vocabulary") return [];
+    const set = new Set<string>();
+    for (const item of directoryItems) {
+      if (item.partOfSpeech) set.add(item.partOfSpeech);
+    }
+    return Array.from(set).sort();
+  }, [directoryItems, lockCategory]);
+
+  const visibleDirectoryItems = useMemo(() => {
+    if (lockCategory !== "vocabulary") return directoryItems;
+    return directoryItems.filter((item) => {
+      if (posFilter !== "all" && item.partOfSpeech !== posFilter) return false;
+      if (learnedFilter === "learned" && !item.learned) return false;
+      if (learnedFilter === "not_learned" && item.learned) return false;
+      if (scriptFilter !== "all" && item.type !== scriptFilter) return false;
+      if (reviewDueOnly && !item.reviewDue) return false;
+      return true;
+    });
+  }, [directoryItems, lockCategory, posFilter, learnedFilter, scriptFilter, reviewDueOnly]);
 
   const handleSearch = useCallback(
     (e: React.FormEvent) => {
@@ -247,7 +275,7 @@ export function LearnContent({
                     All {level.toUpperCase()} {lockCategory.charAt(0).toUpperCase() + lockCategory.slice(1)} Directory
                   </h2>
                   <p className="text-secondary text-sm mt-1">
-                    Complete directory index of all {level.toUpperCase()} {lockCategory.toLowerCase()} content ({directoryItems.length} items).
+                    Complete directory index of all {level.toUpperCase()} {lockCategory.toLowerCase()} content ({visibleDirectoryItems.length} of {directoryItems.length} items).
                   </p>
                 </div>
 
@@ -270,12 +298,75 @@ export function LearnContent({
                 </div>
               </div>
 
+              {/* Vocabulary-only filters */}
+              {lockCategory === "vocabulary" && (
+                <div className="flex flex-wrap items-center gap-3 pb-2">
+                  <select
+                    value={posFilter}
+                    onChange={(e) => setPosFilter(e.target.value)}
+                    className="text-xs border border-[var(--divider)] rounded-lg px-3 py-2 text-charcoal bg-white"
+                  >
+                    <option value="all">All parts of speech</option>
+                    {partsOfSpeech.map((pos) => (
+                      <option key={pos} value={pos}>{pos}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={scriptFilter}
+                    onChange={(e) => setScriptFilter(e.target.value as typeof scriptFilter)}
+                    className="text-xs border border-[var(--divider)] rounded-lg px-3 py-2 text-charcoal bg-white"
+                  >
+                    <option value="all">Kana &amp; Kanji words</option>
+                    <option value="kana_word">Kana-only words</option>
+                    <option value="kanji_word">Kanji words</option>
+                  </select>
+                  <select
+                    value={learnedFilter}
+                    onChange={(e) => setLearnedFilter(e.target.value as typeof learnedFilter)}
+                    className="text-xs border border-[var(--divider)] rounded-lg px-3 py-2 text-charcoal bg-white"
+                  >
+                    <option value="all">Learned &amp; not learned</option>
+                    <option value="learned">Learned</option>
+                    <option value="not_learned">Not learned</option>
+                  </select>
+                  <label className="flex items-center gap-1.5 text-xs text-charcoal cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={reviewDueOnly}
+                      onChange={(e) => setReviewDueOnly(e.target.checked)}
+                      className="w-3.5 h-3.5 accent-primary"
+                    />
+                    Review due only
+                  </label>
+                  {(posFilter !== "all" || scriptFilter !== "all" || learnedFilter !== "all" || reviewDueOnly) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPosFilter("all");
+                        setScriptFilter("all");
+                        setLearnedFilter("all");
+                        setReviewDueOnly(false);
+                      }}
+                      className="text-xs text-primary hover:underline font-medium"
+                    >
+                      Clear filters
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {lockCategory === "vocabulary" && visibleDirectoryItems.length === 0 && (
+                <div className="text-center py-10 text-secondary text-sm">
+                  No vocabulary matches these filters. Try clearing one.
+                </div>
+              )}
+
               {/* GALLERY VIEW (Default) */}
               {selectedView === "gallery" && (
                 <>
                   {lockCategory === "grammar" && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {directoryItems.map((item) => (
+                      {visibleDirectoryItems.map((item) => (
                         <div key={item.id} className="p-5 rounded-2xl border border-[#EEEEEE] bg-white flex flex-col justify-between hover:shadow-md transition">
                           <div>
                             <span className="inline-block text-[9px] font-bold text-secondary bg-base border border-[var(--divider)] px-2 py-0.5 rounded uppercase">
@@ -296,7 +387,7 @@ export function LearnContent({
 
                   {lockCategory === "vocabulary" && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {directoryItems.map((item) => (
+                      {visibleDirectoryItems.map((item) => (
                         <div key={item.id} className="p-5 rounded-2xl border border-[#EEEEEE] bg-white flex flex-col justify-between hover:shadow-md transition">
                           <div>
                             <span className="inline-block text-[9px] font-bold text-secondary bg-base border border-[var(--divider)] px-2 py-0.5 rounded uppercase">
@@ -328,7 +419,7 @@ export function LearnContent({
 
                   {lockCategory === "kanji" && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                      {directoryItems.map((item) => (
+                      {visibleDirectoryItems.map((item) => (
                         <div key={item.id} className="p-5 rounded-2xl border border-[#EEEEEE] bg-white flex flex-col justify-between hover:shadow-md transition text-center">
                           <div>
                             <span className="text-[42px] font-bold text-charcoal block mb-1">{item.title}</span>
@@ -363,7 +454,7 @@ export function LearnContent({
 
                   {lockCategory === "listening" && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {directoryItems.map((item) => (
+                      {visibleDirectoryItems.map((item) => (
                         <div key={item.id} className="p-5 rounded-2xl border border-[#EEEEEE] bg-white hover:shadow-md transition flex flex-col justify-between">
                           <div>
                             <span className="inline-block text-[9px] font-bold text-secondary bg-base border border-[var(--divider)] px-2 py-0.5 rounded uppercase">
@@ -384,7 +475,7 @@ export function LearnContent({
 
                   {lockCategory === "writing" && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                      {directoryItems.map((item) => (
+                      {visibleDirectoryItems.map((item) => (
                         <div key={item.id} className="p-5 rounded-2xl border border-[#EEEEEE] bg-white flex flex-col justify-between hover:shadow-md transition text-center">
                           <div>
                             <span className="text-3xl font-bold text-charcoal block mb-1">{item.title}</span>
@@ -435,7 +526,7 @@ export function LearnContent({
                       )}
                     </thead>
                     <tbody className="divide-y divide-[#EEEEEE]">
-                      {directoryItems.map((item) => (
+                      {visibleDirectoryItems.map((item) => (
                         <tr key={item.id} className="hover:bg-base/30 transition">
                           {lockCategory === "vocabulary" ? (
                             <>
@@ -484,7 +575,7 @@ export function LearnContent({
               {/* LIST VIEW */}
               {selectedView === "list" && (
                 <div className="space-y-3">
-                  {directoryItems.map((item) => (
+                  {visibleDirectoryItems.map((item) => (
                     <div key={item.id} className="p-4 rounded-xl border border-[#EEEEEE] bg-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:shadow-sm transition">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">

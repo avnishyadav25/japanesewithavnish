@@ -5,7 +5,7 @@ import { SubmitPaymentDetailsForm } from "./SubmitPaymentDetailsForm";
 
 const UPI_ID = process.env.NEXT_PUBLIC_UPI_ID || "japanesewithavnish@ybl";
 const WHATSAPP_NUMBER = "8960964978";
-const CONTACT_EMAIL = "learnjapanesewithavnish@gmail.com";
+const CONTACT_EMAIL = "support@japanesewithavnish.com";
 
 async function getOrderForPay(orderId: string) {
   if (!sql) return null;
