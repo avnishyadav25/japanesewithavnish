@@ -20,6 +20,7 @@ export function GrammarDrillsPreview() {
   const [loading, setLoading] = useState(true);
   const [index, setIndex] = useState(0);
   const [answered, setAnswered] = useState(0);
+  const [correctCount, setCorrectCount] = useState(0);
 
   useEffect(() => {
     fetch(`/api/learn/grammar-drills?sample=${SAMPLE_COUNT}`)
@@ -39,10 +40,19 @@ export function GrammarDrillsPreview() {
 
   if (done) {
     return (
-      <div className="rounded-bento border border-[var(--divider)] bg-white p-6 text-center space-y-3">
-        <p className="text-charcoal font-medium">
-          Nice work! Create a free account to save your score and continue practising.
+      <div className="rounded-bento border border-[var(--divider)] bg-white p-6 text-center space-y-4">
+        <p className="text-charcoal font-bold text-lg">
+          You scored {correctCount}/{items.length}
         </p>
+        <div className="text-left max-w-xs mx-auto space-y-1.5">
+          <p className="text-secondary text-sm font-medium">Create a free account to:</p>
+          <ul className="text-secondary text-sm space-y-1 list-disc list-inside">
+            <li>save your score</li>
+            <li>unlock daily lessons</li>
+            <li>review mistakes</li>
+            <li>earn XP</li>
+          </ul>
+        </div>
         <Link
           href="/login?tab=signup&redirect=/learn/grammar-drills"
           className="inline-block px-5 py-2.5 bg-primary hover:bg-primary/95 text-white text-sm font-bold rounded-xl transition"
@@ -61,8 +71,9 @@ export function GrammarDrillsPreview() {
         <GrammarDrillCard
           key={current.id}
           item={current}
-          onResponse={() => {
+          onResponse={(correct) => {
             setAnswered((a) => a + 1);
+            if (correct) setCorrectCount((c) => c + 1);
             if (index < items.length - 1) {
               setTimeout(() => setIndex((i) => i + 1), 900);
             }

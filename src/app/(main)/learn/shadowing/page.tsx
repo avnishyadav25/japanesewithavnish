@@ -31,7 +31,7 @@ export default async function LearnShadowingPage() {
         </nav>
         <h1 className="font-heading text-3xl font-bold text-charcoal mb-2">Shadowing (listen & repeat)</h1>
         <p className="text-secondary mb-6">
-          Listen to the native audio, then record yourself repeating the phrase. Play your recording to compare. Pronunciation grading will be added later.
+          Listen to the Japanese pronunciation audio, then record yourself repeating the phrase. Play your recording to compare. Pronunciation grading will be added later.
         </p>
         {session?.email ? (
           <ShadowingPageClient initialItems={items} />

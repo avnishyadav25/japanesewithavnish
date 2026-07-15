@@ -18,6 +18,46 @@ Use the context below (blogs, products, learning content, support) to give accur
 type ToolCall = { id: string; name: string; arguments: string };
 type Message = { role: string; content?: string; tool_calls?: ToolCall[] };
 
+const JAPANESE_RUN_RE = /[ぁ-んァ-ヶー一-龯]+/g;
+
+/**
+ * Best-effort "Open Related Lesson" link: pull kana/kanji runs out of the user's
+ * question and check for an exact match against a vocabulary word, grammar pattern,
+ * or kanji character. No prompt/model changes — purely a lookup against what the
+ * user already typed.
+ */
+async function findRelatedContent(
+  question: string
+): Promise<{ slug: string; contentType: string; title: string } | null> {
+  if (!sql) return null;
+  const runs = Array.from(new Set(question.match(JAPANESE_RUN_RE) || []));
+  if (runs.length === 0) return null;
+  try {
+    const vocabRows = (await sql`
+      SELECT p.slug, p.content_type, p.title FROM vocabulary v JOIN posts p ON p.id = v.post_id
+      WHERE v.word = ANY(${runs}) AND p.status = 'published' LIMIT 1
+    `) as { slug: string; content_type: string; title: string }[];
+    if (vocabRows[0]) return { slug: vocabRows[0].slug, contentType: vocabRows[0].content_type, title: vocabRows[0].title };
+
+    const grammarRows = (await sql`
+      SELECT p.slug, p.content_type, p.title FROM grammar g JOIN posts p ON p.id = g.post_id
+      WHERE g.pattern = ANY(${runs}) AND p.status = 'published' LIMIT 1
+    `) as { slug: string; content_type: string; title: string }[];
+    if (grammarRows[0]) return { slug: grammarRows[0].slug, contentType: grammarRows[0].content_type, title: grammarRows[0].title };
+
+    const kanjiRows = (await sql`
+      SELECT p.slug, p.content_type, p.title FROM kanji k JOIN posts p ON p.id = k.post_id
+      WHERE k.character = ANY(${runs}) AND p.status = 'published' LIMIT 1
+    `) as { slug: string; content_type: string; title: string }[];
+    if (kanjiRows[0]) return { slug: kanjiRows[0].slug, contentType: kanjiRows[0].content_type, title: kanjiRows[0].title };
+
+    return null;
+  } catch (e) {
+    console.warn("findRelatedContent failed:", e);
+    return null;
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const key = process.env.DEEPSEEK_API_KEY;
@@ -96,11 +136,15 @@ export async function POST(req: Request) {
             SET ask_count = ${newCount}, last_asked_at = NOW()
             WHERE id = ${row.id}
           `;
+          const related = await findRelatedContent(userMessage);
           return NextResponse.json({
             reply: row.answer,
             role: "assistant",
             from_cache: true,
             ask_count: newCount,
+            relatedSlug: related?.slug,
+            relatedContentType: related?.contentType,
+            relatedTitle: related?.title,
           });
         }
       } catch (e) {
@@ -148,7 +192,16 @@ export async function POST(req: Request) {
       }
     }
 
-    return NextResponse.json({ reply, role: "assistant", from_cache: false, ask_count: 1 });
+    const related = await findRelatedContent(userMessage);
+    return NextResponse.json({
+      reply,
+      role: "assistant",
+      from_cache: false,
+      ask_count: 1,
+      relatedSlug: related?.slug,
+      relatedContentType: related?.contentType,
+      relatedTitle: related?.title,
+    });
   } catch (e) {
     console.error("Tutor:", e);
     return NextResponse.json({ error: "Failed to get reply" }, { status: 500 });

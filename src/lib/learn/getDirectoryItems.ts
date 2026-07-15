@@ -1,4 +1,5 @@
 import { sql } from "@/lib/db";
+import { getCompleteListeningPostIds } from "@/lib/learn/listeningPublishGate";
 
 export interface DirectoryItem {
   id: string;
@@ -13,11 +14,17 @@ export interface DirectoryItem {
   onyomi?: string[] | null;
   kunyomi?: string[] | null;
   type?: string; // Used for writing (kana vs kanji)
+  partOfSpeech?: string | null; // Vocabulary only
+  learned?: boolean; // Vocabulary only, session-aware
+  reviewDue?: boolean; // Vocabulary only, session-aware
 }
+
+const KANJI_RE = /[一-龯]/;
 
 export async function getDirectoryItems(
   contentType: "grammar" | "vocabulary" | "kanji" | "listening" | "writing",
-  level: string
+  level: string,
+  sessionEmail?: string | null
 ): Promise<DirectoryItem[]> {
   if (!sql) return [];
   const normalizedLevel = level.toUpperCase();
@@ -44,13 +51,35 @@ export async function getDirectoryItems(
 
     if (contentType === "vocabulary") {
       const rows = (await sql`
-        SELECT v.id, v.word as title, v.reading as subtitle, v.romaji, v.meaning, v.notes, p.slug
+        SELECT v.id, v.word as title, v.reading as subtitle, v.romaji, v.meaning, v.notes, v.part_of_speech, p.slug
         FROM vocabulary v
         JOIN posts p ON v.post_id = p.id
         WHERE v.jlpt_level = ${normalizedLevel} OR p.jlpt_level[1] = ${normalizedLevel}
         ORDER BY coalesce(v.romaji, v.reading, v.word) ASC, v.word ASC
         LIMIT 2000
-      `) as { id: string; title: string; subtitle: string; romaji: string | null; meaning: string; notes: string | null; slug: string }[];
+      `) as { id: string; title: string; subtitle: string; romaji: string | null; meaning: string; notes: string | null; part_of_speech: string | null; slug: string }[];
+
+      // Session-aware learned / review-due status, keyed the same way the existing
+      // "Mark as learned" + review-queue feature already keys vocabulary (content_slug).
+      let learnedSlugs = new Set<string>();
+      let dueSlugs = new Set<string>();
+      if (sessionEmail) {
+        const slugs = (rows || []).map((r) => r.slug).filter(Boolean);
+        if (slugs.length > 0) {
+          const [learnedRows, dueRows] = await Promise.all([
+            sql`
+              SELECT content_slug FROM user_learning_progress
+              WHERE user_email = ${sessionEmail} AND status = 'learned' AND content_slug = ANY(${slugs})
+            `,
+            sql`
+              SELECT item_id FROM review_schedule
+              WHERE user_email = ${sessionEmail} AND item_type = 'vocab' AND next_review_at <= NOW() AND item_id = ANY(${slugs})
+            `,
+          ]);
+          learnedSlugs = new Set((learnedRows as { content_slug: string }[]).map((r) => r.content_slug));
+          dueSlugs = new Set((dueRows as { item_id: string }[]).map((r) => r.item_id));
+        }
+      }
 
       return (rows || []).map((r) => ({
         id: r.id,
@@ -59,8 +88,12 @@ export async function getDirectoryItems(
         romaji: r.romaji || "",
         meaning: r.meaning,
         notes: r.notes || "",
+        partOfSpeech: r.part_of_speech,
         slug: r.slug,
         level: normalizedLevel,
+        type: KANJI_RE.test(r.title) ? "kanji_word" : "kana_word",
+        learned: learnedSlugs.has(r.slug),
+        reviewDue: dueSlugs.has(r.slug),
       }));
     }
 
@@ -88,15 +121,20 @@ export async function getDirectoryItems(
 
     if (contentType === "listening") {
       const rows = (await sql`
-        SELECT l.id, l.title, l.audio_url, l.notes, p.slug
+        SELECT l.id, l.post_id, l.title, l.audio_url, l.notes, p.slug
         FROM listening l
         JOIN posts p ON l.post_id = p.id
         WHERE p.jlpt_level[1] = ${normalizedLevel}
         ORDER BY l.title ASC
         LIMIT 100
-      `) as { id: string; title: string; audio_url: string; notes: string | null; slug: string }[];
+      `) as { id: string; post_id: string; title: string; audio_url: string; notes: string | null; slug: string }[];
 
-      return (rows || []).map((r) => ({
+      // Only surface activities that are actually publish-ready (real audio,
+      // transcript, and enough questions) — otherwise the card is a dead end.
+      const completeIds = await getCompleteListeningPostIds();
+      const readyRows = (rows || []).filter((r) => completeIds.has(r.post_id));
+
+      return readyRows.map((r) => ({
         id: r.id,
         title: r.title,
         meaning: r.notes || "", // Description/Notes

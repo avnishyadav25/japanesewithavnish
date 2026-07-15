@@ -18,6 +18,7 @@ import { LearnStickyCta } from "@/components/learn/LearnStickyCta";
 import { BlogTableOfContents } from "@/components/blog/BlogTableOfContents";
 import { BlogNextStepCta } from "@/components/blog/BlogNextStepCta";
 import { reorderContentExamplesLast, boldContentLabels } from "@/lib/learn-content";
+import { getRelatedGrammar } from "@/lib/learn/getRelatedGrammar";
 
 type Meta = Record<string, unknown> | null;
 
@@ -109,36 +110,74 @@ export async function LearnDetailContent({
   const featureImageUrl =
     item.og_image_url ?? (typeof meta.feature_image_url === "string" ? meta.feature_image_url : null);
 
+  if (normalized === "vocabulary") {
+    // Same unification as kanji: prefer the authoritative `vocabulary` table's
+    // part_of_speech/transitivity over posts.meta.type, which can be freeform/inconsistent.
+    const vocabRows = (await sql`
+      SELECT part_of_speech, transitivity FROM vocabulary WHERE post_id = ${item.id} LIMIT 1
+    `) as { part_of_speech: string | null; transitivity: string | null }[];
+    const vocabRow = vocabRows[0];
+    if (vocabRow) {
+      if (vocabRow.part_of_speech) meta.type = vocabRow.part_of_speech;
+      if (vocabRow.transitivity) meta.transitivity = vocabRow.transitivity;
+    }
+  }
+
+  if (normalized === "kanji") {
+    // The posts.meta JSONB onyomi/kunyomi (author/AI-entered) can disagree in casing/format
+    // with the dictionary-sourced `kanji` table used by the /learn/kana/kanji grid. Prefer
+    // the authoritative table data so both surfaces show the same readings.
+    const kanjiRows = (await sql`
+      SELECT character, meaning, meaning_extended, stroke_count, onyomi, kunyomi
+      FROM kanji WHERE post_id = ${item.id} LIMIT 1
+    `) as { character: string; meaning: string | null; meaning_extended: string | null; stroke_count: number | null; onyomi: string[] | null; kunyomi: string[] | null }[];
+    const kanjiRow = kanjiRows[0];
+    if (kanjiRow) {
+      if (kanjiRow.character) meta.character = kanjiRow.character;
+      if (kanjiRow.meaning) meta.meaning = kanjiRow.meaning;
+      if (kanjiRow.meaning_extended) meta.meaning_extended = kanjiRow.meaning_extended;
+      if (kanjiRow.stroke_count != null) meta.stroke_count = kanjiRow.stroke_count;
+      if (kanjiRow.onyomi && kanjiRow.onyomi.length > 0) meta.onyomi = kanjiRow.onyomi;
+      if (kanjiRow.kunyomi && kanjiRow.kunyomi.length > 0) meta.kunyomi = kanjiRow.kunyomi;
+    }
+  }
+
   let related: LearnItemForFilter[] = [];
   let comments: { id: string; author_name: string; author_email: string; content: string; created_at: string }[] = [];
 
-  // Prefer same-level content first (a beginner page should not recommend advanced mock tests),
-  // then fall back to any level in the same content type to fill remaining slots.
-  const sameLevelRows = item.jlpt_level
-    ? await sql`
+  if (normalized === "grammar") {
+    // Curriculum-sequence-aware: next lesson in the same submodule, then prerequisite
+    // review, then same-level, then any-level fallback — rather than a generic recency sort.
+    related = await getRelatedGrammar(item.id, item.jlpt_level ?? null, slug, 6);
+  } else {
+    // Prefer same-level content first (a beginner page should not recommend advanced mock tests),
+    // then fall back to any level in the same content type to fill remaining slots.
+    const sameLevelRows = item.jlpt_level
+      ? await sql`
+          SELECT id, slug, title, content, content_type, (jlpt_level)[1] AS jlpt_level, tags, meta, status, sort_order, created_at, updated_at
+          FROM posts
+          WHERE content_type = ${normalized} AND status = 'published' AND slug != ${slug} AND (jlpt_level)[1] = ${item.jlpt_level}
+          ORDER BY sort_order ASC, created_at DESC
+          LIMIT 6
+        `
+      : [];
+
+    const sameLevelList = (Array.isArray(sameLevelRows) ? sameLevelRows : []) as LearnItemForFilter[];
+
+    if (sameLevelList.length < 6) {
+      const excludeSlugs = [slug, ...sameLevelList.map((r) => r.slug)];
+      const fallbackRows = await sql`
         SELECT id, slug, title, content, content_type, (jlpt_level)[1] AS jlpt_level, tags, meta, status, sort_order, created_at, updated_at
         FROM posts
-        WHERE content_type = ${normalized} AND status = 'published' AND slug != ${slug} AND (jlpt_level)[1] = ${item.jlpt_level}
+        WHERE content_type = ${normalized} AND status = 'published' AND slug != ALL(${excludeSlugs})
         ORDER BY sort_order ASC, created_at DESC
-        LIMIT 6
-      `
-    : [];
-
-  const sameLevelList = (Array.isArray(sameLevelRows) ? sameLevelRows : []) as LearnItemForFilter[];
-
-  if (sameLevelList.length < 6) {
-    const excludeSlugs = [slug, ...sameLevelList.map((r) => r.slug)];
-    const fallbackRows = await sql`
-      SELECT id, slug, title, content, content_type, (jlpt_level)[1] AS jlpt_level, tags, meta, status, sort_order, created_at, updated_at
-      FROM posts
-      WHERE content_type = ${normalized} AND status = 'published' AND slug != ALL(${excludeSlugs})
-      ORDER BY sort_order ASC, created_at DESC
-      LIMIT ${6 - sameLevelList.length}
-    `;
-    const fallbackList = (Array.isArray(fallbackRows) ? fallbackRows : []) as LearnItemForFilter[];
-    related = [...sameLevelList, ...fallbackList];
-  } else {
-    related = sameLevelList;
+        LIMIT ${6 - sameLevelList.length}
+      `;
+      const fallbackList = (Array.isArray(fallbackRows) ? fallbackRows : []) as LearnItemForFilter[];
+      related = [...sameLevelList, ...fallbackList];
+    } else {
+      related = sameLevelList;
+    }
   }
 
   try {

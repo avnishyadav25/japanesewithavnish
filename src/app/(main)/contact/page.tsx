@@ -66,15 +66,15 @@ export default async function ContactPage() {
         {/* Self-Service Quick Action Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-16">
           <Link
-            href="/learn/dashboard"
+            href="/billing"
             className="card p-6 text-center hover:shadow-md hover:border-primary/50 transition duration-200 flex flex-col items-center group"
           >
             <span className="text-3xl mb-3" aria-hidden>💳</span>
             <h3 className="font-heading font-bold text-charcoal text-sm group-hover:text-primary transition-colors">
-              Manage Subscription
+              Manage Premium Access
             </h3>
             <p className="text-secondary text-xs mt-1.5 leading-relaxed">
-              Cancel subscription, view billing history, or update payment method.
+              View your active pass, check expiration date, view payment history, download receipt, or purchase another pass.
             </p>
           </Link>
           <Link

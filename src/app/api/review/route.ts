@@ -35,6 +35,7 @@ export async function GET(req: Request) {
     const now = new Date().toISOString();
     const rows = await sql`
       SELECT rs.id, rs.item_type, rs.item_id, rs.next_review_at, rs.interval_days, rs.repetitions,
+             rs.snapshot_title, rs.snapshot_content,
              p.title AS post_title, p.slug AS post_slug, p.content_type AS post_content_type, p.content, p.meta,
              cl.title AS lesson_title, cl.slug AS lesson_slug, cl.content_type AS lesson_content_type
       FROM review_schedule rs
@@ -51,6 +52,8 @@ export async function GET(req: Request) {
       next_review_at: string;
       interval_days: number;
       repetitions: number;
+      snapshot_title: string | null;
+      snapshot_content: string | null;
       post_title: string | null;
       post_slug: string | null;
       post_content_type: string | null;
@@ -65,10 +68,10 @@ export async function GET(req: Request) {
       id: r.id,
       itemType: r.item_type,
       itemId: r.item_id,
-      title: r.lesson_title ?? r.post_title ?? r.item_id,
+      title: r.lesson_title ?? r.post_title ?? r.snapshot_title ?? r.item_id,
       slug: r.lesson_slug ?? r.post_slug ?? r.item_id,
       contentType: r.lesson_content_type ?? r.post_content_type,
-      content: r.content?.slice(0, 500) ?? "",
+      content: r.content?.slice(0, 500) ?? r.snapshot_content?.slice(0, 500) ?? "",
       meta: r.meta,
       nextReviewAt: r.next_review_at,
     }));
@@ -91,14 +94,34 @@ export async function POST(req: Request) {
     const body = await req.json();
     if (body.action === "add") {
       const itemType = typeof body.itemType === "string" ? body.itemType : "";
-      const itemId = typeof body.itemId === "string" ? body.itemId : "";
-      if (!itemType || !itemId) {
-        return NextResponse.json({ error: "itemType and itemId required" }, { status: 400 });
-      }
-
-      const allowedTypes = new Set(["lesson", "vocab", "kanji", "grammar", "reading", "listening"]);
+      const snapshotTypes = new Set(["tutor_note", "tutor_flashcard"]);
+      const allowedTypes = new Set(["lesson", "vocab", "kanji", "grammar", "reading", "listening", "tutor_note", "tutor_flashcard"]);
       if (!allowedTypes.has(itemType)) {
         return NextResponse.json({ error: "Unsupported review item type" }, { status: 400 });
+      }
+
+      const nextReview = new Date();
+      nextReview.setDate(nextReview.getDate() + 1);
+
+      // Ad-hoc Nihongo Navi answers have no existing post/lesson to key off of —
+      // mint a fresh id and store the Q&A text directly.
+      if (snapshotTypes.has(itemType)) {
+        const snapshotTitle = typeof body.snapshotTitle === "string" ? body.snapshotTitle.slice(0, 200) : "";
+        const snapshotContent = typeof body.snapshotContent === "string" ? body.snapshotContent.slice(0, 2000) : "";
+        if (!snapshotContent) {
+          return NextResponse.json({ error: "snapshotContent required" }, { status: 400 });
+        }
+        const itemId = crypto.randomUUID();
+        await sql`
+          INSERT INTO review_schedule (user_email, item_type, item_id, next_review_at, interval_days, snapshot_title, snapshot_content, updated_at)
+          VALUES (${session.email}, ${itemType}, ${itemId}, ${nextReview.toISOString()}, 1, ${snapshotTitle || null}, ${snapshotContent}, NOW())
+        `;
+        return NextResponse.json({ success: true, itemId });
+      }
+
+      const itemId = typeof body.itemId === "string" ? body.itemId : "";
+      if (!itemId) {
+        return NextResponse.json({ error: "itemId required" }, { status: 400 });
       }
 
       if (itemType === "lesson") {
@@ -109,9 +132,6 @@ export async function POST(req: Request) {
           return NextResponse.json({ error: "Lesson not found" }, { status: 404 });
         }
       }
-
-      const nextReview = new Date();
-      nextReview.setDate(nextReview.getDate() + 1);
 
       await sql`
         INSERT INTO review_schedule (user_email, item_type, item_id, next_review_at, interval_days, updated_at)

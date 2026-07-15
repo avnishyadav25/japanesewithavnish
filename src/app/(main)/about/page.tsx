@@ -16,23 +16,17 @@ const JOURNEY_POST_SLUGS = [
 
 const CONTENT_PROCESS_STEPS = [
   { title: "AI-assisted draft", body: "Every lesson, blog post, or vocabulary set starts as an AI-assisted first draft, built from a structured JLPT curriculum outline rather than free-form generation." },
-  { title: "Language review", body: "Drafts are checked for accuracy — correct readings, natural phrasing, and JLPT-appropriate grammar and vocabulary for the target level." },
-  { title: "Curriculum review", body: "Content is checked against where it sits in the N5→N1 progression, so nothing is introduced before its prerequisites." },
-  { title: "Human approval", body: "I personally review and approve content before it goes live — nothing is published on autopilot." },
+  { title: "Automated language and curriculum checks", body: "Drafts are checked for accuracy — correct readings, natural phrasing, JLPT-appropriate grammar and vocabulary — and cross-checked against where the content sits in the N5→N1 progression, so nothing is introduced before its prerequisites." },
+  { title: "Founder review and approval", body: "I personally review and approve content before it goes live — nothing is published on autopilot." },
+  { title: "External educator review", body: "Available on selected content and expanding over time — dedicated Japanese-language educators are being brought on to give every level a second set of expert eyes." },
   { title: "Published", body: "Once approved, it's published to the site and becomes part of the structured curriculum you're learning from." },
 ];
 
 export default async function AboutPage() {
-  let showEducatorReview = false;
   let journeyPosts: { slug: string; title: string }[] = [];
 
   if (sql) {
-    const [settingsRows, postRows] = await Promise.all([
-      sql`SELECT value FROM site_settings WHERE key = 'about_show_educator_review' LIMIT 1`,
-      sql`SELECT slug, title FROM posts WHERE status = 'published' AND slug = ANY(${JOURNEY_POST_SLUGS})`,
-    ]);
-    const raw = (settingsRows as { value: unknown }[])?.[0]?.value;
-    showEducatorReview = raw === true || raw === "true";
+    const postRows = await sql`SELECT slug, title FROM posts WHERE status = 'published' AND slug = ANY(${JOURNEY_POST_SLUGS})`;
     const rows = (postRows as { slug: string; title: string }[]) ?? [];
     journeyPosts = JOURNEY_POST_SLUGS.map((slug) => rows.find((r) => r.slug === slug)).filter(
       (p): p is { slug: string; title: string } => Boolean(p)
@@ -80,11 +74,6 @@ export default async function AboutPage() {
                 </li>
               ))}
             </ol>
-            {showEducatorReview && (
-              <p className="text-secondary text-xs mt-5 pt-4 border-t border-[var(--divider)]">
-                Reviewed by Japanese-language educators as part of the language review step above.
-              </p>
-            )}
           </div>
 
           <div className="bg-white border border-[var(--divider)] rounded-3xl p-6 sm:p-8 shadow-xs mb-8">

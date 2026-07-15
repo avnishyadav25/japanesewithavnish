@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
-import { getSession } from "@/lib/auth/session";
+import { getSession, createResetToken } from "@/lib/auth/session";
 import { createRazorpayClient, getRazorpayErrorStatus, getRazorpayKeyId, getRazorpayKeySecret } from "@/lib/razorpay";
+import { fulfillOrder } from "@/lib/order-fulfillment";
+import { sendCreatePasswordEmail } from "@/lib/email";
 
 /** Razorpay rejects payloads with emojis (400). Strip emoji/symbols for description. */
 function stripForRazorpay(s: string): string {
@@ -82,14 +84,17 @@ export async function POST(req: Request) {
       }
     }
 
-    if (amountPaise < 100) {
-      return NextResponse.json({ error: `Amount too low for payment (min ${orderCurrency === "USD" ? "$1" : "₹1"})` }, { status: 400 });
-    }
+    // A coupon can discount the order to below Razorpay's minimum chargeable amount
+    // (₹1 / $1). Rather than erroring, treat this as a fully free order: skip Razorpay
+    // entirely and grant access directly.
+    const isFreeOrder = amountPaise < 100;
 
     const keyId = getRazorpayKeyId();
     const keySecret = getRazorpayKeySecret();
-    const useRazorpay = Boolean(keyId && keySecret);
+    const useRazorpay = Boolean(keyId && keySecret) && !isFreeOrder;
 
+    // "manual" (not "razorpay") for free orders too — user_subscriptions_provider_check
+    // only allows razorpay/stripe/manual; coupon_code already records the free-order reason.
     const orderRows = await sql`
       INSERT INTO orders (user_email, user_name, user_phone, status, provider, total_amount_paise, currency, coupon_code, discount_paise, plan_id)
       VALUES (${session.email}, ${name}, ${phone}, 'pending_payment', ${useRazorpay ? "razorpay" : "manual"}, ${amountPaise}, ${orderCurrency}, ${appliedCoupon}, ${discountPaise}, ${dbPlanId})
@@ -109,6 +114,33 @@ export async function POST(req: Request) {
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
     const successUrl = `${siteUrl}/learn/dashboard?payment=success`;
+
+    if (isFreeOrder) {
+      await sql`
+        INSERT INTO payments (order_id, provider_payment_id, status)
+        VALUES (${orderId}, ${orderId}, 'created')
+      `;
+      await fulfillOrder(orderId, { providerPaymentId: orderId });
+
+      // If this session has never set a password (e.g. reached checkout via a magic
+      // link tied to a prior order/entitlement), prompt them to create one now.
+      try {
+        const authRows = await sql`SELECT 1 FROM user_auth WHERE lower(email) = ${session.email.toLowerCase()} LIMIT 1`;
+        if (Array.isArray(authRows) && authRows.length === 0) {
+          const resetToken = await createResetToken(session.email);
+          const resetLink = `${siteUrl}/reset-password?token=${resetToken}`;
+          await sendCreatePasswordEmail(session.email, resetLink);
+        }
+      } catch (e) {
+        console.error("Create-password email (free order):", e);
+      }
+
+      return NextResponse.json({
+        orderId,
+        free: true,
+        redirectUrl: successUrl,
+      });
+    }
 
     if (!useRazorpay) {
       await sql`

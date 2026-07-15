@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
 import { WritingPracticeClient } from "../WritingPracticeClient";
+import { WritingGuestDemo } from "../WritingGuestDemo";
 import { resolveWritingSet } from "@/lib/learn/writing-sets";
 
 interface Props {
@@ -50,16 +51,19 @@ export default async function WritingDetailPage({ params }: Props) {
               initialCharacters={activeSet.chars}
             />
           ) : (
-            <div className="text-center py-6">
-              <p className="text-secondary text-xs mb-4">
-                Sign in to use the interactive canvas, check stroke order matches, and track progress.
-              </p>
-              <Link
-                href={`/login?redirect=/learn/writing/${slug}`}
-                className="btn-primary inline-flex h-11 px-5 rounded-xl text-xs font-bold font-heading items-center"
-              >
-                Sign In / Sign Up
-              </Link>
+            <div className="space-y-5">
+              <WritingGuestDemo redirectSlug={slug} />
+              <div className="text-center pt-4 border-t border-[var(--divider)]">
+                <p className="text-secondary text-xs mb-3">
+                  Sign in to unlock the full {activeSet.title} set, check stroke order matches, and track progress.
+                </p>
+                <Link
+                  href={`/login?redirect=/learn/writing/${slug}`}
+                  className="btn-secondary inline-flex h-10 px-4 rounded-xl text-xs font-bold font-heading items-center"
+                >
+                  Sign In
+                </Link>
+              </div>
             </div>
           )}
         </div>

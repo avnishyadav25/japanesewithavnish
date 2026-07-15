@@ -30,10 +30,13 @@ export async function POST(req: Request) {
     }
 
     const { hash, salt } = hashPassword(newPassword);
+    // Upsert rather than UPDATE-only: a session can exist (via magic link, tied to an
+    // `orders`/`entitlements` row) without ever having a `user_auth` row, e.g. after
+    // redeeming a free-coupon order. This lets the same link create the first password.
     const result = await sql`
-      UPDATE user_auth
-      SET password_hash = ${hash}, salt = ${salt}, updated_at = NOW()
-      WHERE email = ${payload.email}
+      INSERT INTO user_auth (email, password_hash, salt, updated_at)
+      VALUES (${payload.email}, ${hash}, ${salt}, NOW())
+      ON CONFLICT (email) DO UPDATE SET password_hash = ${hash}, salt = ${salt}, updated_at = NOW()
       RETURNING email
     ` as { email: string }[];
     if (!Array.isArray(result) || result.length === 0) {

@@ -1,10 +1,17 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import Link from "next/navigation";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-type Message = { role: "user" | "assistant"; content: string; mode?: string };
+type Message = {
+  role: "user" | "assistant";
+  content: string;
+  mode?: string;
+  relatedSlug?: string | null;
+  relatedContentType?: string | null;
+  relatedTitle?: string | null;
+};
 type TutorHistoryItem = {
   question: string;
   answer_preview: string;
@@ -137,7 +144,16 @@ export default function TutorPage() {
       });
       const data = await res.json();
       if (data.reply != null) {
-        setMessages((m) => [...m, { role: "assistant", content: data.reply }]);
+        setMessages((m) => [
+          ...m,
+          {
+            role: "assistant",
+            content: data.reply,
+            relatedSlug: data.relatedSlug ?? null,
+            relatedContentType: data.relatedContentType ?? null,
+            relatedTitle: data.relatedTitle ?? null,
+          },
+        ]);
         fetchHistory();
       } else {
         setMessages((m) => [...m, { role: "assistant", content: data.error || "Sorry, I couldn’t reply." }]);
@@ -158,6 +174,50 @@ export default function TutorPage() {
     navigator.clipboard.writeText(txt);
     setMsg("✅ Copied to clipboard!");
     setTimeout(() => setMsg(""), 2000);
+  };
+
+  const handleSaveToReview = async (question: string, answer: string, asFlashcard: boolean) => {
+    if (!sessionEmail) {
+      router.push(`/login?redirect=/tutor`);
+      return;
+    }
+    try {
+      const res = await fetch("/api/review", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "add",
+          itemType: asFlashcard ? "tutor_flashcard" : "tutor_note",
+          snapshotTitle: question.slice(0, 200),
+          snapshotContent: `Q: ${question}\n\nA: ${answer}`,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      setMsg(asFlashcard ? "✅ Flashcard created!" : "✅ Saved to review queue!");
+    } catch {
+      setMsg("Couldn't save that right now. Try again.");
+    } finally {
+      setTimeout(() => setMsg(""), 2500);
+    }
+  };
+
+  const handleReportIssue = async (question: string, answer: string) => {
+    try {
+      const res = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: sessionEmail || "",
+          message: `Reported from Nihongo Navi.\nQ: ${question}\nA: ${answer}`.slice(0, 2000),
+        }),
+      });
+      if (!res.ok) throw new Error();
+      setMsg("✅ Thanks — reported to the team.");
+    } catch {
+      setMsg("Couldn't submit the report. Try again.");
+    } finally {
+      setTimeout(() => setMsg(""), 2500);
+    }
   };
 
   return (
@@ -296,9 +356,9 @@ export default function TutorPage() {
                       }`}
                     >
                       <p className="whitespace-pre-wrap">{msg.content}</p>
-                      
+
                       {!isUser && (
-                        <div className="mt-3.5 pt-2 border-t border-[var(--divider)] flex gap-3 text-[10px] font-bold text-secondary">
+                        <div className="mt-3.5 pt-2 border-t border-[var(--divider)] flex flex-wrap gap-3 text-[10px] font-bold text-secondary">
                           <button
                             onClick={() => handleCopy(msg.content)}
                             className="hover:text-primary transition-colors"
@@ -310,6 +370,32 @@ export default function TutorPage() {
                             className="hover:text-primary transition-colors"
                           >
                             Practice Again
+                          </button>
+                          <button
+                            onClick={() => handleSaveToReview(messages[i - 1]?.content ?? "", msg.content, false)}
+                            className="hover:text-primary transition-colors"
+                          >
+                            Save to Review
+                          </button>
+                          <button
+                            onClick={() => handleSaveToReview(messages[i - 1]?.content ?? "", msg.content, true)}
+                            className="hover:text-primary transition-colors"
+                          >
+                            Create Flashcard
+                          </button>
+                          {msg.relatedSlug && msg.relatedContentType && (
+                            <Link
+                              href={`/learn/${msg.relatedContentType}/${msg.relatedSlug}`}
+                              className="hover:text-primary transition-colors"
+                            >
+                              Open Related Lesson{msg.relatedTitle ? `: ${msg.relatedTitle}` : ""}
+                            </Link>
+                          )}
+                          <button
+                            onClick={() => handleReportIssue(messages[i - 1]?.content ?? "", msg.content)}
+                            className="hover:text-primary transition-colors"
+                          >
+                            Report an Issue
                           </button>
                         </div>
                       )}
@@ -367,7 +453,7 @@ export default function TutorPage() {
                   onChange={(e) => setUseContext(e.target.checked)}
                   className="h-3 w-3 text-primary rounded"
                 />
-                <label htmlFor="ctxToggle" className="cursor-pointer">Use current studied lesson context</label>
+                <label htmlFor="ctxToggle" className="cursor-pointer">Use my current lesson as context</label>
               </div>
             </div>
 
