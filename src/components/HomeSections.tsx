@@ -273,7 +273,7 @@ const WHY_FEATURES = [
   },
   {
     title: "Progressive grammar, vocab, and kanji",
-    sub: "Learn smarter, not more — spaced repetition built in.",
+    sub: "Save learning items and return to them through your review queue.",
   },
   {
     title: "AI tutor available 24/7",
@@ -290,14 +290,14 @@ export function WhyAvnishSection() {
           <div className="w-[220px] h-[280px] rounded-[20px] bg-[var(--divider)] mx-auto flex items-center justify-center overflow-hidden">
             <Image
               src="/logo.png"
-              alt="Avnish — JLPT educator"
+              alt="Avnish — Founder & Japanese learner"
               width={220}
               height={280}
               className="object-cover w-full h-full"
             />
           </div>
           <div className="mt-4 text-[17px] font-bold text-[#1A1A1A]">Avnish</div>
-          <div className="text-[13px] text-[var(--subtle)]">JLPT educator & creator</div>
+          <div className="text-[13px] text-[var(--subtle)]">Founder, platform creator & Japanese learner</div>
         </div>
 
         {/* Content */}

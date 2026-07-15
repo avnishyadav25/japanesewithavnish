@@ -83,10 +83,12 @@ export default function AdminBackupPage() {
         breadcrumb={[{ label: "Admin", href: "/admin" }, { label: "Settings", href: "/admin/settings" }, { label: "Backup" }]}
       />
       <p className="text-secondary text-sm max-w-2xl">
-        Full nightly backup of every Neon table to Supabase, Turso, and Cloudflare R2 (JSON snapshots), plus a
-        Google Sheet summary. Automated via a scheduled n8n ping to <code className="bg-base px-1 rounded">/api/cron/backup-sync</code>,
-        which processes a few tables per call and resumes until the full sync completes. Use the button below to
-        run it manually and watch progress live.
+        Full backup of every Neon table to Supabase, Turso, and Cloudflare R2 (JSON snapshots), plus a
+        Google Sheet summary. Runs automatically via an hourly Vercel Cron ping to{" "}
+        <code className="bg-base px-1 rounded">/api/cron/backup-sync</code>, which processes a few tables per
+        call and resumes until the full sync completes, then idles for the rest of the day (20h cooldown) — so a
+        fresh full backup completes roughly once every 24 hours. Use the button below to run it manually on demand
+        and watch progress live.
       </p>
 
       <AdminCard>

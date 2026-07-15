@@ -25,7 +25,7 @@ async function run() {
       is_active: true,
       is_popular: false,
       sort_order: 10,
-      features: ["30 Days Unlimited access", "Sequential lesson lock bypass", "Unlimited practice drills", "Listening generator access", "Scoreboard & leaderboards"]
+      features: ["30 Days Unlimited access", "Learn any lesson without waiting", "Unlimited practice drills", "AI-powered listening practice", "Scoreboard & leaderboards"]
     },
     {
       name: "Yearly Premium Pass",
@@ -38,7 +38,7 @@ async function run() {
       is_active: true,
       is_popular: true,
       sort_order: 20,
-      features: ["365 Days Unlimited access", "Includes all N5-N1 lessons", "Sequential lesson lock bypass", "Unlimited practice drills", "Listening generator access", "Scoreboard & leaderboards"]
+      features: ["365 Days Unlimited access", "Includes all N5-N1 lessons", "Learn any lesson without waiting", "Unlimited practice drills", "AI-powered listening practice", "Scoreboard & leaderboards"]
     },
     {
       name: "Lifetime Premium Pass",

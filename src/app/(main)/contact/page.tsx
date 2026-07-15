@@ -22,7 +22,7 @@ const FAQS = [
   },
   {
     question: "What is your refund policy?",
-    answer: "Our refund policy varies by plan: Monthly plans are non-refundable. Yearly and Lifetime passes are eligible for a full refund within the <strong>first 7 days</strong> of purchase, provided you have not completed more than 5 lessons. Legacy one-time digital bundles are non-refundable. Please read our full <a href='/policies/refunds' class='text-primary hover:underline font-semibold'>Cancellation & Refund Policy</a> for details.",
+    answer: "Our refund policy varies by plan: 30-Day Premium Passes are non-refundable once access has been granted. Yearly and Lifetime passes are eligible for a full refund within the <strong>first 7 days</strong> of purchase, provided you have not completed more than 5 lessons. Legacy one-time digital bundles are non-refundable. Please read our full <a href='/policies/refunds' class='text-primary hover:underline font-semibold'>Cancellation & Refund Policy</a> for details.",
   },
   {
     question: "How does the JLPT Placement Quiz work?",

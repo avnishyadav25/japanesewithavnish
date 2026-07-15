@@ -135,16 +135,17 @@ function formatTotalTime(minutes: number): string {
   return `~${hrs} hr${hrs !== 1 ? "s" : ""}`;
 }
 
-export function CurriculumBrowserClient() {
-  const [data, setData] = useState<CurriculumResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+export function CurriculumBrowserClient({ initialData }: { initialData: CurriculumResponse }) {
+  const [data] = useState<CurriculumResponse | null>(initialData);
 
   const searchParams = useSearchParams();
   const levelParam = searchParams ? searchParams.get("level") : null;
   const moduleParam = searchParams ? searchParams.get("module") : null;
 
   // Selected level tab
-  const [activeLevel, setActiveLevel] = useState<string>("N5");
+  const [activeLevel, setActiveLevel] = useState<string>(
+    (levelParam || initialData.currentLevelCode || "N5").toUpperCase()
+  );
   // Active module selection (defaults to first module of active level)
   const [activeModuleId, setActiveModuleId] = useState<string | null>(null);
   // Lock modal state
@@ -161,21 +162,6 @@ export function CurriculumBrowserClient() {
     }
     window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
   };
-
-  useEffect(() => {
-    fetch("/api/learn/curriculum?path=1")
-      .then((r) => r.json())
-      .then((d) => {
-        setData(d);
-        if (levelParam) {
-          setActiveLevel(levelParam.toUpperCase());
-        } else if (d.currentLevelCode) {
-          setActiveLevel(d.currentLevelCode.toUpperCase());
-        }
-      })
-      .catch(() => setData(null))
-      .finally(() => setLoading(false));
-  }, [levelParam]);
 
   const levels = (data?.levels as Level[]) || [];
   const selectedLevel = levels.find((l) => l.code.toUpperCase() === activeLevel.toUpperCase());
@@ -196,15 +182,6 @@ export function CurriculumBrowserClient() {
       setActiveModuleId(null);
     }
   }, [activeLevel, data, modules.length, moduleParam]);
-
-  if (loading) {
-    return (
-      <div className="py-12 flex flex-col items-center justify-center">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mb-4" />
-        <p className="text-secondary text-sm">Loading curriculum path...</p>
-      </div>
-    );
-  }
 
   if (!data?.levels?.length) {
     return (

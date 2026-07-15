@@ -8,6 +8,7 @@ export interface KanjiDbItem {
   id: string;
   character: string;
   meaning: string;
+  meaning_extended?: string | null;
   stroke_count: number | null;
   onyomi: string[] | null;
   kunyomi: string[] | null;
@@ -148,6 +149,13 @@ export function KanjiClient({ initialKanji }: KanjiClientProps) {
                     <span>Practice Drawing</span>
                     <span>✍️</span>
                   </button>
+
+                  {item.meaning_extended && (
+                    <details className="mt-3 text-xs text-secondary">
+                      <summary className="cursor-pointer hover:text-primary">Advanced dictionary information</summary>
+                      <p className="mt-1.5 leading-relaxed">{item.meaning_extended}</p>
+                    </details>
+                  )}
                 </div>
               ))}
             </div>

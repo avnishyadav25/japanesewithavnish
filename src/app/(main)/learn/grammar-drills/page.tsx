@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
 import { GrammarDrillsClient } from "./GrammarDrillsClient";
+import { GrammarDrillsPreview } from "./GrammarDrillsPreview";
 
 export default async function GrammarDrillsPage({
   searchParams,
@@ -24,9 +25,12 @@ export default async function GrammarDrillsPage({
         {session?.email ? (
           <GrammarDrillsClient lessonId={params.lessonId} grammarId={params.grammarId} />
         ) : (
-          <p className="text-secondary text-sm">
-            <Link href={`/login?redirect=/learn/grammar-drills`} className="text-primary hover:underline">Sign in</Link> to practice.
-          </p>
+          <div className="space-y-6">
+            <GrammarDrillsPreview />
+            <p className="text-secondary text-sm">
+              <Link href={`/login?redirect=/learn/grammar-drills`} className="text-primary hover:underline">Sign in</Link> to practice full lessons.
+            </p>
+          </div>
         )}
         <div className="mt-8 pt-6 border-t border-[var(--divider)] flex flex-wrap gap-4">
           <Link href="/learn/dashboard" className="text-primary text-sm font-medium hover:underline">← Dashboard</Link>

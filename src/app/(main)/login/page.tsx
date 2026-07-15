@@ -11,9 +11,10 @@ export default function LoginPage() {
   const redirect = searchParams?.get("redirect") || "/learn/dashboard";
   const safeRedirect = redirect.startsWith("/") ? redirect : "/learn/dashboard";
   const showForgot = searchParams?.get("forgot") === "1";
+  const showSignup = searchParams?.get("tab") === "signup";
   const verificationStatus = searchParams?.get("verification") || "";
 
-  const [tab, setTab] = useState<Tab>(showForgot ? "forgot" : "signin");
+  const [tab, setTab] = useState<Tab>(showForgot ? "forgot" : showSignup ? "signup" : "signin");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
