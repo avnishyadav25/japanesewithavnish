@@ -42,6 +42,9 @@ export function BlogPostForm({ post }: { post?: Post }) {
   const router = useRouter();
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [gateFindings, setGateFindings] = useState<{ id: string; title: string; description: string }[] | null>(null);
+  const [gateReasons, setGateReasons] = useState<string[]>([]);
+  const [overrideGate, setOverrideGate] = useState(false);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [imageModalOpen, setImageModalOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -72,6 +75,8 @@ export function BlogPostForm({ post }: { post?: Post }) {
     e.preventDefault();
     setStatus("loading");
     setErrorMessage(null);
+    setGateFindings(null);
+    setGateReasons([]);
     try {
       const res = await fetch(
         post ? `/api/admin/posts/${post.slug}` : "/api/admin/posts",
@@ -94,14 +99,23 @@ export function BlogPostForm({ post }: { post?: Post }) {
             og_image_url: form.og_image_url || null,
             image_prompt: form.image_prompt || null,
             author_name: form.author_name || null,
+            override_review_gate: overrideGate,
           }),
         }
       );
       if (!res.ok) {
         let msg = "Failed to save blog post";
         try {
-          const data = (await res.json()) as { error?: string };
+          const data = (await res.json()) as {
+            error?: string;
+            reasons?: string[];
+            findings?: { id: string; title: string; description: string }[];
+          };
           if (data?.error) msg = data.error;
+          if (res.status === 409) {
+            setGateFindings(data?.findings ?? []);
+            setGateReasons(data?.reasons ?? []);
+          }
         } catch {
           // ignore parse error
         }
@@ -310,6 +324,29 @@ export function BlogPostForm({ post }: { post?: Post }) {
               />
             </div>
           </div>
+          {gateReasons.length > 0 && (
+            <div className="bg-red-50 border border-red-200 rounded-bento p-4">
+              <p className="text-sm font-medium text-red-700 mb-2">Publish blocked:</p>
+              <ul className="text-sm text-red-700 list-disc list-inside mb-2 space-y-1">
+                {gateReasons.map((r) => (
+                  <li key={r}>{r}</li>
+                ))}
+              </ul>
+              {gateFindings && gateFindings.length > 0 && (
+                <ul className="text-sm text-red-700 list-disc list-inside mb-3 space-y-1 pl-4">
+                  {gateFindings.map((f) => (
+                    <li key={f.id} className="opacity-80">
+                      {f.title}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <label className="flex items-center gap-2 text-sm text-charcoal">
+                <input type="checkbox" checked={overrideGate} onChange={(e) => setOverrideGate(e.target.checked)} />
+                Publish anyway
+              </label>
+            </div>
+          )}
         </div>
       </AdminCard>
 

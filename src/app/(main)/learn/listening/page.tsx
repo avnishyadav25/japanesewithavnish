@@ -3,7 +3,10 @@ import { getDirectoryItems } from "@/lib/learn/getDirectoryItems";
 import { normalizeLearnLevel } from "@/lib/learn-filters";
 import { LearnContent } from "@/components/learn/LearnContent";
 
-
+export const metadata = {
+  title: "Japanese Listening Practice by JLPT Level | Japanese with Avnish",
+  description: "Practice listening comprehension with Japanese audio scenarios organized by JLPT level.",
+};
 
 export default async function LearnListeningPage({
   searchParams,

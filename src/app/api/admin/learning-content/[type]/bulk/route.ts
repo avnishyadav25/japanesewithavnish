@@ -3,6 +3,9 @@ import { getAdminSession } from "@/lib/auth/admin";
 import { sql } from "@/lib/db";
 import { LEARN_CONTENT_TYPES, type LearnContentType } from "@/lib/learn-filters";
 import { syncPostToTypeTable } from "@/lib/admin/syncTypeTables";
+import { getPublishGateStatus } from "@/lib/contentReview/publishGate";
+import { queueReReviewOnEdit } from "@/lib/contentReview/contentEditTrigger";
+import { isReviewEntityType } from "@/lib/contentReview/types";
 
 type BulkItem = {
   title?: string;
@@ -27,7 +30,7 @@ export async function POST(
       return NextResponse.json({ error: "Invalid type" }, { status: 400 });
     }
 
-    let body: { items: BulkItem[]; override?: boolean; jlpt_level?: string | null };
+    let body: { items: BulkItem[]; override?: boolean; jlpt_level?: string | null; override_review_gate?: boolean };
     const contentType = req.headers.get("content-type") ?? "";
     if (contentType.includes("multipart/form-data")) {
       const formData = await req.formData();
@@ -35,7 +38,7 @@ export async function POST(
       if (!file) return NextResponse.json({ error: "file required (JSON)" }, { status: 400 });
       const text = await file.text();
       try {
-        body = JSON.parse(text) as { items: BulkItem[]; override?: boolean; jlpt_level?: string | null };
+        body = JSON.parse(text) as { items: BulkItem[]; override?: boolean; jlpt_level?: string | null; override_review_gate?: boolean };
       } catch {
         return NextResponse.json({ error: "file must be valid JSON" }, { status: 400 });
       }
@@ -46,6 +49,7 @@ export async function POST(
       items,
       override = false,
       jlpt_level: defaultJlpt,
+      override_review_gate = false,
     } = body;
 
     if (!Array.isArray(items) || items.length === 0) {
@@ -88,6 +92,18 @@ export async function POST(
       if (existingSlugs.has(slug)) {
         if (override) {
           try {
+            if (statusVal === "published" && !override_review_gate) {
+              const existingIdRows = await sql`SELECT id FROM posts WHERE content_type = ${type} AND slug = ${slug} LIMIT 1`;
+              const postId = (existingIdRows[0] as { id: string } | undefined)?.id;
+              if (postId) {
+                const gate = await getPublishGateStatus(postId);
+                if (gate.blocked) {
+                  skipped++;
+                  errors.push(`Item ${i + 1} (${slug}): ${gate.reasons.join("; ")} — skipped (pass override_review_gate to force).`);
+                  continue;
+                }
+              }
+            }
             const rows = await sql`
               UPDATE posts SET
                 title = ${title},
@@ -102,7 +118,12 @@ export async function POST(
               WHERE content_type = ${type} AND slug = ${slug}
               RETURNING id, content_type, title, jlpt_level, meta
             ` as { id: string; content_type: string; title: string; jlpt_level: string[] | null; meta: unknown }[];
-            if (rows[0]) await syncPostToTypeTable(rows[0]);
+            if (rows[0]) {
+              await syncPostToTypeTable(rows[0]);
+              if (isReviewEntityType(rows[0].content_type)) {
+                await queueReReviewOnEdit(rows[0].content_type, rows[0].id);
+              }
+            }
             updated++;
           } catch {
             errors.push(`Item ${i + 1} (${slug}): update failed`);

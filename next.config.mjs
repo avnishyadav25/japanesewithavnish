@@ -2,6 +2,14 @@
 const nextConfig = {
   async redirects() {
     return [
+      // Canonical hostname: apex only, no www — avoids duplicate-content/split-SEO
+      // between japanesewithavnish.com and www.japanesewithavnish.com.
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "www.japanesewithavnish.com" }],
+        destination: "https://japanesewithavnish.com/:path*",
+        permanent: true,
+      },
       { source: "/jlpt/n5", destination: "/jlpt?level=n5", permanent: true },
       { source: "/jlpt/n4", destination: "/jlpt?level=n4", permanent: true },
       { source: "/jlpt/n3", destination: "/jlpt?level=n3", permanent: true },

@@ -19,10 +19,27 @@ import { BlogTableOfContents } from "@/components/blog/BlogTableOfContents";
 import { BlogNextStepCta } from "@/components/blog/BlogNextStepCta";
 import { reorderContentExamplesLast, boldContentLabels } from "@/lib/learn-content";
 import { getRelatedGrammar } from "@/lib/learn/getRelatedGrammar";
+import { ReportIssueButton } from "@/components/learn/ReportIssueButton";
+import { isReviewEntityType } from "@/lib/contentReview/types";
 
 type Meta = Record<string, unknown> | null;
 
 const BASE = process.env.NEXT_PUBLIC_SITE_URL || "https://japanesewithavnish.com";
+
+/**
+ * Next.js's App Router does not reliably decode dynamic segment params that mix literal
+ * ASCII with percent-encoded UTF-8 (e.g. slug "vocabulary-n5-%E6%B5%B4..."), so slugs
+ * containing Japanese characters arrive here still percent-encoded and never match the DB.
+ * decodeURIComponent is a no-op for already-decoded/plain-ASCII slugs, so this is safe to
+ * apply unconditionally; the try/catch guards against a literal `%` that isn't valid encoding.
+ */
+function decodeSlugSegment(raw: string): string {
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
 
 /**
  * Shared renderer for a single learning-content lesson (grammar/vocabulary/kanji/reading/
@@ -31,7 +48,7 @@ const BASE = process.env.NEXT_PUBLIC_SITE_URL || "https://japanesewithavnish.com
  */
 export async function getLearnDetailMetadata({
   typeSegment,
-  postSlug,
+  postSlug: rawPostSlug,
   canonicalBase,
 }: {
   typeSegment: string;
@@ -39,6 +56,7 @@ export async function getLearnDetailMetadata({
   canonicalBase: string;
 }) {
   const normalized = typeSegment.toLowerCase();
+  const postSlug = decodeSlugSegment(rawPostSlug);
 
   if (!LEARN_CONTENT_TYPES.includes(normalized as LearnContentType)) return {};
   if (!sql) return {};
@@ -55,7 +73,7 @@ export async function getLearnDetailMetadata({
 
   const title = p.seo_title?.trim() || p.title;
   const description = p.seo_description?.trim() || undefined;
-  const url = `${BASE}${canonicalBase}/${normalized}/${postSlug}`;
+  const url = `${BASE}${canonicalBase}/${normalized}/${encodeURIComponent(postSlug)}`;
 
   return {
     title: title ? `${title} | Japanese with Avnish` : undefined,
@@ -72,7 +90,7 @@ export async function getLearnDetailMetadata({
 
 export async function LearnDetailContent({
   typeSegment,
-  postSlug: slug,
+  postSlug: rawSlug,
   breadcrumbBase,
 }: {
   typeSegment: string;
@@ -80,6 +98,7 @@ export async function LearnDetailContent({
   breadcrumbBase: string;
 }) {
   const normalized = typeSegment.toLowerCase();
+  const slug = decodeSlugSegment(rawSlug);
 
   if (!LEARN_CONTENT_TYPES.includes(normalized as LearnContentType)) notFound();
 
@@ -291,6 +310,7 @@ export async function LearnDetailContent({
                 <h3 className="font-heading text-lg font-semibold text-charcoal mb-3">Add a comment</h3>
                 <LearnCommentForm contentType={normalized} slug={slug} />
               </div>
+              {isReviewEntityType(normalized) && <ReportIssueButton entityType={normalized} entityId={item.id} />}
             </section>
           </div>
 

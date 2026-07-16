@@ -3,13 +3,27 @@ import { slugify } from "@/lib/slugify";
 
 interface BlogArticleContentProps {
   content: string;
+  title?: string;
 }
 
-export function BlogArticleContent({ content }: BlogArticleContentProps) {
-  const isHtml = content.trim().startsWith("<");
+/** Strip a leading "# <title>" line matching the post's own title — the page
+ * template already renders the title as an H1, so a matching one inside the
+ * markdown body would show up twice. */
+function stripDuplicateH1(content: string, title?: string): string {
+  if (!title) return content;
+  const normalizedTitle = title.trim().toLowerCase();
+  return content.replace(/^\s*#[^\n]*\n+/, (match) => {
+    const heading = match.replace(/^\s*#\s*/, "").trim().toLowerCase();
+    return heading === normalizedTitle ? "" : match;
+  });
+}
+
+export function BlogArticleContent({ content, title }: BlogArticleContentProps) {
+  const deduped = stripDuplicateH1(content, title);
+  const isHtml = deduped.trim().startsWith("<");
 
   if (isHtml) {
-    return <div dangerouslySetInnerHTML={{ __html: content }} />;
+    return <div dangerouslySetInnerHTML={{ __html: deduped }} />;
   }
 
   return (
@@ -51,7 +65,7 @@ export function BlogArticleContent({ content }: BlogArticleContentProps) {
         ),
       }}
     >
-      {content}
+      {deduped}
     </ReactMarkdown>
   );
 }
