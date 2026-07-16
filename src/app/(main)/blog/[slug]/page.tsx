@@ -54,7 +54,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
   if (!postRaw) notFound();
   const post = postRaw as {
     id: string; title: string; summary?: string | null; seo_description?: string | null; content?: string | null;
-    published_at?: string | null; og_image_url?: string | null; jlpt_level?: unknown; tags?: string[];
+    published_at?: string | null; updated_at?: string | null; og_image_url?: string | null; jlpt_level?: unknown; tags?: string[];
     author_name?: string | null;
     meta?: { jlpt_verification?: { verifiedAt?: string; source?: string; reviewedBy?: string } } | null;
   };
@@ -134,7 +134,19 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
               <span className="font-semibold text-charcoal">By {authorName}</span>
               {post.published_at && (
                 <time>
+                  Published{" "}
                   {new Date(post.published_at).toLocaleDateString("en-US", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })}
+                </time>
+              )}
+              {post.published_at && post.updated_at &&
+                Math.abs(new Date(post.updated_at).getTime() - new Date(post.published_at).getTime()) > 24 * 60 * 60 * 1000 && (
+                <time>
+                  · Updated{" "}
+                  {new Date(post.updated_at).toLocaleDateString("en-US", {
                     year: "numeric",
                     month: "long",
                     day: "numeric",
@@ -185,7 +197,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
               <div className="flex-1 min-w-0">
                 <div className="prose prose-charcoal prose-lg max-w-none text-[1rem] [&_h1]:text-4xl [&_h1]:font-heading [&_h1]:font-bold [&_h2]:text-3xl [&_h2]:font-heading [&_h2]:font-bold [&_h2]:mt-8 [&_h2]:mb-3 [&_h3]:text-2xl [&_h3]:font-heading [&_h3]:font-bold [&_h3]:mt-6 [&_h3]:mb-2 [&_p]:text-[1rem] [&_p]:leading-[1.7] [&_p]:mb-4 [&_ul]:mb-4 [&_ol]:mb-4 [&_li]:text-[1rem]">
                   {contentStr ? (
-                    <BlogArticleContent content={contentStr} />
+                    <BlogArticleContent content={contentStr} title={post.title} />
                   ) : null}
                   <JLPTVerificationBox verification={post.meta?.jlpt_verification} />
                 </div>

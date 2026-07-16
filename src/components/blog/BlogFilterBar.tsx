@@ -2,13 +2,13 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useMemo } from "react";
-import { LEARN_CONTENT_TYPES, LEARN_TYPE_LABELS, type LearnContentType } from "@/lib/learn-filters";
+import { BLOG_CATEGORIES, blogCategoryToId } from "@/lib/blog-filters";
 
 const LEVEL_IDS = ["n5", "n4", "n3", "n2", "n1"] as const;
 
 const TYPE_PILLS = [
   { id: "all" as const, label: "All" },
-  ...LEARN_CONTENT_TYPES.map((t) => ({ id: t as string, label: LEARN_TYPE_LABELS[t as LearnContentType] })),
+  ...BLOG_CATEGORIES.map((c) => ({ id: blogCategoryToId(c), label: c })),
 ];
 
 const LEVEL_PILLS = LEVEL_IDS.map((id) => ({ id, label: id.toUpperCase() }));

@@ -21,6 +21,23 @@ export const ALLOWED_PROMPT_KEYS = [
   "content_gen_brand",
   "content_gen_tone_rules",
   "content_gen_lesson_style",
+  "content_review_shared_policy",
+  "content_review_metadata_taxonomy",
+  "content_review_japanese_language",
+  "content_review_level_alignment",
+  "content_review_practice_answer",
+  "content_review_content_type_specialist",
+  "content_review_final_aggregator",
+  "content_review_grammar_reviewer",
+  "content_review_vocabulary_reviewer",
+  "content_review_kanji_reviewer",
+  "content_review_reading_reviewer",
+  "content_review_listening_reviewer",
+  "content_review_writing_reviewer",
+  "content_review_kana_pronunciation_reviewer",
+  "content_review_example_sentence_reviewer",
+  "content_review_seo_reviewer",
+  "content_review_trust_claims_reviewer",
 ] as const;
 
 export type PromptKey = (typeof ALLOWED_PROMPT_KEYS)[number];
@@ -37,6 +54,26 @@ const POLICY_EXCLUDED_KEYS = new Set<string>([
   "content_gen_brand",
   "content_gen_tone_rules",
   "content_gen_lesson_style",
+  // Content Review Center prompts assemble their own shared prefix (content_review_shared_policy,
+  // an injection-defense policy) via getReviewAgentPrompt() in src/lib/contentReview/agentPrompts.ts —
+  // excluded here so the unrelated content-generation/brand-voice policy isn't also prepended.
+  "content_review_shared_policy",
+  "content_review_metadata_taxonomy",
+  "content_review_japanese_language",
+  "content_review_level_alignment",
+  "content_review_practice_answer",
+  "content_review_content_type_specialist",
+  "content_review_final_aggregator",
+  "content_review_grammar_reviewer",
+  "content_review_vocabulary_reviewer",
+  "content_review_kanji_reviewer",
+  "content_review_reading_reviewer",
+  "content_review_listening_reviewer",
+  "content_review_writing_reviewer",
+  "content_review_kana_pronunciation_reviewer",
+  "content_review_example_sentence_reviewer",
+  "content_review_seo_reviewer",
+  "content_review_trust_claims_reviewer",
 ]);
 
 async function getRawPromptContent(key: string): Promise<string | null> {

@@ -118,10 +118,23 @@ export function filterLearnItems(
   });
 }
 
+/** Strip common markdown syntax so card excerpts read as plain text, not raw markdown. */
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/^#{1,6}\s+/gm, "") // headings
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1") // links -> label text
+    .replace(/(\*\*|__)(.*?)\1/g, "$2") // bold
+    .replace(/(\*|_)(.*?)\1/g, "$2") // italic
+    .replace(/`([^`]*)`/g, "$1") // inline code
+    .replace(/^>\s?/gm, "") // blockquotes
+    .replace(/^[-*+]\s+/gm, "") // list markers
+    .replace(/^\d+\.\s+/gm, ""); // ordered list markers
+}
+
 export function getSummary(item: LearnItemForFilter, maxLen = 120): string {
   const meta = item.meta as { summary?: string } | null;
   if (meta?.summary && typeof meta.summary === "string") return meta.summary;
-  const text = (item.content || "").replace(/\s+/g, " ").trim();
+  const text = stripMarkdown(item.content || "").replace(/\s+/g, " ").trim();
   if (text.length <= maxLen) return text;
   return text.slice(0, maxLen).trim() + "…";
 }

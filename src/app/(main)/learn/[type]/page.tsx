@@ -10,6 +10,56 @@ import { getLearnCatalog } from "@/lib/learn/getLearnCatalog";
 import { getDirectoryItems } from "@/lib/learn/getDirectoryItems";
 import { getSession } from "@/lib/auth/session";
 
+const LEARN_TYPE_METADATA: Record<string, { title: string; description: string }> = {
+  grammar: {
+    title: "JLPT Grammar Lessons from N5 to N1",
+    description: "Browse structured Japanese grammar points by JLPT level, with meanings, examples, and usage notes.",
+  },
+  vocabulary: {
+    title: "JLPT Vocabulary Lists with Readings and Examples",
+    description: "Browse Japanese vocabulary by JLPT level, with kana readings, meanings, and part of speech.",
+  },
+  kanji: {
+    title: "JLPT Kanji Meanings, Readings & Writing Practice",
+    description: "Browse Kanji characters by JLPT level with on-yomi/kun-yomi readings, meanings, and stroke-order practice.",
+  },
+  reading: {
+    title: "Japanese Reading Practice from N5 to N1",
+    description: "Read real Japanese passages by JLPT level with comprehension questions and vocabulary notes.",
+  },
+  writing: {
+    title: "Hiragana, Katakana & Kanji Writing Practice",
+    description: "Practice writing hiragana, katakana, and kanji with guided stroke-order canvases.",
+  },
+  listening: {
+    title: "Japanese Listening Practice by JLPT Level",
+    description: "Practice listening comprehension with Japanese audio scenarios organized by JLPT level.",
+  },
+  sounds: {
+    title: "Japanese Pronunciation & Sounds Practice",
+    description: "Practice Japanese pronunciation and sound recognition by JLPT level.",
+  },
+  study_guide: {
+    title: "JLPT Study Guides and Practice Exercises",
+    description: "Structured JLPT study guides and practice exercises by level.",
+  },
+  practice_test: {
+    title: "JLPT Practice Tests",
+    description: "JLPT-style practice tests to check your readiness at each level.",
+  },
+};
+
+export async function generateMetadata({ params }: { params: Promise<{ type: string }> }) {
+  const { type } = await params;
+  const meta = LEARN_TYPE_METADATA[type.toLowerCase()];
+  if (!meta) return {};
+  return {
+    title: `${meta.title} | Japanese with Avnish`,
+    description: meta.description,
+    openGraph: { title: meta.title, description: meta.description, type: "website" },
+  };
+}
+
 export const dynamic = "force-dynamic";
 
 export default async function LearnTypePage({

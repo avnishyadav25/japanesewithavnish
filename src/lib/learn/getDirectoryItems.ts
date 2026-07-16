@@ -35,7 +35,7 @@ export async function getDirectoryItems(
         SELECT g.id, g.pattern as title, g.notes, p.title as post_title, p.slug
         FROM grammar g
         JOIN posts p ON g.post_id = p.id
-        WHERE p.jlpt_level[1] = ${normalizedLevel}
+        WHERE p.jlpt_level[1] = ${normalizedLevel} AND p.status = 'published'
         ORDER BY g.pattern ASC
         LIMIT 200
       `) as { id: string; title: string | null; notes: string | null; post_title: string; slug: string }[];
@@ -54,7 +54,7 @@ export async function getDirectoryItems(
         SELECT v.id, v.word as title, v.reading as subtitle, v.romaji, v.meaning, v.notes, v.part_of_speech, p.slug
         FROM vocabulary v
         JOIN posts p ON v.post_id = p.id
-        WHERE v.jlpt_level = ${normalizedLevel} OR p.jlpt_level[1] = ${normalizedLevel}
+        WHERE (v.jlpt_level = ${normalizedLevel} OR p.jlpt_level[1] = ${normalizedLevel}) AND p.status = 'published'
         ORDER BY coalesce(v.romaji, v.reading, v.word) ASC, v.word ASC
         LIMIT 2000
       `) as { id: string; title: string; subtitle: string; romaji: string | null; meaning: string; notes: string | null; part_of_speech: string | null; slug: string }[];
@@ -102,7 +102,7 @@ export async function getDirectoryItems(
         SELECT k.id, k.character as title, k.meaning, k.stroke_count, k.onyomi, k.kunyomi, p.slug
         FROM kanji k
         JOIN posts p ON k.post_id = p.id
-        WHERE p.jlpt_level[1] = ${normalizedLevel}
+        WHERE p.jlpt_level[1] = ${normalizedLevel} AND p.status = 'published'
         ORDER BY k.character ASC
         LIMIT 200
       `) as { id: string; title: string; meaning: string | null; stroke_count: number | null; onyomi: string[] | null; kunyomi: string[] | null; slug: string }[];
@@ -124,7 +124,7 @@ export async function getDirectoryItems(
         SELECT l.id, l.post_id, l.title, l.audio_url, l.notes, p.slug
         FROM listening l
         JOIN posts p ON l.post_id = p.id
-        WHERE p.jlpt_level[1] = ${normalizedLevel}
+        WHERE p.jlpt_level[1] = ${normalizedLevel} AND p.status = 'published'
         ORDER BY l.title ASC
         LIMIT 100
       `) as { id: string; post_id: string; title: string; audio_url: string; notes: string | null; slug: string }[];
@@ -159,7 +159,7 @@ export async function getDirectoryItems(
           SELECT k.id, k.character as title, k.meaning, k.stroke_count, p.slug
           FROM kanji k
           JOIN posts p ON k.post_id = p.id
-          WHERE p.jlpt_level[1] = 'N5'
+          WHERE p.jlpt_level[1] = 'N5' AND p.status = 'published'
           ORDER BY k.character ASC
         `) as { id: string; title: string; meaning: string | null; stroke_count: number | null; slug: string }[];
 
@@ -189,7 +189,7 @@ export async function getDirectoryItems(
           SELECT k.id, k.character as title, k.meaning, k.stroke_count, p.slug
           FROM kanji k
           JOIN posts p ON k.post_id = p.id
-          WHERE p.jlpt_level[1] = ${normalizedLevel}
+          WHERE p.jlpt_level[1] = ${normalizedLevel} AND p.status = 'published'
           ORDER BY k.character ASC
         `) as { id: string; title: string; meaning: string | null; stroke_count: number | null; slug: string }[];
 

@@ -3,6 +3,9 @@ import { getAdminSession } from "@/lib/auth/admin";
 import { sql } from "@/lib/db";
 import { LEARN_CONTENT_TYPES, type LearnContentType } from "@/lib/learn-filters";
 import { syncPostToTypeTable } from "@/lib/admin/syncTypeTables";
+import { getPublishGateStatus } from "@/lib/contentReview/publishGate";
+import { queueReReviewOnEdit } from "@/lib/contentReview/contentEditTrigger";
+import { isReviewEntityType } from "@/lib/contentReview/types";
 
 export async function GET(
   _req: Request,
@@ -46,7 +49,7 @@ export async function PUT(
     }
 
     const body = await req.json();
-    const { slug, title, content, jlpt_level, tags, status, sort_order, meta } = body;
+    const { slug, title, content, jlpt_level, tags, status, sort_order, meta, override_review_gate } = body;
 
     if (!slug || !title) {
       return NextResponse.json({ error: "slug and title required" }, { status: 400 });
@@ -55,6 +58,20 @@ export async function PUT(
     if (!sql) return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
 
     const statusVal = status === "published" ? "published" : "draft";
+
+    if (statusVal === "published" && !override_review_gate) {
+      const existingRows = await sql`SELECT id FROM posts WHERE content_type = ${type} AND slug = ${oldSlug} LIMIT 1`;
+      const postId = (existingRows[0] as { id: string } | undefined)?.id;
+      if (postId) {
+        const gate = await getPublishGateStatus(postId);
+        if (gate.blocked) {
+          return NextResponse.json(
+            { error: `Publish blocked: ${gate.reasons.join("; ")}.`, reasons: gate.reasons, findings: gate.openCriticalFindings },
+            { status: 409 }
+          );
+        }
+      }
+    }
     const sortOrderVal = typeof sort_order === "number" ? sort_order : 0;
     const metaVal =
       meta != null && typeof meta === "object" && !Array.isArray(meta)
@@ -84,6 +101,9 @@ export async function PUT(
       const updated = updatedRows[0];
       if (updated) {
         await syncPostToTypeTable(updated);
+        if (isReviewEntityType(updated.content_type)) {
+          await queueReReviewOnEdit(updated.content_type, updated.id);
+        }
       }
 
       return NextResponse.json({ success: true });

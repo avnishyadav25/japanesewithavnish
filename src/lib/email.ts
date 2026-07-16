@@ -317,6 +317,30 @@ export async function sendFeedbackNotification(
   return sendMail(to, `New feedback from ${escapedName} — Japanese with Avnish`, html);
 }
 
+/** Gap-fix phase 22: notifies a learner when the content issue they reported (via the
+ * report-issue widget, learner_content_reports) has been marked resolved by an admin —
+ * closing the loop so a learner who took the time to report something knows it was acted on. */
+export async function sendLearnerReportResolvedEmail(
+  email: string,
+  contentTitle: string,
+  contentUrl: string | null,
+  reportMessage: string
+): Promise<{ id?: string } | null> {
+  const escapedMessage = escapeHtml(reportMessage).replace(/\n/g, "<br>");
+  const linkHtml = contentUrl
+    ? `<p style="margin:0 0 20px;"><a href="${contentUrl}" style="background:#D0021B;color:white;padding:12px 26px;text-decoration:none;border-radius:8px;display:inline-block;font-weight:600;">View the updated content</a></p>`
+    : "";
+  const content = `
+    <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">Hi there,</p>
+    <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">Thanks for reporting an issue on "<strong>${escapeHtml(contentTitle)}</strong>" — we've reviewed it and marked it resolved.</p>
+    <p style="font-size:14px;line-height:1.6;margin:0 0 16px;color:#555;">Your report: "${escapedMessage}"</p>
+    ${linkHtml}
+    <p style="font-size:14px;line-height:1.6;margin:0;color:#555;">Thank you for helping us keep the content accurate.</p>
+    <p style="font-size:14px;line-height:1.6;margin:16px 0 0;">— Japanese with Avnish</p>
+  `;
+  return sendMail(email, `Your reported issue on "${contentTitle}" has been resolved — Japanese with Avnish`, emailWrapper(content, ""));
+}
+
 /** Generic admin-to-user reply, used by the Contact/Comments/Feedback admin reply flows. */
 export async function sendAdminReplyEmail(
   to: string,

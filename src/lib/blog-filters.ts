@@ -20,13 +20,33 @@ function matchesLevel(postLevels: string[], filterLevel: string): boolean {
 function matchesType(
   postTags: string[],
   filterType: string,
-  contentType: string | null | undefined
+  contentType: string | null | undefined,
+  blogCategory: string | null | undefined
 ): boolean {
   const selected = parseTypes(filterType);
   if (selected.length === 0) return true;
+  const categoryNorm = (blogCategory ?? "").toLowerCase().replace(/\s+/g, "_").replace(/&/g, "and");
+  if (categoryNorm && selected.includes(categoryNorm)) return true;
   const contentTypeNorm = (contentType ?? "").toLowerCase();
   if (contentTypeNorm && selected.includes(contentTypeNorm)) return true;
   return postTags.some((t) => selected.some((s) => (t ?? "").toLowerCase().includes(s === "vocabulary" ? "vocab" : s)));
+}
+
+export const BLOG_CATEGORIES = [
+  "Learning Journey",
+  "JLPT Guides",
+  "Study Plans",
+  "Japanese Grammar",
+  "Kanji Learning",
+  "Vocabulary Learning",
+  "Listening & Reading",
+  "Books & Resources",
+  "Japanese Culture",
+  "Platform Updates",
+] as const;
+
+export function blogCategoryToId(category: string): string {
+  return category.toLowerCase().replace(/\s+/g, "_").replace(/&/g, "and");
 }
 
 function matchesSearch(
@@ -57,6 +77,7 @@ export type PostForFilter = {
   og_image_url?: string | null;
   seo_description?: string | null;
   content_type?: string | null;
+  blog_category?: string | null;
 };
 
 export function isLearnContent(contentType: string | null | undefined): boolean {
@@ -75,7 +96,7 @@ export function filterPosts(
     const tags = (p.tags || []) as string[];
     return (
       matchesLevel(postLevels, level) &&
-      matchesType(tags, type, p.content_type) &&
+      matchesType(tags, type, p.content_type, p.blog_category) &&
       matchesSearch(p.title || "", p.summary || "", tags, search)
     );
   });

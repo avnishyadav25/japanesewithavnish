@@ -15,6 +15,10 @@
     {
       "path": "/api/cron/backup-sync",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/content-review-worker",
+      "schedule": "*/10 * * * *"
     }
   ]
 }

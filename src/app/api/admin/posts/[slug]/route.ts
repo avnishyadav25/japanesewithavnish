@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth/admin";
 import { sql } from "@/lib/db";
+import { getPublishGateStatus } from "@/lib/contentReview/publishGate";
+import { queueReReviewOnEdit } from "@/lib/contentReview/contentEditTrigger";
+import { isReviewEntityType } from "@/lib/contentReview/types";
 
 export async function PUT(
   req: Request,
@@ -25,6 +28,7 @@ export async function PUT(
       og_image_url,
       image_prompt,
       author_name,
+      override_review_gate,
     } = body;
 
     if (!slug || !title) {
@@ -36,8 +40,22 @@ export async function PUT(
     const statusVal = status === "published" ? "published" : "draft";
     const publishedAtVal = statusVal === "published" ? new Date().toISOString() : null;
 
+    if (statusVal === "published" && !override_review_gate) {
+      const existingRows = await sql`SELECT id FROM posts WHERE slug = ${oldSlug} LIMIT 1`;
+      const postId = (existingRows[0] as { id: string } | undefined)?.id;
+      if (postId) {
+        const gate = await getPublishGateStatus(postId);
+        if (gate.blocked) {
+          return NextResponse.json(
+            { error: `Publish blocked: ${gate.reasons.join("; ")}.`, reasons: gate.reasons, findings: gate.openCriticalFindings },
+            { status: 409 }
+          );
+        }
+      }
+    }
+
     try {
-      await sql`
+      const updatedRows = await sql`
         UPDATE posts SET
           slug = ${String(slug).trim()},
           title = ${String(title).trim()},
@@ -54,7 +72,14 @@ export async function PUT(
           author_name = ${author_name || null},
           updated_at = ${new Date().toISOString()}
         WHERE slug = ${oldSlug}
-      `;
+        RETURNING id, content_type
+      ` as { id: string; content_type: string }[];
+
+      const updated = updatedRows[0];
+      if (updated && isReviewEntityType(updated.content_type)) {
+        await queueReReviewOnEdit(updated.content_type, updated.id);
+      }
+
       return NextResponse.json({ success: true });
     } catch (err: unknown) {
       const e = err as { code?: string };

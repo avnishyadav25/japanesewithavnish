@@ -74,6 +74,21 @@ const navGroups = [
     ]
   },
   {
+    label: "Content Review",
+    items: [
+      { href: "/admin/review", label: "Dashboard" },
+      { href: "/admin/review/queue", label: "Review Queue" },
+      { href: "/admin/review/jobs", label: "Review Jobs" },
+      { href: "/admin/review/runs", label: "AI Review Runs" },
+      { href: "/admin/review/duplicates", label: "Duplicate Detector" },
+      { href: "/admin/review/learner-reports", label: "Learner Reports" },
+      { href: "/admin/review/missing-content", label: "Missing Content" },
+      { href: "/admin/review/policies", label: "Review Policies" },
+      { href: "/admin/review/agents", label: "Agent Configuration" },
+      { href: "/admin/review/audit-log", label: "Audit Log" }
+    ]
+  },
+  {
     label: "Gamification",
     items: [
       { href: "/admin/gamification/xp-rules", label: "XP Rules" },
@@ -225,7 +240,7 @@ export function AdminSidebar() {
         .catch(() => {});
     }
     fetchCounts();
-    const interval = setInterval(fetchCounts, 60000);
+    const interval = setInterval(fetchCounts, 600000);
     return () => {
       cancelled = true;
       clearInterval(interval);

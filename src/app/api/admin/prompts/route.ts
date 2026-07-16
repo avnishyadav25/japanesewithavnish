@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth/admin";
 import { sql } from "@/lib/db";
 import { isAllowedPromptKey } from "@/lib/ai/load-prompts";
+import { findAgentKeyByPromptKey, recordAgentVersion } from "@/lib/contentReview/agentVersions";
 
 type PromptRow = { key: string; content: string; updated_at: string };
 
@@ -47,6 +48,12 @@ export async function PATCH(req: Request) {
     if (!result?.length) {
       return NextResponse.json({ error: "Prompt not found" }, { status: 404 });
     }
+
+    // Gap-fix phase 18: if this prompt is one specific agent's own prompt_key (not the
+    // cross-cutting content_review_shared_policy prefix), snapshot that agent's version.
+    const agentKey = await findAgentKeyByPromptKey(trimmedKey);
+    if (agentKey) await recordAgentVersion(agentKey, admin.email);
+
     return NextResponse.json({ prompt: result[0] });
   } catch (e) {
     console.error("Admin prompts PATCH:", e);
