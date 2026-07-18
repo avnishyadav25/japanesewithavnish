@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth/admin";
 import { sql } from "@/lib/db";
-import { validateBlockData, type BlockType } from "@/lib/curriculum/blockTypes";
+import { validateBlockData, type BlockType } from "@/lib/blocks/blockTypes";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string; blockId: string }> }) {
   const admin = await getAdminSession();
@@ -23,6 +23,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const blockDataVal = body.block_data !== undefined ? JSON.stringify(body.block_data) : null;
   const sortOrderVal = typeof body.sort_order === "number" ? body.sort_order : null;
+  const BLOCK_ACCESS_TIERS = ["public", "free_account", "daily_unlocked", "premium", "preview"];
+  const blockAccessVal = BLOCK_ACCESS_TIERS.includes(body.block_access) ? body.block_access : null;
   // Saving validated block_data with no explicit status auto-publishes it — there's no
   // separate publish action in the admin UI, so a successful content save is the publish signal.
   const statusVal =
@@ -39,12 +41,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       block_data = COALESCE(${blockDataVal}::jsonb, block_data),
       sort_order = COALESCE(${sortOrderVal}, sort_order),
       status = COALESCE(${statusVal}, status),
+      block_access = COALESCE(${blockAccessVal}, block_access),
       review_status = CASE WHEN ${statusVal} = 'published' AND review_status = 'pending' THEN 'approved' ELSE review_status END,
       reviewed_by = CASE WHEN ${statusVal} = 'published' AND review_status = 'pending' THEN ${admin.email} ELSE reviewed_by END,
       reviewed_at = CASE WHEN ${statusVal} = 'published' AND review_status = 'pending' THEN NOW() ELSE reviewed_at END,
       updated_at = NOW()
     WHERE id = ${blockId} AND lesson_id = ${lessonId}
-    RETURNING id, lesson_id, block_type, block_data, sort_order, status
+    RETURNING id, lesson_id, block_type, block_data, sort_order, status, block_access
   `;
   return NextResponse.json((rows as unknown[])[0]);
 }

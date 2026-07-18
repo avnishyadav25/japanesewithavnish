@@ -91,7 +91,7 @@ export function LearnLessonCard({ item, variant = "card" }: LearnLessonCardProps
     return (
       <Link
         href={`/learn/grammar/${item.slug}`}
-        className="card bg-white border border-[var(--divider)] p-5 rounded-2xl flex flex-col justify-between hover:shadow-md transition hover:no-underline group"
+        className="card bg-white border border-[var(--divider)] p-5 rounded-2xl overflow-hidden flex flex-col justify-between hover:shadow-md hover:border-primary transition-all duration-300 hover:no-underline group"
       >
         <div>
           <span className="inline-block text-[10px] font-bold text-primary bg-[#FFF7F7] border border-primary/15 px-2.5 py-0.5 rounded-full uppercase">
@@ -116,7 +116,7 @@ export function LearnLessonCard({ item, variant = "card" }: LearnLessonCardProps
     return (
       <Link
         href={`/learn/vocabulary/${item.slug}`}
-        className="card bg-white border border-[var(--divider)] p-5 rounded-2xl flex flex-col justify-between hover:shadow-md transition hover:no-underline group"
+        className="card bg-white border border-[var(--divider)] p-5 rounded-2xl overflow-hidden flex flex-col justify-between hover:shadow-md hover:border-primary transition-all duration-300 hover:no-underline group"
       >
         <div>
           <span className="inline-block text-[10px] font-bold text-primary bg-[#FFF7F7] border border-primary/15 px-2.5 py-0.5 rounded-full uppercase">
@@ -146,7 +146,7 @@ export function LearnLessonCard({ item, variant = "card" }: LearnLessonCardProps
     return (
       <Link
         href={`/learn/kanji/${item.slug}`}
-        className="card bg-white border border-[var(--divider)] p-5 rounded-2xl flex flex-col justify-between hover:shadow-md transition hover:no-underline text-center group"
+        className="card bg-white border border-[var(--divider)] p-5 rounded-2xl overflow-hidden flex flex-col justify-between hover:shadow-md hover:border-primary transition-all duration-300 hover:no-underline text-center group"
       >
         <div>
           {featureImageUrl ? (
@@ -182,7 +182,7 @@ export function LearnLessonCard({ item, variant = "card" }: LearnLessonCardProps
     return (
       <Link
         href={`/learn/listening/${item.slug}`}
-        className="card bg-white border border-[var(--divider)] p-5 rounded-2xl flex flex-col justify-between hover:shadow-md transition hover:no-underline group"
+        className="card bg-white border border-[var(--divider)] p-5 rounded-2xl overflow-hidden flex flex-col justify-between hover:shadow-md hover:border-primary transition-all duration-300 hover:no-underline group"
       >
         <div>
           <span className="inline-block text-[10px] font-bold text-primary bg-[#FFF7F7] border border-primary/15 px-2.5 py-0.5 rounded-full uppercase">
@@ -207,7 +207,7 @@ export function LearnLessonCard({ item, variant = "card" }: LearnLessonCardProps
     return (
       <Link
         href={`/learn/writing/${item.slug || "hiragana-a-row"}`}
-        className="card bg-white border border-[var(--divider)] p-5 rounded-2xl flex flex-col justify-between hover:shadow-md transition hover:no-underline group text-left"
+        className="card bg-white border border-[var(--divider)] p-5 rounded-2xl overflow-hidden flex flex-col justify-between hover:shadow-md hover:border-primary transition-all duration-300 hover:no-underline group text-left"
       >
         <div>
           <span className="inline-block text-[10px] font-bold text-primary bg-[#FFF7F7] border border-primary/15 px-2.5 py-0.5 rounded-full uppercase">
@@ -231,7 +231,7 @@ export function LearnLessonCard({ item, variant = "card" }: LearnLessonCardProps
   return (
     <Link
       href={getLearnHref(item.content_type, item.slug)}
-      className="card block overflow-hidden p-0 hover:shadow-md transition hover:no-underline group bg-white border border-[var(--divider)] rounded-2xl"
+      className="card block overflow-hidden p-0 hover:shadow-md hover:border-primary transition-all duration-300 hover:no-underline group bg-white border border-[var(--divider)] rounded-2xl"
     >
       <div className="aspect-video w-full bg-[var(--divider)]/20 relative overflow-hidden">
         {featureImageUrl ? (

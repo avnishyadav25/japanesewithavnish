@@ -7,9 +7,25 @@ type VocabLink = { id: string; vocabulary_id: string; word: string | null; readi
 type GrammarLink = { id: string; grammar_id: string; pattern: string | null; structure: string | null; slug: string };
 type KanjiLink = { id: string; kanji_id: string; character: string | null; meaning: string | null; slug: string };
 type KanaLink = { id: string; kana_id: string; character: string; type: string; romaji: string; row_label: string | null };
+type ReadingLink = { id: string; reading_id: string; title: string | null; level: string | null; slug: string };
+type ListeningLink = { id: string; listening_id: string; title: string | null; level: string | null; slug: string };
+type WritingLink = { id: string; writing_id: string; title: string | null; level: string | null; slug: string };
+type PracticeTestLink = { id: string; practice_test_id: string; title: string | null; slug: string };
 type ExampleRow = { id: string; sentence_ja: string; sentence_romaji: string | null; sentence_en: string; notes: string | null };
 
 type VocabGenerated = { word: string; reading: string; meaning: string };
+
+type LinkType = "vocabulary" | "grammar" | "kanji" | "kana" | "reading" | "listening" | "writing" | "practice_test";
+const LINK_KEY: Record<LinkType, string> = {
+  vocabulary: "vocabulary_id",
+  grammar: "grammar_id",
+  kanji: "kanji_id",
+  kana: "kana_id",
+  reading: "reading_id",
+  listening: "listening_id",
+  writing: "writing_id",
+  practice_test: "practice_test_id",
+};
 
 export function LessonLinksSection({ lessonId, lessonTitle = "", levelCode = "N5" }: { lessonId: string; lessonTitle?: string; levelCode?: string }) {
   const [content, setContent] = useState<ContentLink[]>([]);
@@ -17,9 +33,13 @@ export function LessonLinksSection({ lessonId, lessonTitle = "", levelCode = "N5
   const [grammar, setGrammar] = useState<GrammarLink[]>([]);
   const [kanji, setKanji] = useState<KanjiLink[]>([]);
   const [kana, setKana] = useState<KanaLink[]>([]);
+  const [reading, setReading] = useState<ReadingLink[]>([]);
+  const [listening, setListening] = useState<ListeningLink[]>([]);
+  const [writing, setWriting] = useState<WritingLink[]>([]);
+  const [practiceTest, setPracticeTest] = useState<PracticeTestLink[]>([]);
   const [examples, setExamples] = useState<ExampleRow[]>([]);
   const [newSlug, setNewSlug] = useState("");
-  const [pickerType, setPickerType] = useState<"vocab" | "grammar" | "kanji" | "kana" | null>(null);
+  const [pickerType, setPickerType] = useState<"vocab" | "grammar" | "kanji" | "kana" | "reading" | "listening" | "writing" | "practice_test" | null>(null);
   const [kanaPickerType, setKanaPickerType] = useState<"hiragana" | "katakana">("hiragana");
   const [pickerQ, setPickerQ] = useState("");
   const [pickerOptions, setPickerOptions] = useState<{ id: string; label: string }[]>([]);
@@ -36,12 +56,16 @@ export function LessonLinksSection({ lessonId, lessonTitle = "", levelCode = "N5
 
   const load = useCallback(async () => {
     const base = "/api/admin";
-    const [c, v, g, k, ka, ex] = await Promise.all([
+    const [c, v, g, k, ka, rd, ls, wr, pt, ex] = await Promise.all([
       fetch(`${base}/curriculum/lessons/${lessonId}/content`).then((r) => r.json()),
       fetch(`${base}/curriculum/lessons/${lessonId}/vocabulary`).then((r) => r.json()),
       fetch(`${base}/curriculum/lessons/${lessonId}/grammar`).then((r) => r.json()),
       fetch(`${base}/curriculum/lessons/${lessonId}/kanji`).then((r) => r.json()),
       fetch(`${base}/curriculum/lessons/${lessonId}/kana`).then((r) => r.json()),
+      fetch(`${base}/curriculum/lessons/${lessonId}/reading`).then((r) => r.json()),
+      fetch(`${base}/curriculum/lessons/${lessonId}/listening`).then((r) => r.json()),
+      fetch(`${base}/curriculum/lessons/${lessonId}/writing`).then((r) => r.json()),
+      fetch(`${base}/curriculum/lessons/${lessonId}/practice_test`).then((r) => r.json()),
       fetch(`${base}/examples?lessonId=${lessonId}`).then((r) => r.json()),
     ]);
     setContent(Array.isArray(c) ? c : []);
@@ -49,6 +73,10 @@ export function LessonLinksSection({ lessonId, lessonTitle = "", levelCode = "N5
     setGrammar(Array.isArray(g) ? g : []);
     setKanji(Array.isArray(k) ? k : []);
     setKana(Array.isArray(ka) ? ka : []);
+    setReading(Array.isArray(rd) ? rd : []);
+    setListening(Array.isArray(ls) ? ls : []);
+    setWriting(Array.isArray(wr) ? wr : []);
+    setPracticeTest(Array.isArray(pt) ? pt : []);
     setExamples(Array.isArray(ex) ? ex : []);
   }, [lessonId]);
 
@@ -147,8 +175,8 @@ export function LessonLinksSection({ lessonId, lessonTitle = "", levelCode = "N5
     }
   }
 
-  async function addLink(type: "vocabulary" | "grammar" | "kanji" | "kana", id: string) {
-    const key = type === "vocabulary" ? "vocabulary_id" : type === "grammar" ? "grammar_id" : type === "kanji" ? "kanji_id" : "kana_id";
+  async function addLink(type: LinkType, id: string) {
+    const key = LINK_KEY[type];
     const res = await fetch(`/api/admin/curriculum/lessons/${lessonId}/${type}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -161,7 +189,7 @@ export function LessonLinksSection({ lessonId, lessonTitle = "", levelCode = "N5
     }
   }
 
-  async function removeLink(type: "vocabulary" | "grammar" | "kanji" | "kana", linkId: string) {
+  async function removeLink(type: LinkType, linkId: string) {
     await fetch(`/api/admin/curriculum/lessons/${lessonId}/${type}/${linkId}`, { method: "DELETE" });
     load();
   }
@@ -351,7 +379,7 @@ export function LessonLinksSection({ lessonId, lessonTitle = "", levelCode = "N5
         <ul className="space-y-1 mb-2">
           {vocab.map((v) => (
             <li key={v.id} className="flex items-center gap-2 text-sm">
-              <a href={`/admin/blogs/${v.slug}/edit`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+              <a href={`/admin/learn/vocabulary/${v.slug}/edit`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                 {v.word ?? v.reading ?? v.vocabulary_id.slice(0, 8)}
               </a>
               {v.meaning && <span className="text-secondary">— {v.meaning}</span>}
@@ -391,7 +419,7 @@ export function LessonLinksSection({ lessonId, lessonTitle = "", levelCode = "N5
         <ul className="space-y-1 mb-2">
           {grammar.map((g) => (
             <li key={g.id} className="flex items-center gap-2 text-sm">
-              <a href={`/admin/blogs/${g.slug}/edit`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+              <a href={`/admin/learn/grammar/${g.slug}/edit`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                 {g.pattern ?? g.structure ?? g.grammar_id.slice(0, 8)}
               </a>
               <button type="button" onClick={() => removeLink("grammar", g.id)} className="text-red-600 hover:underline text-xs">Remove</button>
@@ -418,7 +446,7 @@ export function LessonLinksSection({ lessonId, lessonTitle = "", levelCode = "N5
         <ul className="space-y-1 mb-2">
           {kanji.map((k) => (
             <li key={k.id} className="flex items-center gap-2 text-sm">
-              <a href={`/admin/blogs/${k.slug}/edit`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+              <a href={`/admin/learn/kanji/${k.slug}/edit`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                 {k.character ?? k.kanji_id.slice(0, 8)}
               </a>
               {k.meaning && <span className="text-secondary">— {k.meaning}</span>}
@@ -470,6 +498,117 @@ export function LessonLinksSection({ lessonId, lessonTitle = "", levelCode = "N5
           </div>
         ) : (
           <button type="button" onClick={() => { setPickerType("kana"); setPickerQ(""); }} className="text-primary text-sm hover:underline">+ Add kana</button>
+        )}
+      </section>
+
+      <section>
+        <h3 className="font-heading font-semibold text-charcoal mb-2">Reading</h3>
+        <ul className="space-y-1 mb-2">
+          {reading.map((r) => (
+            <li key={r.id} className="flex items-center gap-2 text-sm">
+              <a href={`/admin/learn/reading/${r.slug}/edit`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                {r.title ?? r.slug}
+              </a>
+              {r.level && <span className="text-secondary text-xs">({r.level})</span>}
+              <button type="button" onClick={() => removeLink("reading", r.id)} className="text-red-600 hover:underline text-xs">Remove</button>
+            </li>
+          ))}
+        </ul>
+        {pickerType === "reading" ? (
+          <div className="space-y-1">
+            <input type="text" value={pickerQ} onChange={(e) => setPickerQ(e.target.value)} placeholder="Search reading…" className="w-full px-3 py-2 border rounded-bento text-sm" />
+            <ul className="border rounded-bento max-h-40 overflow-auto">
+              {pickerOptions.map((o) => (
+                <li key={o.id}><button type="button" onClick={() => addLink("reading", o.id)} className="w-full text-left px-3 py-2 text-sm hover:bg-[var(--divider)]/30">{o.label}</button></li>
+              ))}
+            </ul>
+            <button type="button" onClick={() => setPickerType(null)} className="text-secondary text-xs">Cancel</button>
+          </div>
+        ) : (
+          <button type="button" onClick={() => setPickerType("reading")} className="text-primary text-sm hover:underline">+ Add reading</button>
+        )}
+      </section>
+
+      <section>
+        <h3 className="font-heading font-semibold text-charcoal mb-2">Listening</h3>
+        <ul className="space-y-1 mb-2">
+          {listening.map((l) => (
+            <li key={l.id} className="flex items-center gap-2 text-sm">
+              <a href={`/admin/learn/listening/${l.slug}/edit`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                {l.title ?? l.slug}
+              </a>
+              {l.level && <span className="text-secondary text-xs">({l.level})</span>}
+              <button type="button" onClick={() => removeLink("listening", l.id)} className="text-red-600 hover:underline text-xs">Remove</button>
+            </li>
+          ))}
+        </ul>
+        {pickerType === "listening" ? (
+          <div className="space-y-1">
+            <input type="text" value={pickerQ} onChange={(e) => setPickerQ(e.target.value)} placeholder="Search listening…" className="w-full px-3 py-2 border rounded-bento text-sm" />
+            <ul className="border rounded-bento max-h-40 overflow-auto">
+              {pickerOptions.map((o) => (
+                <li key={o.id}><button type="button" onClick={() => addLink("listening", o.id)} className="w-full text-left px-3 py-2 text-sm hover:bg-[var(--divider)]/30">{o.label}</button></li>
+              ))}
+            </ul>
+            <button type="button" onClick={() => setPickerType(null)} className="text-secondary text-xs">Cancel</button>
+          </div>
+        ) : (
+          <button type="button" onClick={() => setPickerType("listening")} className="text-primary text-sm hover:underline">+ Add listening</button>
+        )}
+      </section>
+
+      <section>
+        <h3 className="font-heading font-semibold text-charcoal mb-2">Writing</h3>
+        <ul className="space-y-1 mb-2">
+          {writing.map((w) => (
+            <li key={w.id} className="flex items-center gap-2 text-sm">
+              <a href={`/admin/learn/writing/${w.slug}/edit`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                {w.title ?? w.slug}
+              </a>
+              {w.level && <span className="text-secondary text-xs">({w.level})</span>}
+              <button type="button" onClick={() => removeLink("writing", w.id)} className="text-red-600 hover:underline text-xs">Remove</button>
+            </li>
+          ))}
+        </ul>
+        {pickerType === "writing" ? (
+          <div className="space-y-1">
+            <input type="text" value={pickerQ} onChange={(e) => setPickerQ(e.target.value)} placeholder="Search writing…" className="w-full px-3 py-2 border rounded-bento text-sm" />
+            <ul className="border rounded-bento max-h-40 overflow-auto">
+              {pickerOptions.map((o) => (
+                <li key={o.id}><button type="button" onClick={() => addLink("writing", o.id)} className="w-full text-left px-3 py-2 text-sm hover:bg-[var(--divider)]/30">{o.label}</button></li>
+              ))}
+            </ul>
+            <button type="button" onClick={() => setPickerType(null)} className="text-secondary text-xs">Cancel</button>
+          </div>
+        ) : (
+          <button type="button" onClick={() => setPickerType("writing")} className="text-primary text-sm hover:underline">+ Add writing</button>
+        )}
+      </section>
+
+      <section>
+        <h3 className="font-heading font-semibold text-charcoal mb-2">Practice test</h3>
+        <ul className="space-y-1 mb-2">
+          {practiceTest.map((p) => (
+            <li key={p.id} className="flex items-center gap-2 text-sm">
+              <a href={`/admin/learn/practice_test/${p.slug}/edit`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                {p.title ?? p.slug}
+              </a>
+              <button type="button" onClick={() => removeLink("practice_test", p.id)} className="text-red-600 hover:underline text-xs">Remove</button>
+            </li>
+          ))}
+        </ul>
+        {pickerType === "practice_test" ? (
+          <div className="space-y-1">
+            <input type="text" value={pickerQ} onChange={(e) => setPickerQ(e.target.value)} placeholder="Search practice tests…" className="w-full px-3 py-2 border rounded-bento text-sm" />
+            <ul className="border rounded-bento max-h-40 overflow-auto">
+              {pickerOptions.map((o) => (
+                <li key={o.id}><button type="button" onClick={() => addLink("practice_test", o.id)} className="w-full text-left px-3 py-2 text-sm hover:bg-[var(--divider)]/30">{o.label}</button></li>
+              ))}
+            </ul>
+            <button type="button" onClick={() => setPickerType(null)} className="text-secondary text-xs">Cancel</button>
+          </div>
+        ) : (
+          <button type="button" onClick={() => setPickerType("practice_test")} className="text-primary text-sm hover:underline">+ Add practice test</button>
         )}
       </section>
 

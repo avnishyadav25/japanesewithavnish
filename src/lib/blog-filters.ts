@@ -1,3 +1,5 @@
+import { LEARN_CONTENT_TYPES } from "@/lib/learn-filters";
+
 const LEVELS = (l: unknown): string[] =>
   Array.isArray(l) ? l.map((x) => String(x).toUpperCase()) : l ? [String(l).toUpperCase()] : [];
 
@@ -64,7 +66,6 @@ function matchesSearch(
   );
 }
 
-const LEARN_CONTENT_TYPES = ["grammar", "vocabulary", "kanji", "reading", "writing", "listening", "sounds", "study_guide", "practice_test"] as const;
 
 export type PostForFilter = {
   id: string;

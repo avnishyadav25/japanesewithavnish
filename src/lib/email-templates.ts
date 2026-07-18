@@ -2,6 +2,13 @@ const PRIMARY = "#D0021B";
 const BASE = "#FAF8F5";
 const CHARCOAL = "#1A1A1A";
 const SECONDARY = "#555555";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://japanesewithavnish.com";
+
+const FOOTER_LINKS: { href: string; label: string }[] = [
+  { href: SITE_URL, label: "Home" },
+  { href: `${SITE_URL}/contact`, label: "Contact" },
+  { href: `${SITE_URL}/policies/privacy`, label: "Privacy Policy" },
+];
 
 export type EmailProduct = {
   slug: string;
@@ -21,21 +28,31 @@ export function productListHtml(_products: EmailProduct[], _siteUrl: string): st
 }
 
 export function emailWrapper(content: string, productList?: string) {
+  const footerLinksHtml = FOOTER_LINKS.map(
+    (l) => `<a href="${l.href}" style="color:${SECONDARY};text-decoration:underline;margin:0 10px;font-size:12px;">${l.label}</a>`
+  ).join("");
+
   return `
 <!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;font-family:system-ui,-apple-system,sans-serif;background:${BASE};color:${CHARCOAL};">
   <div style="max-width:600px;margin:0 auto;padding:24px;">
-    <div style="text-align:center;margin-bottom:24px;">
-      <a href="https://japanesewithavnish.com" style="font-size:18px;font-weight:700;color:${PRIMARY};text-decoration:none;">japanesewithavnish.com</a>
+    <div style="background:${PRIMARY};border-radius:16px 16px 0 0;padding:32px 24px;text-align:center;">
+      <a href="${SITE_URL}" style="text-decoration:none;">
+        <img src="${SITE_URL}/logo.png" width="64" height="64" alt="Japanese with Avnish" style="display:block;margin:0 auto 12px;border-radius:50%;border:0;" />
+        <span style="display:block;font-size:19px;font-weight:700;color:#ffffff;font-family:system-ui,-apple-system,sans-serif;">Japanese with Avnish</span>
+      </a>
     </div>
-    <div style="background:#fff;border-radius:16px;padding:24px;border:1px solid #eee;">
+    <div style="background:#fff;border-radius:0 0 16px 16px;padding:24px;border:1px solid #eee;border-top:none;">
       ${content}
       ${productList || ""}
     </div>
-    <div style="text-align:center;margin-top:24px;font-size:12px;color:${SECONDARY};">
-      © ${new Date().getFullYear()} Japanese with Avnish. All rights reserved.
+    <div style="text-align:center;margin-top:24px;">
+      <p style="margin:0 0 10px;">${footerLinksHtml}</p>
+      <p style="margin:0;font-size:12px;color:${SECONDARY};">
+        © ${new Date().getFullYear()} Japanese with Avnish. All rights reserved.
+      </p>
     </div>
   </div>
 </body>

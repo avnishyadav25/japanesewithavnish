@@ -31,7 +31,7 @@ function getTransporter(): nodemailer.Transporter | null {
   });
 }
 
-async function sendMail(to: string, subject: string, html: string): Promise<{ id?: string } | null> {
+export async function sendMail(to: string, subject: string, html: string): Promise<{ id?: string } | null> {
   const transporter = getTransporter();
   if (!transporter) {
     console.warn("[Email] SMTP not configured (SMTP_HOST missing). Skipping send.");
@@ -71,17 +71,14 @@ export async function getProductsForEmail(): Promise<EmailProduct[]> {
 
 export async function sendMagicLink(email: string, magicLinkUrl: string) {
   const dbTemplate = await renderDbEmailTemplate("magic-link", { magicLinkUrl });
-  if (dbTemplate) return sendMail(email, dbTemplate.subject, dbTemplate.bodyHtml);
-  return sendMail(
-    email,
-    "Login to Japanese with Avnish",
-    `
-      <p>Click the link below to access your library:</p>
-      <p><a href="${magicLinkUrl}" style="color:#D0021B;font-weight:600;">Access Store</a></p>
-      <p>This link expires in 1 hour.</p>
-      <p>If you didn't request this, you can ignore this email.</p>
-    `
-  );
+  if (dbTemplate) return sendMail(email, dbTemplate.subject, emailWrapper(dbTemplate.bodyHtml, ""));
+  const content = `
+      <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">Click the link below to access your library:</p>
+      <p style="margin:0 0 20px;"><a href="${magicLinkUrl}" style="background:#D0021B;color:white;padding:12px 26px;text-decoration:none;border-radius:8px;display:inline-block;font-weight:700;">Access Store</a></p>
+      <p style="font-size:14px;line-height:1.6;margin:0 0 12px;color:#555;">This link expires in 1 hour.</p>
+      <p style="font-size:14px;line-height:1.6;margin:0;color:#555;">If you didn't request this, you can ignore this email.</p>
+    `;
+  return sendMail(email, "Login to Japanese with Avnish", emailWrapper(content, ""));
 }
 
 export async function sendCreatePasswordEmail(email: string, resetLink: string) {
@@ -341,13 +338,31 @@ export async function sendLearnerReportResolvedEmail(
   return sendMail(email, `Your reported issue on "${contentTitle}" has been resolved — Japanese with Avnish`, emailWrapper(content, ""));
 }
 
-/** Generic admin-to-user reply, used by the Contact/Comments/Feedback admin reply flows. */
+/** Renders (without sending) the same HTML sendAdminReplyEmail would send — used by the admin
+ * user-detail page's manual-email "preview before send" step. */
+export function renderAdminReplyHtml(replyBody: string): string {
+  const escapedBody = escapeHtml(replyBody).replace(/\n/g, "<br>");
+  return emailWrapper(`<p>${escapedBody}</p>`);
+}
+
+/** Generic admin-to-user reply, used by the Contact/Comments/Feedback admin reply flows, and
+ * the admin user-detail page's manual-email send action. */
 export async function sendAdminReplyEmail(
   to: string,
   subject: string,
   replyBody: string
 ): Promise<{ id?: string } | null> {
-  const escapedBody = escapeHtml(replyBody).replace(/\n/g, "<br>");
-  const html = `<p>${escapedBody}</p>`;
-  return sendMail(to, subject, emailWrapper(html));
+  return sendMail(to, subject, renderAdminReplyHtml(replyBody));
+}
+
+/** Renders (without sending) a DB email_templates row with {{var}} substitution + the standard
+ * wrapper — used by the admin user-detail page's template-email "preview before send" step, and
+ * shared by the actual send path below so preview and send always match exactly. */
+export async function renderAdminTemplateEmail(
+  templateKey: string,
+  vars: Record<string, string>
+): Promise<{ subject: string; bodyHtml: string } | null> {
+  const dbTemplate = await renderDbEmailTemplate(templateKey, vars);
+  if (!dbTemplate) return null;
+  return { subject: dbTemplate.subject, bodyHtml: emailWrapper(dbTemplate.bodyHtml, "") };
 }

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { AdminCard } from "@/components/admin/AdminCard";
+import { getSocialFormat } from "@/lib/ai/social-formats";
 
 type SocialPack = {
   packId: string | null;
@@ -691,7 +692,7 @@ function PackSections({
                 <div className="flex gap-1">
                   <button
                     type="button"
-                    onClick={() => onGenerateImage(slot, prompt, { aspectRatio: "9:16", referenceImageUrl })}
+                    onClick={() => onGenerateImage(slot, prompt, { aspectRatio: getSocialFormat("story").aspectRatio, referenceImageUrl })}
                     disabled={imageGenLoading === slot || !prompt}
                     className="text-sm text-primary hover:underline disabled:opacity-50"
                   >
@@ -709,7 +710,7 @@ function PackSections({
                   for (let i = 0; i < reelShots.length; i++) {
                     const shot = reelShots[i];
                     const prompt = shot.visual || shot.on_screen_text || "";
-                    if (prompt) await onGenerateImage(`instagram_reel_${i}`, prompt, { aspectRatio: "9:16", referenceImageUrl });
+                    if (prompt) await onGenerateImage(`instagram_reel_${i}`, prompt, { aspectRatio: getSocialFormat("story").aspectRatio, referenceImageUrl });
                   }
                 }}
                 disabled={!!imageGenLoading}
@@ -766,7 +767,7 @@ function PackSections({
             <button type="button" onClick={() => onCopy(postCaption)} className="text-sm text-primary hover:underline">Copy</button>
             <button
               type="button"
-              onClick={() => onGenerateImage("instagram_post", postImagePrompt, { aspectRatio: "1:1", referenceImageUrl })}
+              onClick={() => onGenerateImage("instagram_post", postImagePrompt, { aspectRatio: getSocialFormat("square").aspectRatio, referenceImageUrl })}
               disabled={imageGenLoading === "instagram_post"}
               className="text-sm text-primary hover:underline disabled:opacity-50"
             >
@@ -814,7 +815,7 @@ function PackSections({
                 )}
                 <button
                   type="button"
-                  onClick={() => onGenerateImage(slot, prompt, { aspectRatio: "1:1", referenceImageUrl })}
+                  onClick={() => onGenerateImage(slot, prompt, { aspectRatio: getSocialFormat("square").aspectRatio, referenceImageUrl })}
                   disabled={imageGenLoading === slot || !prompt}
                   className="text-sm text-primary hover:underline disabled:opacity-50"
                 >
@@ -830,7 +831,7 @@ function PackSections({
                 for (let i = 0; i < Math.min(10, carouselSlides.length); i++) {
                   const slide = carouselSlides[i];
                   const prompt = slide.on_screen_caption || slide.body || slide.title || "";
-                  if (prompt) await onGenerateImage(`instagram_carousel_${i}`, prompt, { aspectRatio: "1:1", referenceImageUrl });
+                  if (prompt) await onGenerateImage(`instagram_carousel_${i}`, prompt, { aspectRatio: getSocialFormat("square").aspectRatio, referenceImageUrl });
                 }
               }}
               disabled={!!imageGenLoading}
@@ -856,7 +857,7 @@ function PackSections({
             <button type="button" onClick={() => onCopy(twitterPost)} className="text-sm text-primary hover:underline">Copy</button>
             <button
               type="button"
-              onClick={() => onGenerateImage("twitter_image", twitterImagePrompt, { aspectRatio: "1:1", referenceImageUrl })}
+              onClick={() => onGenerateImage("twitter_image", twitterImagePrompt, { aspectRatio: getSocialFormat("landscape").aspectRatio, referenceImageUrl })}
               disabled={imageGenLoading === "twitter_image"}
               className="text-sm text-primary hover:underline disabled:opacity-50"
             >
@@ -887,7 +888,7 @@ function PackSections({
             <button type="button" onClick={() => onCopy(facebookText)} className="text-sm text-primary hover:underline">Copy</button>
             <button
               type="button"
-              onClick={() => onGenerateImage("facebook_image", facebookImagePrompt, { aspectRatio: "1:1", referenceImageUrl })}
+              onClick={() => onGenerateImage("facebook_image", facebookImagePrompt, { aspectRatio: getSocialFormat("og").aspectRatio, referenceImageUrl })}
               disabled={imageGenLoading === "facebook_image"}
               className="text-sm text-primary hover:underline disabled:opacity-50"
             >
@@ -936,7 +937,7 @@ function PackSections({
             <button type="button" onClick={() => onCopy(linkedinPost)} className="text-sm text-primary hover:underline">Copy</button>
             <button
               type="button"
-              onClick={() => onGenerateImage("linkedin_image", linkedinImagePrompt, { aspectRatio: "1:1", referenceImageUrl })}
+              onClick={() => onGenerateImage("linkedin_image", linkedinImagePrompt, { aspectRatio: getSocialFormat("og").aspectRatio, referenceImageUrl })}
               disabled={imageGenLoading === "linkedin_image"}
               className="text-sm text-primary hover:underline disabled:opacity-50"
             >
@@ -974,7 +975,7 @@ function PackSections({
             <button type="button" onClick={() => onCopy(redditText)} className="text-sm text-primary hover:underline">Copy</button>
             <button
               type="button"
-              onClick={() => onGenerateImage("reddit_image", redditImagePrompt, { aspectRatio: "1:1", referenceImageUrl })}
+              onClick={() => onGenerateImage("reddit_image", redditImagePrompt, { aspectRatio: getSocialFormat("square").aspectRatio, referenceImageUrl })}
               disabled={imageGenLoading === "reddit_image"}
               className="text-sm text-primary hover:underline disabled:opacity-50"
             >
@@ -1002,7 +1003,7 @@ function PackSections({
             <button type="button" onClick={() => onCopy(pinterestText)} className="text-sm text-primary hover:underline">Copy</button>
             <button
               type="button"
-              onClick={() => onGenerateImage("pinterest_image", pinterestImagePrompt, { aspectRatio: "1:1", referenceImageUrl })}
+              onClick={() => onGenerateImage("pinterest_image", pinterestImagePrompt, { aspectRatio: getSocialFormat("pin").aspectRatio, referenceImageUrl })}
               disabled={imageGenLoading === "pinterest_image"}
               className="text-sm text-primary hover:underline disabled:opacity-50"
             >

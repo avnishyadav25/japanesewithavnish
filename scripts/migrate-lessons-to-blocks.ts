@@ -21,7 +21,7 @@ import "dotenv/config";
 import { neon } from "@neondatabase/serverless";
 import { writeFileSync } from "fs";
 import { join } from "path";
-import { validateBlockData } from "../src/lib/curriculum/blockTypes";
+import { validateBlockData } from "../src/lib/blocks/blockTypes";
 import { parseProseToBlocks } from "../src/lib/curriculum/parseProseToBlocks";
 
 const DATABASE_URL = process.env.DATABASE_URL;

@@ -34,7 +34,7 @@ export function LearnContentRowActions({
 
   return (
     <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-      <Link href={`/admin/blogs/${slug}/edit`} className="text-primary text-sm hover:underline">
+      <Link href={`/admin/learn/${contentType}/${slug}/edit`} className="text-primary text-sm hover:underline">
         Edit
       </Link>
       <Link

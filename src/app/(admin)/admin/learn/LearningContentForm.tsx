@@ -6,6 +6,10 @@ import { AdminCard } from "@/components/admin/AdminCard";
 import { GenerateContentButton } from "@/components/admin/GenerateContentButton";
 import { GenerateImageModal } from "@/components/admin/GenerateImageModal";
 import { LearnInlineImageGenerator } from "@/components/admin/LearnInlineImageGenerator";
+import { SidecarExamplesSection } from "@/components/admin/SidecarExamplesSection";
+import { KanjiStrokePreview } from "@/components/admin/KanjiStrokePreview";
+import { ContentBlocksSection } from "@/components/admin/ContentBlocksSection";
+import { PracticeTestBuilder } from "@/components/admin/PracticeTestBuilder";
 
 type Item = {
   id: string;
@@ -19,16 +23,45 @@ type Item = {
   sort_order: number;
 };
 
+type UsedInLesson = { lesson_id: string; lesson_title: string; lesson_code: string; module_title: string; level_code: string };
+
+/** Content types with a dedicated editor: structured fields bind to real sidecar-table columns, not meta. */
+const SIDECAR_TYPES = new Set(["vocabulary", "grammar", "kanji", "practice_test", "reading", "listening", "writing"]);
+/** Of SIDECAR_TYPES, the ones with a real Examples-table CRUD section (reading/listening/writing/practice_test
+ * use content_blocks instead; all SIDECAR_TYPES still get the "used in lessons" reverse lookup). */
+const SIDECAR_TYPES_WITH_EXAMPLES = new Set(["vocabulary", "grammar", "kanji"]);
+
 export function LearningContentForm({
   contentType,
   item,
   editBasePath = "learn",
+  sidecar = null,
+  usedInLessons = [],
 }: {
   contentType: string;
   item?: Item;
   /** When "blogs", save/redirect uses /admin/blogs/[slug]/edit. */
   editBasePath?: "learn" | "blogs";
+  /** Existing sidecar row (vocabulary/grammar/kanji) for content types with a dedicated editor. Null for "new" or types without one yet. */
+  sidecar?: Record<string, unknown> | null;
+  usedInLessons?: UsedInLesson[];
 }) {
+  const hasSidecar = SIDECAR_TYPES.has(contentType);
+  const [sidecarState, setSidecarState] = useState<Record<string, unknown>>(sidecar ?? {});
+  const sidecarId = typeof sidecarState.id === "string" ? sidecarState.id : null;
+
+  function sidecarStr(key: string): string {
+    const v = sidecarState[key];
+    return v == null ? "" : String(v);
+  }
+  function sidecarArr(key: string): string[] {
+    const v = sidecarState[key];
+    if (Array.isArray(v)) return v.map((x) => (x != null ? String(x) : ""));
+    return [];
+  }
+  function updateSidecar(key: string, value: unknown) {
+    setSidecarState((s) => ({ ...s, [key]: value }));
+  }
   const router = useRouter();
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string>("");
@@ -65,24 +98,6 @@ export function LearningContentForm({
     const v = form.meta[key];
     if (Array.isArray(v)) return v.map((x) => (x != null ? String(x) : ""));
     return [];
-  }
-
-  type ExampleRow = { japanese?: string; romaji?: string; translation?: string };
-  function getExamples(): ExampleRow[] {
-    const v = form.meta.examples;
-    if (!Array.isArray(v)) return [];
-    return v.map((x) =>
-      typeof x === "object" && x !== null
-        ? {
-            japanese: x && typeof (x as Record<string, unknown>).japanese === "string" ? (x as Record<string, unknown>).japanese as string : "",
-            romaji: x && typeof (x as Record<string, unknown>).romaji === "string" ? (x as Record<string, unknown>).romaji as string : "",
-            translation: x && typeof (x as Record<string, unknown>).translation === "string" ? (x as Record<string, unknown>).translation as string : "",
-          }
-        : { japanese: "", romaji: "", translation: "" }
-    );
-  }
-  function setExamples(next: ExampleRow[]) {
-    updateMeta({ ...form.meta, examples: next.length ? next : undefined });
   }
 
   type ImagePromptItem = { placeholder: string; role: string; prompt: string; aspect_ratio?: string };
@@ -149,6 +164,7 @@ export function LearningContentForm({
         status: form.status,
         sort_order: form.sort_order,
         meta: metaPayload,
+        sidecar: hasSidecar ? sidecarState : undefined,
       }),
     });
 
@@ -228,11 +244,11 @@ export function LearningContentForm({
                   topic: form.title,
                   tags: form.tags,
                   description: metaStr("summary") || form.content?.slice(0, 200) || undefined,
-                  pattern: contentType === "grammar" ? (metaStr("grammar_form") || metaStr("reading") || undefined) : undefined,
-                  word: contentType === "vocabulary" ? (metaStr("japanese") || form.title || undefined) : undefined,
-                  character: contentType === "kanji" ? (metaStr("character") || undefined) : undefined,
-                  meaning: metaStr("meaning") || undefined,
-                  structure: contentType === "grammar" ? (metaStr("structure") || undefined) : undefined,
+                  pattern: contentType === "grammar" ? (sidecarStr("pattern") || undefined) : undefined,
+                  word: contentType === "vocabulary" ? (sidecarStr("word") || form.title || undefined) : undefined,
+                  character: contentType === "kanji" ? (sidecarStr("character") || undefined) : undefined,
+                  meaning: hasSidecar ? (sidecarStr("meaning") || undefined) : (metaStr("meaning") || undefined),
+                  structure: contentType === "grammar" ? (sidecarStr("structure") || undefined) : undefined,
                 }}
                 onGenerated={(data) => {
                   if (typeof data === "string") {
@@ -436,26 +452,26 @@ export function LearningContentForm({
                   <label className="block text-sm text-secondary mb-1">Japanese</label>
                   <input
                     type="text"
-                    value={metaStr("japanese")}
-                    onChange={(e) => updateMeta({ ...form.meta, japanese: e.target.value || undefined })}
+                    value={sidecarStr("word")}
+                    onChange={(e) => updateSidecar("word", e.target.value || undefined)}
                     className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-secondary mb-1">Reading (romaji)</label>
+                  <label className="block text-sm text-secondary mb-1">Reading (furigana)</label>
                   <input
                     type="text"
-                    value={metaStr("reading")}
-                    onChange={(e) => updateMeta({ ...form.meta, reading: e.target.value || undefined })}
+                    value={sidecarStr("reading")}
+                    onChange={(e) => updateSidecar("reading", e.target.value || undefined)}
                     className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-secondary mb-1">Type (e.g. Noun, Verb)</label>
+                  <label className="block text-sm text-secondary mb-1">Romaji</label>
                   <input
                     type="text"
-                    value={metaStr("type")}
-                    onChange={(e) => updateMeta({ ...form.meta, type: e.target.value || undefined })}
+                    value={sidecarStr("romaji")}
+                    onChange={(e) => updateSidecar("romaji", e.target.value || undefined)}
                     className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
                   />
                 </div>
@@ -463,13 +479,40 @@ export function LearningContentForm({
                   <label className="block text-sm text-secondary mb-1">Meaning</label>
                   <input
                     type="text"
-                    value={metaStr("meaning")}
-                    onChange={(e) => updateMeta({ ...form.meta, meaning: e.target.value || undefined })}
+                    value={sidecarStr("meaning")}
+                    onChange={(e) => updateSidecar("meaning", e.target.value || undefined)}
+                    className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-secondary mb-1">Part of speech (e.g. Noun, Verb)</label>
+                  <input
+                    type="text"
+                    value={sidecarStr("part_of_speech")}
+                    onChange={(e) => updateSidecar("part_of_speech", e.target.value || undefined)}
+                    className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-secondary mb-1">Transitivity (verbs only, optional)</label>
+                  <input
+                    type="text"
+                    value={sidecarStr("transitivity")}
+                    onChange={(e) => updateSidecar("transitivity", e.target.value || undefined)}
+                    className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
+                    placeholder="transitive / intransitive"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-sm text-secondary mb-1">Notes (when to use, nuance)</label>
+                  <textarea
+                    value={sidecarStr("notes")}
+                    onChange={(e) => updateSidecar("notes", e.target.value || undefined)}
+                    rows={2}
                     className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
                   />
                 </div>
               </div>
-              <p className="text-xs text-secondary mt-2">Add 8–12 <code className="bg-[var(--divider)] px-1 rounded">examples</code> in Meta (JSON): japanese, romaji, translation.</p>
             </div>
           )}
           {contentType === "grammar" && (
@@ -477,40 +520,50 @@ export function LearningContentForm({
               <h3 className="text-sm font-medium text-charcoal">Grammar</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-secondary mb-1">Grammar form (日本語)</label>
+                  <label className="block text-sm text-secondary mb-1">Pattern (日本語)</label>
                   <input
                     type="text"
-                    value={metaStr("grammar_form")}
-                    onChange={(e) => updateMeta({ ...form.meta, grammar_form: e.target.value || undefined })}
+                    value={sidecarStr("pattern")}
+                    onChange={(e) => updateSidecar("pattern", e.target.value || undefined)}
                     className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-secondary mb-1">Reading (romaji)</label>
+                  <label className="block text-sm text-secondary mb-1">Structure</label>
                   <input
                     type="text"
-                    value={metaStr("reading")}
-                    onChange={(e) => updateMeta({ ...form.meta, reading: e.target.value || undefined })}
+                    value={sidecarStr("structure")}
+                    onChange={(e) => updateSidecar("structure", e.target.value || undefined)}
                     className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
+                    placeholder="[TOPIC] は [comment]"
                   />
                 </div>
                 <div className="sm:col-span-2">
                   <label className="block text-sm text-secondary mb-1">Meaning</label>
                   <input
                     type="text"
-                    value={metaStr("meaning")}
-                    onChange={(e) => updateMeta({ ...form.meta, meaning: e.target.value || undefined })}
+                    value={sidecarStr("meaning")}
+                    onChange={(e) => updateSidecar("meaning", e.target.value || undefined)}
                     className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-sm text-secondary mb-1">Structure (optional)</label>
-                  <input
-                    type="text"
-                    value={metaStr("structure")}
-                    onChange={(e) => updateMeta({ ...form.meta, structure: e.target.value || undefined })}
+                  <label className="block text-sm text-secondary mb-1">When to use</label>
+                  <textarea
+                    value={sidecarStr("when_to_use")}
+                    onChange={(e) => updateSidecar("when_to_use", e.target.value || undefined)}
+                    rows={3}
                     className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
-                    placeholder="[TOPIC] は [comment]"
+                    placeholder="Explain the situations/nuance where this grammar point applies"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-sm text-secondary mb-1">Notes (optional)</label>
+                  <textarea
+                    value={sidecarStr("notes")}
+                    onChange={(e) => updateSidecar("notes", e.target.value || undefined)}
+                    rows={2}
+                    className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
                   />
                 </div>
               </div>
@@ -524,8 +577,8 @@ export function LearningContentForm({
                   <label className="block text-sm text-secondary mb-1">Character</label>
                   <input
                     type="text"
-                    value={metaStr("character")}
-                    onChange={(e) => updateMeta({ ...form.meta, character: e.target.value || undefined })}
+                    value={sidecarStr("character")}
+                    onChange={(e) => updateSidecar("character", e.target.value || undefined)}
                     className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
                   />
                 </div>
@@ -533,8 +586,8 @@ export function LearningContentForm({
                   <label className="block text-sm text-secondary mb-1">Meaning</label>
                   <input
                     type="text"
-                    value={metaStr("meaning")}
-                    onChange={(e) => updateMeta({ ...form.meta, meaning: e.target.value || undefined })}
+                    value={sidecarStr("meaning")}
+                    onChange={(e) => updateSidecar("meaning", e.target.value || undefined)}
                     className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
                   />
                 </div>
@@ -542,13 +595,8 @@ export function LearningContentForm({
                   <label className="block text-sm text-secondary mb-1">Onyomi</label>
                   <input
                     type="text"
-                    value={metaStr("onyomi")}
-                    onChange={(e) =>
-                      updateMeta({
-                        ...form.meta,
-                        onyomi: e.target.value ? e.target.value.split(/[\s,]+/).filter(Boolean) : undefined,
-                      })
-                    }
+                    value={sidecarArr("onyomi").join(", ")}
+                    onChange={(e) => updateSidecar("onyomi", e.target.value ? e.target.value.split(/[\s,]+/).filter(Boolean) : undefined)}
                     className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
                     placeholder="ニチ, ジツ"
                   />
@@ -557,13 +605,8 @@ export function LearningContentForm({
                   <label className="block text-sm text-secondary mb-1">Kunyomi</label>
                   <input
                     type="text"
-                    value={Array.isArray(form.meta.kunyomi) ? (form.meta.kunyomi as string[]).join(", ") : metaStr("kunyomi")}
-                    onChange={(e) =>
-                      updateMeta({
-                        ...form.meta,
-                        kunyomi: e.target.value ? e.target.value.split(/[\s,]+/).filter(Boolean) : undefined,
-                      })
-                    }
+                    value={sidecarArr("kunyomi").join(", ")}
+                    onChange={(e) => updateSidecar("kunyomi", e.target.value ? e.target.value.split(/[\s,]+/).filter(Boolean) : undefined)}
                     className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
                     placeholder="ひ, か"
                   />
@@ -572,76 +615,175 @@ export function LearningContentForm({
                   <label className="block text-sm text-secondary mb-1">Stroke count</label>
                   <input
                     type="number"
-                    value={metaStr("stroke_count")}
-                    onChange={(e) =>
-                      updateMeta({
-                        ...form.meta,
-                        stroke_count: e.target.value ? parseInt(e.target.value, 10) : undefined,
-                      })
-                    }
+                    value={sidecarStr("stroke_count")}
+                    onChange={(e) => updateSidecar("stroke_count", e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                    className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-sm text-secondary mb-1">Extended meaning / usage notes (optional)</label>
+                  <textarea
+                    value={sidecarStr("meaning_extended")}
+                    onChange={(e) => updateSidecar("meaning_extended", e.target.value || undefined)}
+                    rows={2}
                     className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
                   />
                 </div>
               </div>
-              <p className="text-xs text-secondary mt-2">Add 8–12 <code className="bg-[var(--divider)] px-1 rounded">examples</code> in Meta (JSON): japanese, romaji, translation (compounds/sentences).</p>
+              {sidecarStr("character") && (
+                <KanjiStrokePreview
+                  character={sidecarStr("character")}
+                  strokeCount={sidecarStr("stroke_count") ? Number(sidecarStr("stroke_count")) : null}
+                  reading={sidecarArr("onyomi")[0] ?? sidecarArr("kunyomi")[0] ?? null}
+                />
+              )}
+            </div>
+          )}
+          {hasSidecar && sidecarId && SIDECAR_TYPES_WITH_EXAMPLES.has(contentType) && (
+            <SidecarExamplesSection contentType={contentType as "vocabulary" | "grammar" | "kanji"} sidecarId={sidecarId} />
+          )}
+          {hasSidecar && usedInLessons.length > 0 && (
+            <div className="space-y-2 pt-2 border-t border-[var(--divider)]">
+              <h3 className="text-sm font-medium text-charcoal">Used in lessons</h3>
+              <div className="flex flex-wrap gap-2">
+                {usedInLessons.map((u) => (
+                  <a
+                    key={u.lesson_id}
+                    href={`/admin/learn/curriculum/lessons/${u.lesson_id}`}
+                    className="text-[11px] px-2 py-1 rounded-full bg-primary/5 text-primary border border-primary/20 font-semibold hover:bg-primary/10 transition"
+                    title={`${u.level_code} — ${u.module_title} — ${u.lesson_title}`}
+                  >
+                    {u.level_code} {u.lesson_code}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+          {hasSidecar && (contentType === "vocabulary" || contentType === "grammar" || contentType === "kanji") && (
+            <div className="space-y-4 pt-2 border-t border-[var(--divider)]">
+              <h3 className="text-sm font-medium text-charcoal">Rich content</h3>
+              <p className="text-sm text-secondary">
+                {contentType === "kanji"
+                  ? "Optional deeper teaching content: radicals, visually similar kanji, and memory aids — beyond the core fields above."
+                  : contentType === "grammar"
+                  ? "Optional deeper teaching content: formation variants, nuance, register, and common restrictions — beyond the core fields above."
+                  : "Optional deeper teaching content: collocations and related words — beyond the core fields above."}
+              </p>
+              {item ? (
+                <ContentBlocksSection postId={item.id} />
+              ) : (
+                <p className="text-xs text-secondary italic">Save once to add rich content blocks.</p>
+              )}
             </div>
           )}
           {contentType === "reading" && (
             <div className="space-y-4 pt-2 border-t border-[var(--divider)]">
-              <h3 className="text-sm font-medium text-charcoal">Reading / practice</h3>
+              <h3 className="text-sm font-medium text-charcoal">Reading</h3>
               <p className="text-sm text-secondary">
-                Use &quot;Meta (JSON)&quot; below for <code className="bg-[var(--divider)] px-1 rounded">sentences</code> (8–12 items: japanese, romaji, translation). Optional <code className="bg-[var(--divider)] px-1 rounded">summary</code>, <code className="bg-[var(--divider)] px-1 rounded">audio_url</code>.
+                Build the passage and comprehension questions from content blocks below — a Reading Passage block (with furigana/plain versions) plus Comprehension Question blocks.
               </p>
+              {item ? (
+                <ContentBlocksSection postId={item.id} />
+              ) : (
+                <p className="text-xs text-secondary italic">Save once to add content blocks.</p>
+              )}
             </div>
           )}
           {contentType === "listening" && (
             <div className="space-y-4 pt-2 border-t border-[var(--divider)]">
               <h3 className="text-sm font-medium text-charcoal">Listening</h3>
               <p className="text-sm text-secondary">
-                Use &quot;Meta (JSON)&quot; for <code className="bg-[var(--divider)] px-1 rounded">summary</code> and <code className="bg-[var(--divider)] px-1 rounded">examples</code> (8–12: japanese, romaji, translation). Optional <code className="bg-[var(--divider)] px-1 rounded">audio_url</code> above.
+                Build the scenario from content blocks below — an Audio block (transcript + duration required to publish) plus at least 3 Comprehension Question blocks, each with an explanation.
               </p>
+              {item ? (
+                <ContentBlocksSection postId={item.id} />
+              ) : (
+                <p className="text-xs text-secondary italic">Save once to add content blocks.</p>
+              )}
             </div>
           )}
           {contentType === "writing" && (
             <div className="space-y-4 pt-2 border-t border-[var(--divider)]">
               <h3 className="text-sm font-medium text-charcoal">Writing</h3>
               <p className="text-sm text-secondary">
-                Use &quot;Meta (JSON)&quot; for <code className="bg-[var(--divider)] px-1 rounded">summary</code> and <code className="bg-[var(--divider)] px-1 rounded">examples</code> (8–12: japanese, romaji, translation).
+                Build the composition exercise from content blocks below — a Writing Prompt block (task/conditions), a Japanese Learning Text block for the model answer, and Rich Text/Section Heading blocks for evaluation notes and practice advice.
               </p>
+              {item ? (
+                <ContentBlocksSection postId={item.id} />
+              ) : (
+                <p className="text-xs text-secondary italic">Save once to add content blocks.</p>
+              )}
             </div>
           )}
           {contentType === "practice_test" && (
             <div className="space-y-4 pt-2 border-t border-[var(--divider)]">
-              <h3 className="text-sm font-medium text-charcoal">Practice test</h3>
-              <div className="grid grid-cols-1 gap-4">
+              <h3 className="text-sm font-medium text-charcoal">Practice test settings</h3>
+              <div className="grid sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-secondary mb-1">PDF URL</label>
+                  <label className="block text-sm text-secondary mb-1">Duration (minutes)</label>
+                  <input
+                    type="number"
+                    value={sidecarStr("duration_minutes")}
+                    onChange={(e) => updateSidecar("duration_minutes", e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                    className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
+                    placeholder="60"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-secondary mb-1">Passing score (%)</label>
+                  <input
+                    type="number"
+                    value={sidecarStr("passing_score_percent")}
+                    onChange={(e) => updateSidecar("passing_score_percent", e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                    className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
+                    placeholder="60"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-secondary mb-1">Format</label>
+                  <select
+                    value={sidecarStr("test_variant") || "full"}
+                    onChange={(e) => updateSidecar("test_variant", e.target.value)}
+                    className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal bg-white"
+                  >
+                    <option value="full">Full mock test</option>
+                    <option value="mini">Mini mock test</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm text-secondary mb-1">Attempt policy</label>
+                  <select
+                    value={sidecarStr("attempt_policy") || "unlimited"}
+                    onChange={(e) => updateSidecar("attempt_policy", e.target.value)}
+                    className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal bg-white"
+                  >
+                    <option value="unlimited">Unlimited attempts</option>
+                    <option value="one_time">One attempt only</option>
+                  </select>
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-sm text-secondary mb-1">Instructions</label>
+                  <textarea
+                    value={sidecarStr("instructions")}
+                    onChange={(e) => updateSidecar("instructions", e.target.value || undefined)}
+                    rows={2}
+                    className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
+                    placeholder="Shown before the learner starts the test"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-sm text-secondary mb-1">Official PDF URL (optional supplementary download)</label>
                   <input
                     type="url"
-                    value={metaStr("pdf_url")}
-                    onChange={(e) => updateMeta({ ...form.meta, pdf_url: e.target.value || undefined })}
+                    value={sidecarStr("pdf_url")}
+                    onChange={(e) => updateSidecar("pdf_url", e.target.value || undefined)}
                     className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
                     placeholder="https://..."
                   />
                 </div>
-                <div>
-                  <label className="block text-sm text-secondary mb-1">Audio URLs (one per line)</label>
-                  <textarea
-                    value={metaArr("audio_urls").join("\n")}
-                    onChange={(e) =>
-                      updateMeta({
-                        ...form.meta,
-                        audio_urls: e.target.value
-                          ? e.target.value.split("\n").map((s) => s.trim()).filter(Boolean)
-                          : undefined,
-                      })
-                    }
-                    rows={3}
-                    className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal font-mono text-sm"
-                    placeholder="https://...section1.mp3"
-                  />
-                </div>
               </div>
+              <p className="text-xs text-secondary italic">Save once to build sections and questions below.</p>
+              {item && <PracticeTestBuilder postId={item.id} jlptLevel={form.jlpt_level} />}
             </div>
           )}
           {contentType === "sounds" && (
@@ -660,65 +802,17 @@ export function LearningContentForm({
               </p>
             </div>
           )}
-
-          {/* Examples array (grammar, vocabulary, kanji, listening, writing) */}
-          {["grammar", "vocabulary", "kanji", "listening", "writing"].includes(contentType) && (
+          {contentType === "conversation" && (
             <div className="space-y-4 pt-2 border-t border-[var(--divider)]">
-              <h3 className="text-sm font-medium text-charcoal">Examples</h3>
-              <p className="text-xs text-secondary mb-2">Each row: Japanese, romaji, translation. Shown on the lesson page with per-example sound.</p>
-              <div className="space-y-3">
-                {getExamples().map((ex, i) => (
-                  <div key={i} className="flex flex-wrap items-start gap-2 p-3 rounded-bento border border-[var(--divider)] bg-[var(--divider)]/10">
-                    <input
-                      type="text"
-                      placeholder="Japanese"
-                      value={ex.japanese ?? ""}
-                      onChange={(e) => {
-                        const list = getExamples();
-                        list[i] = { ...list[i], japanese: e.target.value };
-                        setExamples(list);
-                      }}
-                      className="flex-1 min-w-[120px] px-3 py-2 border border-[var(--divider)] rounded-bento text-charcoal text-sm"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Romaji"
-                      value={ex.romaji ?? ""}
-                      onChange={(e) => {
-                        const list = getExamples();
-                        list[i] = { ...list[i], romaji: e.target.value };
-                        setExamples(list);
-                      }}
-                      className="flex-1 min-w-[120px] px-3 py-2 border border-[var(--divider)] rounded-bento text-charcoal text-sm"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Translation"
-                      value={ex.translation ?? ""}
-                      onChange={(e) => {
-                        const list = getExamples();
-                        list[i] = { ...list[i], translation: e.target.value };
-                        setExamples(list);
-                      }}
-                      className="flex-1 min-w-[120px] px-3 py-2 border border-[var(--divider)] rounded-bento text-charcoal text-sm"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setExamples(getExamples().filter((_, j) => j !== i))}
-                      className="px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-bento border border-[var(--divider)]"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => setExamples([...getExamples(), { japanese: "", romaji: "", translation: "" }])}
-                  className="px-4 py-2 text-sm border border-[var(--divider)] rounded-bento text-charcoal hover:bg-[var(--divider)]/20"
-                >
-                  Add example
-                </button>
-              </div>
+              <h3 className="text-sm font-medium text-charcoal">Conversation</h3>
+              <p className="text-sm text-secondary">
+                Build the scenario from content blocks below — dialogue lines, speaking prompts, audio, vocabulary/grammar tie-ins.
+              </p>
+              {item ? (
+                <ContentBlocksSection postId={item.id} />
+              ) : (
+                <p className="text-xs text-secondary italic">Save once to add content blocks.</p>
+              )}
             </div>
           )}
 

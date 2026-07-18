@@ -1,19 +1,20 @@
-import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { sql } from "@/lib/db";
 import { LEARN_CONTENT_TYPES, type LearnContentType } from "@/lib/learn-filters";
 import { isLearnContent } from "@/lib/blog-filters";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
-import { LearnEditPageActions } from "@/components/admin/LearnEditPageActions";
 import { BlogPostForm } from "../../BlogPostForm";
-import { LearningContentForm } from "@/app/(admin)/admin/learn/LearningContentForm";
 
 export default async function AdminBlogsEditPage({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }) {
-  const { slug } = await params;
+  const { slug: rawSlug } = await params;
+  // [slug] isn't the final path segment here (followed by "edit"), so Next.js
+  // doesn't auto-decode it — non-ASCII slugs (old bookmarked learn-content
+  // URLs) arrive still percent-encoded. Decode explicitly; harmless no-op otherwise.
+  const slug = decodeURIComponent(rawSlug);
   if (!sql) notFound();
 
   const rows = await sql`
@@ -28,42 +29,13 @@ export default async function AdminBlogsEditPage({
   const contentType = row.content_type != null ? String(row.content_type) : null;
   const isLearn = contentType && isLearnContent(contentType);
 
+  // Learn content types now have their own dedicated editor; keep this redirect
+  // so old bookmarked /admin/blogs/{slug}/edit links still work.
   if (isLearn && LEARN_CONTENT_TYPES.includes(contentType as LearnContentType)) {
-    const item = {
-      id: String(row.id),
-      slug: String(row.slug),
-      title: String(row.title ?? ""),
-      content: row.content != null ? String(row.content) : null,
-      jlpt_level: row.jlpt_level != null ? String(row.jlpt_level) : null,
-      tags: Array.isArray(row.tags) ? (row.tags as string[]) : [],
-      meta: row.meta != null && typeof row.meta === "object" ? (row.meta as Record<string, unknown>) : {},
-      status: String(row.status ?? "draft"),
-      sort_order: Number(row.sort_order) ?? 0,
-    };
-
-    return (
-      <div>
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <div>
-            <nav className="text-sm text-secondary mb-2 flex items-center gap-2">
-              <Link href="/admin" className="hover:text-primary transition">Admin</Link>
-              <span className="opacity-50">／</span>
-              <Link href="/admin/blogs" className="hover:text-primary transition">Blogs</Link>
-              <span className="opacity-50">／</span>
-              <span className="text-charcoal truncate max-w-[200px]">{item.title}</span>
-            </nav>
-            <h1 className="font-heading text-2xl font-bold text-charcoal">{`Edit ${item.title}`}</h1>
-          </div>
-          <LearnEditPageActions
-            contentType={contentType}
-            slug={slug}
-            status={item.status}
-            redirectAfterDelete="/admin/blogs"
-          />
-        </div>
-        <LearningContentForm contentType={contentType} item={item} editBasePath="blogs" />
-      </div>
-    );
+    // redirect() sets a raw HTTP Location header, which Node rejects outright
+    // for non-ASCII bytes (unlike a JSX href, which the browser encodes for us)
+    // — encode the slug explicitly so this doesn't crash for Unicode slugs.
+    redirect(`/admin/learn/${contentType}/${encodeURIComponent(slug)}/edit`);
   }
 
   // Blog post (content_type null or 'blog')

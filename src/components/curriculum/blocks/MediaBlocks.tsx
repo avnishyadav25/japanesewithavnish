@@ -1,12 +1,67 @@
-import type { AudioData, PronunciationData, DialogueData, ReadingPassageData } from "@/lib/curriculum/blockTypes";
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import type { AudioData, PronunciationData, DialogueData, ReadingPassageData, ResourceLinkData, NextLessonData } from "@/lib/blocks/blockTypes";
+import type { LessonResolved } from "@/lib/curriculum/getLessonBlocks";
+import { EmptyBlockState } from "./BlockStates";
 
 export function AudioBlock({ data }: { data: AudioData }) {
+  const [failed, setFailed] = useState(false);
   return (
     <div className="bg-white border border-[var(--divider)] rounded-bento p-5">
-      <audio controls loop={data.loop} src={data.audioUrl} className="w-full" />
+      {failed ? (
+        <p className="text-red-700 text-xs bg-red-50 border border-red-200 rounded-xl px-3 py-2">Audio unavailable — the file couldn&apos;t be loaded.</p>
+      ) : (
+        <audio controls loop={data.loop} src={data.audioUrl} className="w-full" onError={() => setFailed(true)} />
+      )}
       {data.transcript && <p className="text-charcoal text-sm mt-3">{data.transcript}</p>}
       {data.translation && <p className="text-secondary text-xs mt-1">{data.translation}</p>}
     </div>
+  );
+}
+
+const RESOURCE_TYPE_ICONS: Record<ResourceLinkData["resourceType"], string> = {
+  article: "📄",
+  video: "🎬",
+  audio: "🎧",
+  tool: "🛠️",
+  pdf: "📑",
+  other: "🔗",
+};
+
+export function ResourceLinkBlock({ data }: { data: ResourceLinkData }) {
+  return (
+    <a
+      href={data.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-start gap-3 bg-white border border-[var(--divider)] rounded-bento p-5 hover:border-primary/40 transition"
+    >
+      <span className="text-2xl shrink-0">{RESOURCE_TYPE_ICONS[data.resourceType] ?? "🔗"}</span>
+      <div className="min-w-0">
+        <p className="text-charcoal font-semibold text-sm">{data.title}</p>
+        {data.description && <p className="text-secondary text-xs mt-1">{data.description}</p>}
+        <p className="text-primary text-xs mt-1 font-semibold">Open resource →</p>
+      </div>
+    </a>
+  );
+}
+
+export function NextLessonBlock({ data, lessons }: { data: NextLessonData; lessons: LessonResolved[] }) {
+  const lesson = lessons[0];
+  if (!lesson) return <EmptyBlockState label="The next lesson for this block is unavailable." />;
+  return (
+    <Link
+      href={`/learn/curriculum/lesson/${lesson.slug || lesson.id}`}
+      className="flex items-center justify-between gap-3 bg-white border border-primary/20 rounded-bento p-5 hover:border-primary/40 transition"
+    >
+      <div className="min-w-0">
+        <p className="text-[10px] font-bold text-primary uppercase tracking-wider">{data.note || "Next lesson"}</p>
+        <p className="text-charcoal font-semibold text-sm mt-1">{lesson.title}</p>
+      </div>
+      <span className="text-primary text-lg shrink-0">→</span>
+    </Link>
   );
 }
 

@@ -5,6 +5,8 @@ import Link from "next/link";
 import { TTSPlayButton } from "@/components/learn/LessonMetaContent";
 import { WritingPracticeModal } from "@/components/learn/WritingPracticeModal";
 import type { CharacterType } from "@/components/learn/WritingCanvas";
+import { SaveButton } from "@/components/curriculum/SaveButton";
+import { ReportIssueButton } from "@/components/learn/ReportIssueButton";
 
 type VocabItem = { id: string; word: string | null; reading: string | null; meaning: string | null; slug: string };
 type GrammarItem = { id: string; pattern: string | null; structure: string | null; slug: string };
@@ -16,23 +18,54 @@ export function LessonMaterialsSidebar({
   grammar,
   kanji,
   kana,
+  lessonId,
+  sectionProgress,
+  saved,
 }: {
   vocab: VocabItem[];
   grammar: GrammarItem[];
   kanji: KanjiItem[];
   kana: KanaItem[];
+  lessonId: string;
+  /** Omitted for anonymous viewers (nothing to persist against — see page.tsx). */
+  sectionProgress?: { total: number; completed: number };
+  /** Only meaningful alongside sectionProgress — both come from a logged-in viewer. */
+  saved?: boolean;
 }) {
   const [practiceChar, setPracticeChar] = useState<{ character: string; characterType: CharacterType } | null>(null);
 
   return (
     <div id="lists" className="space-y-4">
+      {sectionProgress && sectionProgress.total > 0 && (
+        <div className="bg-white border border-[var(--divider)] rounded-2xl p-4 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-heading font-bold text-xs uppercase tracking-wider text-secondary">Your progress</h3>
+            <span className="text-xs font-semibold text-charcoal">
+              {sectionProgress.completed} of {sectionProgress.total} sections
+            </span>
+          </div>
+          <div className="h-1.5 rounded-full bg-[var(--divider)]/40 overflow-hidden">
+            <div
+              className="h-full bg-primary rounded-full transition-all"
+              style={{ width: `${Math.round((sectionProgress.completed / sectionProgress.total) * 100)}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {saved !== undefined && (
+        <div className="flex items-center gap-2">
+          <SaveButton ownerType="lesson" ownerId={lessonId} saved={saved} />
+        </div>
+      )}
+
       <h3 className="font-heading font-bold text-xs uppercase tracking-wider text-secondary pl-1">
         Lesson Materials
       </h3>
 
       {/* Vocabulary */}
       <div className="bg-white border border-[var(--divider)] rounded-2xl p-4 shadow-sm">
-        <h4 className="font-heading font-semibold text-xs text-charcoal mb-2">Vocabulary</h4>
+        <h4 className="font-heading font-semibold text-xs text-charcoal mb-2">Vocabulary ({vocab.length})</h4>
         {vocab.length ? (
           <div className="space-y-2.5">
             {vocab.map((v) => (
@@ -54,7 +87,7 @@ export function LessonMaterialsSidebar({
 
       {/* Grammar */}
       <div className="bg-white border border-[var(--divider)] rounded-2xl p-4 shadow-sm">
-        <h4 className="font-heading font-semibold text-xs text-charcoal mb-2">Grammar</h4>
+        <h4 className="font-heading font-semibold text-xs text-charcoal mb-2">Grammar ({grammar.length})</h4>
         {grammar.length ? (
           <div className="space-y-2.5">
             {grammar.map((g) => (
@@ -76,7 +109,7 @@ export function LessonMaterialsSidebar({
 
       {/* Kanji */}
       <div className="bg-white border border-[var(--divider)] rounded-2xl p-4 shadow-sm">
-        <h4 className="font-heading font-semibold text-xs text-charcoal mb-2">Kanji</h4>
+        <h4 className="font-heading font-semibold text-xs text-charcoal mb-2">Kanji ({kanji.length})</h4>
         {kanji.length ? (
           <div className="space-y-2.5">
             {kanji.map((k) => (
@@ -115,7 +148,7 @@ export function LessonMaterialsSidebar({
 
       {/* Kana */}
       <div className="bg-white border border-[var(--divider)] rounded-2xl p-4 shadow-sm">
-        <h4 className="font-heading font-semibold text-xs text-charcoal mb-2">Kana</h4>
+        <h4 className="font-heading font-semibold text-xs text-charcoal mb-2">Kana ({kana.length})</h4>
         {kana.length ? (
           <div className="flex flex-wrap gap-1.5">
             {kana.map((k) => (
@@ -133,6 +166,10 @@ export function LessonMaterialsSidebar({
         ) : (
           <p className="text-secondary text-xs italic">No kana characters in this lesson.</p>
         )}
+      </div>
+
+      <div className="pl-1">
+        <ReportIssueButton entityType="lesson" entityId={lessonId} />
       </div>
 
       {practiceChar && (

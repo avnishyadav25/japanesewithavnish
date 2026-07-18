@@ -21,6 +21,8 @@
     "content:verify-jlpt-facts": "tsx scripts/verify-jlpt-facts.ts",
     "content:triage-quality": "tsx scripts/triage-content-quality.ts",
     "content:dedupe": "node scripts/dedupe-learning-content.mjs",
+    "content:diagnose-slugs": "node scripts/diagnose-learn-content-slugs.mjs",
+    "content:backfill-sidecar-examples": "node scripts/backfill-sidecar-examples.mjs",
     "content:seed-kanji": "node scripts/seed-kanji-coverage-from-json.mjs",
     "content:import-n5-n4-vocab": "node scripts/import-nihongoichiban-n5-n4-vocab.mjs",
     "content:import-n3-n2-n1-vocab": "node scripts/import-japanesetest4you-n3-n2-n1-vocab.mjs",

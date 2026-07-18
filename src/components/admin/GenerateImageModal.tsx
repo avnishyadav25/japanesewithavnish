@@ -6,6 +6,8 @@ import {
   type ImageType,
   type ImageContext,
 } from "@/lib/ai/image-prompts";
+import { getSocialFormat, type SocialFormatId } from "@/lib/ai/social-formats";
+import { SocialFormatPicker } from "@/components/admin/SocialFormatPicker";
 
 type GenerateImageModalProps = {
   open: boolean;
@@ -28,6 +30,7 @@ export function GenerateImageModal({
   const [tags, setTags] = useState(initialContext.tags ?? "");
   const [description, setDescription] = useState(initialContext.description ?? "");
   const [customPrompt, setCustomPrompt] = useState(initialPrompt ?? "");
+  const [format, setFormat] = useState<SocialFormatId>("landscape");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -38,6 +41,7 @@ export function GenerateImageModal({
       setTags(initialContext.tags ?? "");
       setDescription(initialContext.description ?? "");
       setCustomPrompt(initialPrompt ?? "");
+      setFormat("landscape");
       setError(null);
       setPreviewUrl(null);
     }
@@ -68,7 +72,7 @@ export function GenerateImageModal({
       const res = await fetch("/api/ai/generate-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageType, context, prompt: previewPrompt }),
+        body: JSON.stringify({ imageType, context, prompt: previewPrompt, aspectRatio: getSocialFormat(format).aspectRatio }),
       });
       const data = await res.json();
 
@@ -147,6 +151,8 @@ export function GenerateImageModal({
               className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
             />
           </div>
+
+          <SocialFormatPicker value={format} onChange={setFormat} />
 
           <div>
             <label className="block text-sm font-medium text-charcoal mb-1">

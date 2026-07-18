@@ -2,6 +2,15 @@ import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { isReviewEntityType } from "@/lib/contentReview/types";
 
+// REVIEW_ENTITY_TYPES deliberately excludes curriculum lessons (they use their own admin-side
+// review_status gate, not the AI content-review pipeline) — but learners should still be able to
+// report an issue on a lesson page, into the same lightweight learner_content_reports table.
+// "lesson" is accepted here, one level up from the AI-pipeline entity list, not added to it.
+const REPORTABLE_ENTITY_TYPES = ["lesson"];
+function isReportableEntityType(value: string): boolean {
+  return isReviewEntityType(value) || REPORTABLE_ENTITY_TYPES.includes(value);
+}
+
 const REPORT_CATEGORIES = [
   "japanese_mistake", "wrong_meaning", "wrong_reading", "wrong_answer",
   "audio_problem", "broken_image", "too_difficult", "unclear", "duplicate", "other",
@@ -38,7 +47,7 @@ export async function POST(req: Request) {
     const message = typeof body.message === "string" ? body.message.trim().slice(0, 2000) : null;
     const reporterEmail = typeof body.reporterEmail === "string" ? body.reporterEmail.trim().slice(0, 200) : null;
 
-    if (typeof entityType !== "string" || !isReviewEntityType(entityType) || typeof entityId !== "string" || !entityId) {
+    if (typeof entityType !== "string" || !isReportableEntityType(entityType) || typeof entityId !== "string" || !entityId) {
       return NextResponse.json({ error: "entityType and entityId are required" }, { status: 400 });
     }
     if (typeof category !== "string" || !REPORT_CATEGORIES.includes(category)) {

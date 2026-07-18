@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminCard } from "@/components/admin/AdminCard";
+import { SendEmailPanel } from "@/components/admin/SendEmailPanel";
+import { UserActivityTrace } from "@/components/admin/UserActivityTrace";
 
 type UserDetail = {
   email: string;
@@ -259,6 +261,18 @@ export default function AdminUserDetailPage() {
                 <span className="text-lg font-black text-primary mt-1 block">{user.xp} / {user.points}</span>
               </div>
             </div>
+          </AdminCard>
+
+          {/* Section 4: Send email */}
+          <AdminCard>
+            <h3 className="font-heading font-bold text-charcoal text-sm mb-4">Send Email</h3>
+            <SendEmailPanel email={email} />
+          </AdminCard>
+
+          {/* Section 5: Activity trace */}
+          <AdminCard>
+            <h3 className="font-heading font-bold text-charcoal text-sm mb-4">Activity Trace</h3>
+            <UserActivityTrace email={email} />
           </AdminCard>
 
         </div>

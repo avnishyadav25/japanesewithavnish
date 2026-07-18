@@ -68,6 +68,7 @@ const navGroups = [
       { href: "/admin/learn/reading", label: "Reading" },
       { href: "/admin/learn/listening", label: "Listening" },
       { href: "/admin/learn/writing", label: "Writing" },
+      { href: "/admin/learn/conversation", label: "Conversation" },
       { href: "/admin/learn/practice_test", label: "Mock Tests" },
       { href: "/admin/blogs", label: "Blogs" },
       { href: "/admin/guide", label: "Site Guide" }

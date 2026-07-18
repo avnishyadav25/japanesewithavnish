@@ -40,8 +40,9 @@ type Post = {
 
 export function BlogPostForm({ post }: { post?: Post }) {
   const router = useRouter();
-  const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [currentSlug, setCurrentSlug] = useState(post?.slug ?? "");
   const [gateFindings, setGateFindings] = useState<{ id: string; title: string; description: string }[] | null>(null);
   const [gateReasons, setGateReasons] = useState<string[]>([]);
   const [overrideGate, setOverrideGate] = useState(false);
@@ -79,7 +80,7 @@ export function BlogPostForm({ post }: { post?: Post }) {
     setGateReasons([]);
     try {
       const res = await fetch(
-        post ? `/api/admin/posts/${post.slug}` : "/api/admin/posts",
+        post ? `/api/admin/posts/${currentSlug}` : "/api/admin/posts",
         {
           method: post ? "PUT" : "POST",
           headers: { "Content-Type": "application/json" },
@@ -120,12 +121,22 @@ export function BlogPostForm({ post }: { post?: Post }) {
           // ignore parse error
         }
         setErrorMessage(msg);
-        throw new Error(msg);
+        setStatus("error");
+        return;
       }
-      router.push("/admin/blogs");
+      // Stay on this page after saving (rather than redirecting to the list) so the success
+      // message and any gate/error banners are actually visible. If the slug changed, swap
+      // the URL to match without a full navigation/reload, and use the new slug for the next
+      // save's PUT target — otherwise a second save would 404 against the old slug.
+      if (post && form.slug && form.slug !== currentSlug) {
+        setCurrentSlug(form.slug);
+        router.replace(`/admin/blogs/${form.slug}/edit`);
+      }
+      setStatus("success");
       router.refresh();
     } catch {
       setStatus("error");
+      setErrorMessage("Failed to save blog post — check your connection and try again.");
     }
   }
 
@@ -434,6 +445,9 @@ export function BlogPostForm({ post }: { post?: Post }) {
         <button type="submit" className="btn-primary" disabled={status === "loading"}>
           {status === "loading" ? "Saving..." : "Save"}
         </button>
+        {status === "success" && (
+          <span className="text-sm text-green-600 font-medium">✓ Saved</span>
+        )}
         {status === "error" && errorMessage && (
           <span className="text-sm text-red-600">{errorMessage}</span>
         )}

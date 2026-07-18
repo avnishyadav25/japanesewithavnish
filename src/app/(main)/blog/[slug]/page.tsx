@@ -6,6 +6,8 @@ import { BlogCommentList } from "@/components/BlogCommentList";
 import { BlogStickyCta } from "@/components/blog/BlogStickyCta";
 import { BlogTableOfContents } from "@/components/blog/BlogTableOfContents";
 import { BlogArticleContent } from "@/components/blog/BlogArticleContent";
+import { BlogKeyTakeaways } from "@/components/blog/BlogKeyTakeaways";
+import { BlogSources } from "@/components/blog/BlogSources";
 import { JLPTVerificationBox } from "@/components/learn/JLPTVerificationBox";
 import { BlogNextStepCta } from "@/components/blog/BlogNextStepCta";
 import { BlogPostCard } from "@/components/blog/BlogPostCard";
@@ -56,8 +58,14 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
     id: string; title: string; summary?: string | null; seo_description?: string | null; content?: string | null;
     published_at?: string | null; updated_at?: string | null; og_image_url?: string | null; jlpt_level?: unknown; tags?: string[];
     author_name?: string | null;
-    meta?: { jlpt_verification?: { verifiedAt?: string; source?: string; reviewedBy?: string } } | null;
+    meta?: {
+      jlpt_verification?: { verifiedAt?: string; source?: string; reviewedBy?: string };
+      keyTakeaways?: string[];
+      sources?: { title: string; url: string }[];
+    } | null;
   };
+  const keyTakeaways = Array.isArray(post.meta?.keyTakeaways) ? post.meta!.keyTakeaways! : [];
+  const sources = Array.isArray(post.meta?.sources) ? post.meta!.sources! : [];
   const authorName = post.author_name?.trim() || "Japanese with Avnish Editorial Team";
 
   const jlptLevels = Array.isArray(post.jlpt_level)
@@ -187,6 +195,8 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
               </div>
             )}
 
+            <BlogKeyTakeaways items={keyTakeaways} />
+
             {/* TOC + Article */}
             <div className="flex gap-8">
               {isMarkdown && (
@@ -200,6 +210,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
                     <BlogArticleContent content={contentStr} title={post.title} />
                   ) : null}
                   <JLPTVerificationBox verification={post.meta?.jlpt_verification} />
+                  <BlogSources sources={sources} />
                 </div>
               </div>
             </div>
