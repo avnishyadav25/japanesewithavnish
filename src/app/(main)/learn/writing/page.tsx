@@ -24,6 +24,7 @@ export default async function LearnWritingPage({
   );
 
   const levelsInfo = [
+    { code: "all", title: "All", label: "Every level" },
     { code: "n5", title: "N5", label: "Beginner" },
     { code: "n4", title: "N4", label: "Elementary" },
     { code: "n3", title: "N3", label: "Intermediate" },
@@ -71,7 +72,7 @@ export default async function LearnWritingPage({
 
         {/* Level Tabs */}
         <div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
             {levelsInfo.map((l) => {
               const active = level === l.code;
               return (

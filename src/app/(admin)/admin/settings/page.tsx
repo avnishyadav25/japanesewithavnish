@@ -22,6 +22,11 @@ export default async function AdminSettingsPage() {
         if (HOMEPAGE_KEYS.includes(r.key)) {
           homepageSettings[r.key] = v ?? null;
           settings[r.key] = v ?? null;
+        } else if (v != null && typeof v === "object") {
+          // Object/array-valued settings (e.g. learn_recommended, progression_rules,
+          // jlpt_pinned_posts) must pass through unchanged — String(v) on these produces
+          // "[object Object]" or a lossy comma-joined array, corrupting the value on next save.
+          settings[r.key] = v;
         } else {
           settings[r.key] = v == null ? "" : String(v);
         }

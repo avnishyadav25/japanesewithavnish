@@ -96,9 +96,15 @@ function chunkToSets(chars: string[], level: string): WritingSet[] {
   return sets;
 }
 
-/** All writing sets for a level (kana sets are N5 only). */
+/** All writing sets for a level (kana sets are N5 only). "all" is the union of every real
+ * per-level level's sets (not a re-chunked cross-level kanji list) — each set keeps its real
+ * N5-N1 level/slug this way, so resolveWritingSet's slug lookup below still works unchanged. */
 export async function getWritingSetsForLevel(level: string): Promise<WritingSet[]> {
   const upper = level.toUpperCase();
+  if (upper === "ALL") {
+    const perLevel = await Promise.all(["N5", "N4", "N3", "N2", "N1"].map((lv) => getWritingSetsForLevel(lv)));
+    return perLevel.flat();
+  }
   const kanjiSets = chunkToSets(await kanjiCharsForLevel(upper), upper);
   if (upper === "N5") return [...KANA_SETS, ...LEGACY_KANJI_SETS, ...kanjiSets];
   return kanjiSets;

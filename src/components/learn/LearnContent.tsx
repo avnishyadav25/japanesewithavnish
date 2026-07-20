@@ -121,6 +121,7 @@ export function LearnContent({
   const prevHref = currentPage <= 2 ? (prevParams.toString() ? `${basePath}?${prevParams.toString()}` : basePath) : `${basePath}?${prevParams.toString()}`;
 
   const levelsInfo = [
+    { code: "all", title: "All", label: "Every level" },
     { code: "n5", title: "N5", label: "Beginner" },
     { code: "n4", title: "N4", label: "Elementary" },
     { code: "n3", title: "N3", label: "Intermediate" },
@@ -196,9 +197,9 @@ export function LearnContent({
 
         {/* Level filter layout */}
         {lockCategory ? (
-          /* Locked Category Page: 5 Level Boxes */
+          /* Locked Category Page: 6 Level Boxes (All + N5-N1) */
           <div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
               {levelsInfo.map((l) => {
                 const active = level.toLowerCase() === l.code;
                 return (
@@ -218,17 +219,6 @@ export function LearnContent({
                 );
               })}
             </div>
-            {level !== "all" && (
-              <div className="mt-4 text-right">
-                <button
-                  type="button"
-                  onClick={() => handleLevelSelect("all")}
-                  className="text-sm text-primary hover:underline font-medium"
-                >
-                  Clear level filter
-                </button>
-              </div>
-            )}
           </div>
         ) : (
           /* General Category Landing Page: Tabs */

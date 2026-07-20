@@ -83,6 +83,13 @@ export default function LearnHubPage() {
       image: "/images/hub/quiz.jpg",
       badge: "Quiz",
     },
+    {
+      title: "JLPT Mock Tests",
+      desc: "Full-length and mini practice tests by level, with section timers, real scoring, and weak-area analysis.",
+      href: "/learn/practice_test",
+      image: "/images/hub/mock-test.jpg",
+      badge: "New",
+    },
   ];
 
   return (

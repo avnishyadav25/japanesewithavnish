@@ -16,9 +16,14 @@ export async function POST(req: Request) {
 
     const updatedAt = new Date().toISOString();
     for (const [key, value] of Object.entries(body)) {
+      // value column is JSONB — every write in this codebase goes through JSON.stringify()::jsonb
+      // (see e.g. social-packs/[id]/route.ts); a plain JS string passed directly, unencoded, is
+      // not valid JSON on its own (JSON strings must be quoted) and fails Postgres's jsonb
+      // validation (22P02) for every plain-text setting — this was the actual cause of every
+      // save silently failing.
       await sql`
         INSERT INTO site_settings (key, value, updated_at)
-        VALUES (${key}, ${value ?? null}, ${updatedAt})
+        VALUES (${key}, ${JSON.stringify(value ?? null)}::jsonb, ${updatedAt})
         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at
       `;
     }
