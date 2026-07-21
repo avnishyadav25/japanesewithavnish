@@ -13,7 +13,7 @@ export default async function LearnWritingPage({
   searchParams?: Promise<{ level?: string; search?: string }>;
 }) {
   const sp = await searchParams;
-  const level = (sp?.level || "n5").toLowerCase();
+  const level = (sp?.level || "all").toLowerCase();
   const search = (sp?.search || "").toLowerCase().trim();
 
   // Kana rows + DB-driven kanji sets for the selected level

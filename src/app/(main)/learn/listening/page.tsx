@@ -14,7 +14,7 @@ export default async function LearnListeningPage({
   searchParams: Promise<{ level?: string; search?: string; sort?: string; page?: string }>;
 }) {
   const sp = await searchParams;
-  const level = normalizeLearnLevel(sp.level || "n5");
+  const level = normalizeLearnLevel(sp.level || "all");
   const search = (sp.search || "").trim();
   const sort = sp.sort === "recommended" ? ("recommended" as const) : ("newest" as const);
   const page = Math.max(1, parseInt(sp.page || "1", 10));
