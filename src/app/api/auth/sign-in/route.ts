@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { verifyPassword } from "@/lib/auth/password";
 import { createSessionToken, getSessionCookieName } from "@/lib/auth/session";
+import { recordLoginEvent } from "@/lib/auth/loginEvents";
 import { logError } from "@/lib/error-log";
 
 export async function POST(req: Request) {
@@ -28,11 +29,7 @@ export async function POST(req: Request) {
     }
 
     const sessionToken = await createSessionToken(row.email);
-    try {
-      await sql`UPDATE profiles SET last_login_at = NOW(), updated_at = NOW() WHERE email = ${row.email}`;
-    } catch {
-      // ignore if column missing
-    }
+    await recordLoginEvent(row.email, req);
     const redirectTo = typeof redirectParam === "string" ? redirectParam : "/learn/dashboard";
     const safeRedirect = redirectTo.startsWith("/") ? redirectTo : "/learn/dashboard";
 

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { AdminCard } from "@/components/admin/AdminCard";
 import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
-import { BLOCK_TYPE_LABELS, type BlockType } from "@/lib/curriculum/blockTypes";
+import { BLOCK_TYPE_LABELS, type BlockType } from "@/lib/blocks/blockTypes";
 
 type PendingBlock = {
   id: string;

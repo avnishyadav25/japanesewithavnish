@@ -29,6 +29,7 @@ export async function PUT(
       image_prompt,
       author_name,
       override_review_gate,
+      published_at,
     } = body;
 
     if (!slug || !title) {
@@ -38,7 +39,12 @@ export async function PUT(
     if (!sql) return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
 
     const statusVal = status === "published" ? "published" : "draft";
-    const publishedAtVal = statusVal === "published" ? new Date().toISOString() : null;
+    // Bug fix: this previously ignored the submitted published_at entirely and always reset
+    // it to the current save time whenever status was "published" — silently bumping an
+    // already-published post's date on every edit, and making the form's "Published at"
+    // field non-functional. Now honors whatever was submitted, only defaulting to "now" the
+    // first time a post is actually published (no value submitted).
+    const publishedAtVal = statusVal === "published" ? published_at || new Date().toISOString() : null;
 
     if (statusVal === "published" && !override_review_gate) {
       const existingRows = await sql`SELECT id FROM posts WHERE slug = ${oldSlug} LIMIT 1`;

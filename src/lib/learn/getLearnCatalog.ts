@@ -107,6 +107,13 @@ export async function getLearnCatalog({
   );
 
   const recommendedItems: LearnItemForFilter[] = [];
+  // Only explicitly founder-curated items get excluded from the main list below (showing a
+  // deliberately-highlighted item twice on one page is redundant) — items that just backfilled
+  // an under-full Recommended row stay eligible for the main list too. Content types/levels with
+  // very few items (e.g. a level with only 1-2 published practice tests) would otherwise have
+  // every item swallowed into "Recommended", leaving the main list to wrongly claim nothing
+  // exists at all.
+  const curatedIds = new Set<string>();
   const seen = new Set<string>();
 
   for (const slug of curatedSlugs.slice(0, 6)) {
@@ -116,6 +123,7 @@ export async function getLearnCatalog({
     if (respectCuratedLevel && !matchesLevel(item.jlpt_level, level)) continue;
     recommendedItems.push(item);
     seen.add(item.id);
+    curatedIds.add(item.id);
   }
 
   // Fill remaining slots from the filtered list.
@@ -143,8 +151,7 @@ export async function getLearnCatalog({
             (createdAtMsById.get(b.id) ?? 0) - (createdAtMsById.get(a.id) ?? 0)
         );
 
-  const recommendedIds = new Set(recommendedItems.map((i) => i.id));
-  const listItems = sorted.filter((i) => !recommendedIds.has(i.id));
+  const listItems = sorted.filter((i) => !curatedIds.has(i.id));
 
   const totalCount = listItems.length;
   const totalPages = Math.ceil(totalCount / PER_PAGE) || 1;

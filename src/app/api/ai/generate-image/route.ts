@@ -10,6 +10,10 @@ import { generateImageWithDeepSeekHtml } from "@/lib/ai/image-providers/deepseek
 
 const validImageTypes: ImageType[] = ["product", "blog", "newsletter", "page", "learning", "curriculum"];
 
+// Content types with their own DB-editable image prompt (ai_prompts key
+// "learning_{type}_image") — see ALLOWED_PROMPT_KEYS in src/lib/ai/load-prompts.ts.
+const LEARNING_IMAGE_PROMPT_TYPES = new Set(["vocabulary", "grammar", "kanji"]);
+
 function getR2Client(): S3Client | null {
   const endpoint = process.env.R2_ENDPOINT;
   const accessKey = process.env.R2_ACCESS_KEY_ID;
@@ -51,6 +55,20 @@ export async function POST(req: Request) {
         userPrompt = dbPrompt
           .replace(/\{\{title\}\}/g, title)
           .replace(/\{\{entityType\}\}/g, entityType);
+      } else {
+        userPrompt = getImagePrompt(imageType, context);
+      }
+    } else if (imageType === "learning" && context.contentType && LEARNING_IMAGE_PROMPT_TYPES.has(context.contentType)) {
+      // Per-content-type DB-editable override (e.g. learning_vocabulary_image),
+      // same pattern as curriculum_feature_image above — falls back to the
+      // hardcoded generic "learning" template if no override is set.
+      const dbPrompt = await getPromptContent(`learning_${context.contentType}_image`);
+      if (dbPrompt?.trim()) {
+        const title = context.title || context.topic || "Japanese with Avnish";
+        userPrompt = dbPrompt
+          .replace(/\{\{title\}\}/g, title)
+          .replace(/\{\{jlptLevel\}\}/g, context.jlptLevel || "")
+          .replace(/\{\{contentType\}\}/g, context.contentType);
       } else {
         userPrompt = getImagePrompt(imageType, context);
       }

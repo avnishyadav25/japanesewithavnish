@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth/admin";
 import { sql } from "@/lib/db";
-import { ALL_BLOCK_TYPES, type BlockType } from "@/lib/curriculum/blockTypes";
+import { ALL_BLOCK_TYPES, type BlockType } from "@/lib/blocks/blockTypes";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const admin = await getAdminSession();
@@ -9,7 +9,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (!sql) return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
   const { id: lessonId } = await params;
   const rows = await sql`
-    SELECT id, lesson_id, block_type, block_data, sort_order, status, review_status, generated_by_model, created_at, updated_at
+    SELECT id, lesson_id, block_type, block_data, sort_order, status, block_access, review_status, generated_by_model, created_at, updated_at
     FROM lesson_blocks
     WHERE lesson_id = ${lessonId}
     ORDER BY sort_order, created_at
@@ -34,10 +34,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const maxSortRows = await sql`SELECT COALESCE(MAX(sort_order), 0) AS max FROM lesson_blocks WHERE lesson_id = ${lessonId}`;
   const nextSort = ((maxSortRows as { max: number }[])[0]?.max ?? 0) + 10;
 
+  // New blocks default to the nearest preceding section_heading's access tier — nudges authors
+  // toward gating at "meaningful section boundaries" (per the founder's spec) without a hard DB
+  // constraint; still overridable per-block via PATCH.
+  const precedingSectionRows = await sql`
+    SELECT block_access FROM lesson_blocks
+    WHERE lesson_id = ${lessonId} AND block_type = 'section_heading' AND sort_order < ${nextSort}
+    ORDER BY sort_order DESC LIMIT 1
+  `;
+  const inheritedAccess = (precedingSectionRows as { block_access: string }[])[0]?.block_access ?? "public";
+
   const rows = await sql`
-    INSERT INTO lesson_blocks (lesson_id, block_type, block_data, sort_order, status)
-    VALUES (${lessonId}, ${blockType}, ${JSON.stringify(blockData)}::jsonb, ${nextSort}, 'draft')
-    RETURNING id, lesson_id, block_type, block_data, sort_order, status
+    INSERT INTO lesson_blocks (lesson_id, block_type, block_data, sort_order, status, block_access)
+    VALUES (${lessonId}, ${blockType}, ${JSON.stringify(blockData)}::jsonb, ${nextSort}, 'draft', ${inheritedAccess})
+    RETURNING id, lesson_id, block_type, block_data, sort_order, status, block_access
   `;
   return NextResponse.json((rows as unknown[])[0]);
 }

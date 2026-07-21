@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 
+// Neon's HTTP driver issues its queries via fetch(), which Next.js's Data Cache would otherwise
+// cache indefinitely (including across dev-server restarts, via the on-disk fetch cache) since
+// this route has no other dynamic API usage to opt it out automatically. force-dynamic makes sure
+// every request re-queries site_settings; the Cache-Control header below still bounds how long a
+// CDN/browser may reuse that fresh response.
+export const dynamic = "force-dynamic";
+
 const HOMEPAGE_KEYS = [
   "announcement_bar",
   "bundle_comparison",

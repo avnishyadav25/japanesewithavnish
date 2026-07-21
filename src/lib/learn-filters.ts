@@ -56,6 +56,7 @@ export const LEARN_CONTENT_TYPES = [
   "sounds",
   "study_guide",
   "practice_test",
+  "conversation",
 ] as const;
 
 export type LearnContentType = (typeof LEARN_CONTENT_TYPES)[number];
@@ -70,6 +71,7 @@ export const LEARN_TYPE_LABELS: Record<LearnContentType, string> = {
   sounds: "Sounds",
   study_guide: "Study guide",
   practice_test: "Practice test",
+  conversation: "Conversation",
 };
 
 export const LEARN_CATEGORIES = [
@@ -83,6 +85,7 @@ export const LEARN_CATEGORIES = [
   { id: "sounds", label: "Sounds" },
   { id: "study_guide", label: "Study guide" },
   { id: "practice_test", label: "Practice test" },
+  { id: "conversation", label: "Conversation" },
   { id: "roadmap", label: "Roadmap" },
   { id: "tips", label: "Tips" },
 ] as const;

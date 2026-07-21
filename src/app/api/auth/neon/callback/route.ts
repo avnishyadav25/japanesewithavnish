@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { verifyNeonAuthToken } from "@/lib/neon-auth";
 import { createSessionToken } from "@/lib/auth/session";
+import { recordLoginEvent } from "@/lib/auth/loginEvents";
 
 const COOKIE_NAME = "auth_session";
 const MAX_AGE = 60 * 60 * 24 * 7; // 7 days
@@ -25,6 +26,7 @@ export async function GET(req: Request) {
   }
 
   const sessionToken = await createSessionToken(payload.email);
+  await recordLoginEvent(payload.email, req);
   const store = await cookies();
   store.set(COOKIE_NAME, sessionToken, {
     httpOnly: true,

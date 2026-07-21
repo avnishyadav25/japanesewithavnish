@@ -2,11 +2,30 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import type { JapaneseLearningTextData, KanaCharacterData, KanaGridData, VocabularySetData, GrammarRuleData, KanjiFocusData, ExampleSetData, ComparisonData } from "@/lib/curriculum/blockTypes";
+import type {
+  JapaneseLearningTextData,
+  KanaCharacterData,
+  KanaGridData,
+  VocabularySetData,
+  GrammarRuleData,
+  KanjiFocusData,
+  ExampleSetData,
+  ComparisonData,
+  KanjiRadicalsData,
+  SimilarKanjiData,
+  MemoryAidData,
+  GrammarFormationData,
+  NuanceData,
+  RegisterData,
+  WhenNotToUseData,
+  CollocationsData,
+  RelatedWordsData,
+} from "@/lib/blocks/blockTypes";
 import type { VocabResolved, GrammarResolved, KanjiResolved, KanaResolved, ExampleResolved } from "@/lib/curriculum/getLessonBlocks";
 import { TTSPlayButton } from "@/components/learn/LessonMetaContent";
 import { WritingPracticeModal } from "@/components/learn/WritingPracticeModal";
 import type { CharacterType } from "@/components/learn/WritingCanvas";
+import { EmptyBlockState } from "./BlockStates";
 
 export function JapaneseLearningTextBlock({ data }: { data: JapaneseLearningTextData }) {
   return (
@@ -25,6 +44,7 @@ export function JapaneseLearningTextBlock({ data }: { data: JapaneseLearningText
 
 export function KanaCharacterBlock({ kana }: { data: KanaCharacterData; kana: KanaResolved[] }) {
   const [practiceChar, setPracticeChar] = useState<{ character: string; characterType: CharacterType } | null>(null);
+  if (kana.length === 0) return <EmptyBlockState label="No kana characters available for this block." />;
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
       {kana.map((k) => (
@@ -52,6 +72,7 @@ export function KanaCharacterBlock({ kana }: { data: KanaCharacterData; kana: Ka
 
 export function KanaGridBlock({ data, kana }: { data: KanaGridData; kana: KanaResolved[] }) {
   const [practiceChar, setPracticeChar] = useState<{ character: string; characterType: CharacterType } | null>(null);
+  if (kana.length === 0) return <EmptyBlockState label="No kana characters available for this block." />;
   const rows = new Map<string, KanaResolved[]>();
   for (const k of kana) {
     const key = k.rowLabel || "";
@@ -94,6 +115,7 @@ export function KanaGridBlock({ data, kana }: { data: KanaGridData; kana: KanaRe
 }
 
 export function VocabularySetBlock({ data, vocabulary }: { data: VocabularySetData; vocabulary: VocabResolved[] }) {
+  if (vocabulary.length === 0) return <EmptyBlockState label="No vocabulary available for this block." />;
   return (
     <div className="bg-white border border-[var(--divider)] rounded-bento p-5">
       <h3 className="font-heading font-bold text-sm text-charcoal mb-3">Vocabulary</h3>
@@ -115,6 +137,7 @@ export function VocabularySetBlock({ data, vocabulary }: { data: VocabularySetDa
 }
 
 export function GrammarRuleBlock({ grammar }: { data: GrammarRuleData; grammar: GrammarResolved[] }) {
+  if (grammar.length === 0) return <EmptyBlockState label="No grammar rules available for this block." />;
   return (
     <div className="bg-white border border-[var(--divider)] rounded-bento p-5">
       <h3 className="font-heading font-bold text-sm text-charcoal mb-3">Grammar</h3>
@@ -135,6 +158,7 @@ export function GrammarRuleBlock({ grammar }: { data: GrammarRuleData; grammar: 
 
 export function KanjiFocusBlock({ kanji }: { data: KanjiFocusData; kanji: KanjiResolved[] }) {
   const [practiceChar, setPracticeChar] = useState<string | null>(null);
+  if (kanji.length === 0) return <EmptyBlockState label="No kanji available for this block." />;
   return (
     <div className="grid sm:grid-cols-2 gap-3">
       {kanji.map((k) => (
@@ -174,6 +198,7 @@ export function KanjiFocusBlock({ kanji }: { data: KanjiFocusData; kanji: KanjiR
 }
 
 export function ExampleSetBlock({ data, examples }: { data: ExampleSetData; examples: ExampleResolved[] }) {
+  if (examples.length === 0) return <EmptyBlockState label="No examples available for this block." />;
   return (
     <div className="space-y-3">
       {examples.map((ex) => (
@@ -187,6 +212,137 @@ export function ExampleSetBlock({ data, examples }: { data: ExampleSetData; exam
           {ex.notes && <p className="text-secondary text-xs mt-1 italic">{ex.notes}</p>}
         </div>
       ))}
+    </div>
+  );
+}
+
+export function KanjiRadicalsBlock({ data }: { data: KanjiRadicalsData }) {
+  return (
+    <div className="bg-base border border-[var(--divider)] rounded-bento p-5">
+      <h3 className="text-xs font-bold uppercase tracking-wider text-primary mb-3">Radicals</h3>
+      <div className="flex flex-wrap gap-3">
+        {data.radicals.map((r, j) => (
+          <div key={j} className="flex items-center gap-2 bg-white border border-[var(--divider)] rounded-[8px] px-3 py-2">
+            <span className="text-2xl font-heading text-charcoal">{r.character}</span>
+            <div className="text-sm text-secondary">
+              <div>{r.meaning}</div>
+              {r.strokeCount != null && <div className="text-xs">{r.strokeCount} strokes</div>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function SimilarKanjiBlock({ data, kanji }: { data: SimilarKanjiData; kanji: KanjiResolved[] }) {
+  if (kanji.length === 0 && !data.note) return <EmptyBlockState label="No similar kanji available for this block." />;
+  return (
+    <div className="bg-base border border-[var(--divider)] rounded-bento p-5">
+      <h3 className="text-xs font-bold uppercase tracking-wider text-primary mb-3">Similar kanji — don&apos;t confuse these</h3>
+      <div className="space-y-3">
+        {kanji.length > 0 && (
+          <div className="flex flex-wrap gap-3">
+            {kanji.map((k) => (
+              <div key={k.id} className="flex items-center gap-2 bg-white border border-[var(--divider)] rounded-[8px] px-3 py-2">
+                <span className="text-2xl font-heading text-charcoal">{k.character}</span>
+                {k.meaning && <span className="text-sm text-secondary">{k.meaning}</span>}
+              </div>
+            ))}
+          </div>
+        )}
+        {data.note && <p className="text-sm text-secondary leading-relaxed">{data.note}</p>}
+      </div>
+    </div>
+  );
+}
+
+export function MemoryAidBlock({ data }: { data: MemoryAidData }) {
+  return (
+    <div className="bg-base border border-[var(--divider)] rounded-bento p-5">
+      <h3 className="text-xs font-bold uppercase tracking-wider text-primary mb-3">Memory aid</h3>
+      <p className="text-sm text-secondary leading-relaxed italic">{data.text}</p>
+    </div>
+  );
+}
+
+export function GrammarFormationBlock({ data }: { data: GrammarFormationData }) {
+  return (
+    <div className="bg-base border border-[var(--divider)] rounded-bento p-5 overflow-x-auto">
+      <h3 className="text-xs font-bold uppercase tracking-wider text-primary mb-3">Formation</h3>
+      <table className="w-full text-sm">
+        <tbody>
+          {data.variants.map((v, j) => (
+            <tr key={j} className="border-b border-[var(--divider)] last:border-0">
+              <td className="py-2 pr-4 font-semibold text-charcoal whitespace-nowrap align-top">{v.label}</td>
+              <td className="py-2 pr-4 text-charcoal align-top">{v.form}</td>
+              {v.example && <td className="py-2 text-secondary align-top">{v.example}</td>}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export function NuanceBlock({ data }: { data: NuanceData }) {
+  return (
+    <div className="bg-base border border-[var(--divider)] rounded-bento p-5">
+      <h3 className="text-xs font-bold uppercase tracking-wider text-primary mb-3">Nuance</h3>
+      <p className="text-sm text-secondary leading-relaxed">{data.text}</p>
+    </div>
+  );
+}
+
+export function RegisterBlock({ data }: { data: RegisterData }) {
+  return (
+    <div className="bg-base border border-[var(--divider)] rounded-bento p-5">
+      <h3 className="text-xs font-bold uppercase tracking-wider text-primary mb-3">Register</h3>
+      <p className="text-sm text-secondary leading-relaxed">{data.text}</p>
+    </div>
+  );
+}
+
+export function WhenNotToUseBlock({ data }: { data: WhenNotToUseData }) {
+  return (
+    <div className="bg-base border border-[var(--divider)] rounded-bento p-5">
+      <h3 className="text-xs font-bold uppercase tracking-wider text-primary mb-3">When not to use</h3>
+      <p className="text-sm text-secondary leading-relaxed">{data.text}</p>
+    </div>
+  );
+}
+
+export function CollocationsBlock({ data }: { data: CollocationsData }) {
+  return (
+    <div className="bg-base border border-[var(--divider)] rounded-bento p-5">
+      <h3 className="text-xs font-bold uppercase tracking-wider text-primary mb-3">Common collocations</h3>
+      <ul className="space-y-1.5">
+        {data.items.map((it, j) => (
+          <li key={j} className="text-sm">
+            <span className="font-semibold text-charcoal">{it.phrase}</span>
+            {it.translation && <span className="text-secondary"> — {it.translation}</span>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+export function RelatedWordsBlock({ data }: { data: RelatedWordsData }) {
+  return (
+    <div className="bg-base border border-[var(--divider)] rounded-bento p-5">
+      <h3 className="text-xs font-bold uppercase tracking-wider text-primary mb-3">Related words</h3>
+      <div className="space-y-2 text-sm">
+        {data.synonyms && data.synonyms.length > 0 && (
+          <p><span className="font-semibold text-charcoal">Synonyms: </span><span className="text-secondary">{data.synonyms.join(", ")}</span></p>
+        )}
+        {data.antonyms && data.antonyms.length > 0 && (
+          <p><span className="font-semibold text-charcoal">Antonyms: </span><span className="text-secondary">{data.antonyms.join(", ")}</span></p>
+        )}
+        {data.wordFamily && data.wordFamily.length > 0 && (
+          <p><span className="font-semibold text-charcoal">Word family: </span><span className="text-secondary">{data.wordFamily.join(", ")}</span></p>
+        )}
+      </div>
     </div>
   );
 }

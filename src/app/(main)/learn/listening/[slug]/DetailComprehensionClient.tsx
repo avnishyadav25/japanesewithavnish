@@ -16,6 +16,7 @@ type Question = {
   questionText: string;
   options: string[];
   correctIndex: number;
+  explanation: string | null;
   sortOrder: number;
 };
 
@@ -54,6 +55,7 @@ export function DetailComprehensionClient({ scenarios, sessionEmail }: Props) {
             questionText: q.questionText,
             options: Array.isArray(q.options) ? q.options : [],
             correctIndex: q.correctIndex,
+            explanation: q.explanation ?? null,
             sortOrder: q.sortOrder ?? 0,
           }))
         );
@@ -187,6 +189,10 @@ export function DetailComprehensionClient({ scenarios, sessionEmail }: Props) {
                       );
                     })}
                   </div>
+
+                  {submitted && q.explanation && (
+                    <p className="pl-4 text-xs text-secondary italic">{q.explanation}</p>
+                  )}
                 </div>
               ))}
 

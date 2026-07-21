@@ -2,10 +2,25 @@ import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth/admin";
 import { sql } from "@/lib/db";
 import { LEARN_CONTENT_TYPES, type LearnContentType } from "@/lib/learn-filters";
-import { syncPostToTypeTable } from "@/lib/admin/syncTypeTables";
+import { syncPostToTypeTable, applySidecarOverrides } from "@/lib/admin/syncTypeTables";
 import { getPublishGateStatus } from "@/lib/contentReview/publishGate";
+import { getContentBlockPublishGateStatus } from "@/lib/blocks/publishGate";
 import { queueReReviewOnEdit } from "@/lib/contentReview/contentEditTrigger";
 import { isReviewEntityType } from "@/lib/contentReview/types";
+
+// [slug] here isn't the final path segment for the page routes that link to
+// this API (…/edit), and Next.js only auto-decodes a dynamic segment when it's
+// terminal — so route params can arrive still percent-encoded for non-ASCII
+// slugs. This route itself IS terminal, but decode defensively anyway since a
+// client fetch() built from an already-decoded slug should still round-trip
+// safely (decodeURIComponent on text with no "%" sequences is a no-op).
+function decodeSlug(raw: string): string {
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
 
 export async function GET(
   _req: Request,
@@ -15,7 +30,8 @@ export async function GET(
     const admin = await getAdminSession();
     if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { type, slug } = await params;
+    const { type, slug: rawSlug } = await params;
+    const slug = decodeSlug(rawSlug);
     if (!LEARN_CONTENT_TYPES.includes(type as LearnContentType)) {
       return NextResponse.json({ error: "Invalid type" }, { status: 400 });
     }
@@ -43,13 +59,14 @@ export async function PUT(
     const admin = await getAdminSession();
     if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { type, slug: oldSlug } = await params;
+    const { type, slug: rawOldSlug } = await params;
+    const oldSlug = decodeSlug(rawOldSlug);
     if (!LEARN_CONTENT_TYPES.includes(type as LearnContentType)) {
       return NextResponse.json({ error: "Invalid type" }, { status: 400 });
     }
 
     const body = await req.json();
-    const { slug, title, content, jlpt_level, tags, status, sort_order, meta, override_review_gate } = body;
+    const { slug, title, content, jlpt_level, tags, status, sort_order, meta, override_review_gate, sidecar } = body;
 
     if (!slug || !title) {
       return NextResponse.json({ error: "slug and title required" }, { status: 400 });
@@ -63,10 +80,14 @@ export async function PUT(
       const existingRows = await sql`SELECT id FROM posts WHERE content_type = ${type} AND slug = ${oldSlug} LIMIT 1`;
       const postId = (existingRows[0] as { id: string } | undefined)?.id;
       if (postId) {
-        const gate = await getPublishGateStatus(postId);
-        if (gate.blocked) {
+        const [gate, blockGate] = await Promise.all([
+          getPublishGateStatus(postId),
+          getContentBlockPublishGateStatus(postId, type),
+        ]);
+        const allReasons = [...gate.reasons, ...blockGate.reasons];
+        if (gate.blocked || blockGate.blocked) {
           return NextResponse.json(
-            { error: `Publish blocked: ${gate.reasons.join("; ")}.`, reasons: gate.reasons, findings: gate.openCriticalFindings },
+            { error: `Publish blocked: ${allReasons.join("; ")}.`, reasons: allReasons, findings: gate.openCriticalFindings },
             { status: 409 }
           );
         }
@@ -100,7 +121,14 @@ export async function PUT(
 
       const updated = updatedRows[0];
       if (updated) {
+        // Sync from meta first (covers types without a dedicated editor yet),
+        // then apply explicit sidecar fields from a dedicated editor — these
+        // take precedence since they're the authoritative source once a type
+        // has one (unlike meta, which is heuristically parsed).
         await syncPostToTypeTable(updated);
+        if (sidecar && typeof sidecar === "object" && !Array.isArray(sidecar)) {
+          await applySidecarOverrides(type, updated.id, sidecar as Record<string, unknown>);
+        }
         if (isReviewEntityType(updated.content_type)) {
           await queueReReviewOnEdit(updated.content_type, updated.id);
         }
@@ -126,7 +154,8 @@ export async function DELETE(
     const admin = await getAdminSession();
     if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { type, slug } = await params;
+    const { type, slug: rawSlug } = await params;
+    const slug = decodeSlug(rawSlug);
     if (!LEARN_CONTENT_TYPES.includes(type as LearnContentType)) {
       return NextResponse.json({ error: "Invalid type" }, { status: 400 });
     }

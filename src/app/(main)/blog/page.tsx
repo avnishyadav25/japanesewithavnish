@@ -66,16 +66,16 @@ export default async function BlogPage({
   return (
     <div className="py-12 sm:py-16 px-4 sm:px-6">
       <div className="max-w-[1200px] mx-auto">
-        {/* Hero: title left, search + links top right */}
-        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6 mb-8">
-          <div>
-            <h1 className="font-heading text-3xl sm:text-4xl font-bold text-charcoal mb-2">
-              Blog
-            </h1>
-            <p className="text-secondary">
-              Lessons, tips, and resources for your JLPT journey.
-            </p>
-          </div>
+        {/* Hero: centered title/subtitle (matches Learn Hub), search + links in their own row below */}
+        <div className="text-center mb-6">
+          <h1 className="font-heading text-3xl sm:text-4xl font-bold text-charcoal mb-2">
+            Blog
+          </h1>
+          <p className="text-secondary text-sm">
+            Lessons, tips, and resources for your JLPT journey.
+          </p>
+        </div>
+        <div className="flex justify-center mb-8">
           <BlogHeroWithSearch initialSearch={search} />
         </div>
 

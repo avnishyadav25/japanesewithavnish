@@ -21,6 +21,32 @@ import { reorderContentExamplesLast, boldContentLabels } from "@/lib/learn-conte
 import { getRelatedGrammar } from "@/lib/learn/getRelatedGrammar";
 import { ReportIssueButton } from "@/components/learn/ReportIssueButton";
 import { isReviewEntityType } from "@/lib/contentReview/types";
+import { PracticeTestDetail } from "@/components/learn/PracticeTestDetail";
+import type { ClientSection } from "@/components/learn/PracticeTestClient";
+import { LessonBlockRenderer } from "@/components/curriculum/LessonBlockRenderer";
+import { getResolvedContentBlocks } from "@/lib/blocks/getContentBlocks";
+import type { ResolvedBlock } from "@/lib/curriculum/getLessonBlocks";
+import type { BlockType as RichContentBlockType } from "@/lib/blocks/blockTypes";
+
+const RICH_CONTENT_BLOCK_TYPES: RichContentBlockType[] = [
+  "kanji_radicals",
+  "similar_kanji",
+  "memory_aid",
+  "grammar_formation",
+  "nuance",
+  "register",
+  "when_not_to_use",
+  "collocations",
+  "related_words",
+  // Spec §7 gap, closed in the Phase 13 reconciliation pass: these already render correctly on
+  // curriculum lessons via the same LessonBlockRenderer switch, but were never included in the
+  // vocab/grammar/kanji rich-content tail — authored blocks of these types had nowhere to render
+  // publicly outside curriculum. No content exists yet that used them (confirmed via query), so
+  // this closes a latent gap rather than fixing an active bug.
+  "common_mistake",
+  "tip",
+  "culture_note",
+];
 
 type Meta = Record<string, unknown> | null;
 
@@ -125,21 +151,82 @@ export async function LearnDetailContent({
   } | undefined;
   if (!item) notFound();
 
+  // A real (sections + scored questions) practice test takes precedence over the legacy
+  // PDF/audio-link-only rendering below — same "real structured content wins, safe fallback
+  // otherwise" pattern already used for Reading (content_blocks) and Writing (composition).
+  if (normalized === "practice_test") {
+    const testRows = (await sql`
+      SELECT id, duration_minutes, passing_score_percent, instructions, pdf_url, test_variant, attempt_policy
+      FROM practice_tests WHERE post_id = ${item.id} LIMIT 1
+    `) as { id: string; duration_minutes: number; passing_score_percent: number; instructions: string | null; pdf_url: string | null; test_variant: string; attempt_policy: string }[];
+    const test = testRows[0];
+    if (test) {
+      const sectionRows = (await sql`
+        SELECT id, title, section_type, time_limit_minutes, passage, audio_url
+        FROM practice_test_sections WHERE practice_test_id = ${test.id} ORDER BY sort_order, created_at
+      `) as Omit<ClientSection, "questions">[];
+      if (sectionRows.length > 0) {
+        const sectionIds = sectionRows.map((s) => s.id);
+        const questionRows = (await sql`
+          SELECT id, section_id, question_text, item_type, options, correct_index, explanation, audio_url
+          FROM practice_test_questions WHERE section_id = ANY(${sectionIds}) ORDER BY sort_order, created_at
+        `) as { id: string; section_id: string; question_text: string; item_type: string | null; options: string[]; correct_index: number; explanation: string | null; audio_url: string | null }[];
+        const questionsBySection = new Map<string, ClientSection["questions"]>();
+        for (const q of questionRows) {
+          const list = questionsBySection.get(q.section_id) ?? [];
+          list.push({ id: q.id, question_text: q.question_text, item_type: q.item_type, options: q.options, correct_index: q.correct_index, explanation: q.explanation, audio_url: q.audio_url });
+          questionsBySection.set(q.section_id, list);
+        }
+        const sections: ClientSection[] = sectionRows.map((s) => ({ ...s, questions: questionsBySection.get(s.id) ?? [] }));
+        if (sections.some((s) => s.questions.length > 0)) {
+          return (
+            <PracticeTestDetail
+              item={{ id: item.id, title: item.title, slug: item.slug, jlpt_level: item.jlpt_level }}
+              test={test}
+              sections={sections}
+              breadcrumbBase={breadcrumbBase}
+            />
+          );
+        }
+      }
+    }
+  }
+
   const meta = (item.meta ?? {}) as Record<string, unknown>;
   const featureImageUrl =
     item.og_image_url ?? (typeof meta.feature_image_url === "string" ? meta.feature_image_url : null);
+
+  // Examples now live in the `examples` table for content types with a
+  // dedicated admin editor (Phase 1 of the admin content-editor overhaul) —
+  // prefer those rows, falling back to the legacy posts.meta.examples array
+  // for any item not yet backfilled/re-saved through the new editor.
+  async function preferSidecarExamples(fkColumn: "vocabulary_id" | "grammar_id" | "kanji_id", sidecarId: string) {
+    const exampleRows = (await sql!.query(
+      `SELECT sentence_ja, sentence_romaji, sentence_en FROM examples WHERE ${fkColumn} = $1 ORDER BY sort_order, sentence_ja`,
+      [sidecarId]
+    )) as unknown as { sentence_ja: string; sentence_romaji: string | null; sentence_en: string }[];
+    if (exampleRows.length > 0) {
+      meta.examples = exampleRows.map((e) => ({ japanese: e.sentence_ja, romaji: e.sentence_romaji ?? "", translation: e.sentence_en }));
+    }
+  }
 
   if (normalized === "vocabulary") {
     // Same unification as kanji: prefer the authoritative `vocabulary` table's
     // part_of_speech/transitivity over posts.meta.type, which can be freeform/inconsistent.
     const vocabRows = (await sql`
-      SELECT part_of_speech, transitivity FROM vocabulary WHERE post_id = ${item.id} LIMIT 1
-    `) as { part_of_speech: string | null; transitivity: string | null }[];
+      SELECT id, part_of_speech, transitivity FROM vocabulary WHERE post_id = ${item.id} LIMIT 1
+    `) as { id: string; part_of_speech: string | null; transitivity: string | null }[];
     const vocabRow = vocabRows[0];
     if (vocabRow) {
       if (vocabRow.part_of_speech) meta.type = vocabRow.part_of_speech;
       if (vocabRow.transitivity) meta.transitivity = vocabRow.transitivity;
+      await preferSidecarExamples("vocabulary_id", vocabRow.id);
     }
+  }
+
+  if (normalized === "grammar") {
+    const grammarRows = (await sql`SELECT id FROM grammar WHERE post_id = ${item.id} LIMIT 1`) as { id: string }[];
+    if (grammarRows[0]) await preferSidecarExamples("grammar_id", grammarRows[0].id);
   }
 
   if (normalized === "kanji") {
@@ -147,9 +234,9 @@ export async function LearnDetailContent({
     // with the dictionary-sourced `kanji` table used by the /learn/kana/kanji grid. Prefer
     // the authoritative table data so both surfaces show the same readings.
     const kanjiRows = (await sql`
-      SELECT character, meaning, meaning_extended, stroke_count, onyomi, kunyomi
+      SELECT id, character, meaning, meaning_extended, stroke_count, onyomi, kunyomi
       FROM kanji WHERE post_id = ${item.id} LIMIT 1
-    `) as { character: string; meaning: string | null; meaning_extended: string | null; stroke_count: number | null; onyomi: string[] | null; kunyomi: string[] | null }[];
+    `) as { id: string; character: string; meaning: string | null; meaning_extended: string | null; stroke_count: number | null; onyomi: string[] | null; kunyomi: string[] | null }[];
     const kanjiRow = kanjiRows[0];
     if (kanjiRow) {
       if (kanjiRow.character) meta.character = kanjiRow.character;
@@ -158,7 +245,28 @@ export async function LearnDetailContent({
       if (kanjiRow.stroke_count != null) meta.stroke_count = kanjiRow.stroke_count;
       if (kanjiRow.onyomi && kanjiRow.onyomi.length > 0) meta.onyomi = kanjiRow.onyomi;
       if (kanjiRow.kunyomi && kanjiRow.kunyomi.length > 0) meta.kunyomi = kanjiRow.kunyomi;
+      await preferSidecarExamples("kanji_id", kanjiRow.id);
     }
+  }
+
+  let readingBlocks: ResolvedBlock[] = [];
+  if (normalized === "reading") {
+    // Real cutover (Phase 9), not the earlier single-field patch: a reading post with >=1
+    // published content_blocks row renders its full ordered block set via LessonBlockRenderer
+    // instead of posts.content markdown — this is also the actual fix for comprehension_question
+    // blocks never reaching learners and passage translations being fetched then dropped, not a
+    // narrow patch for either bug in isolation. A post with zero published blocks (every reading
+    // post as of this phase — migrated in draft/pending, awaiting admin review) falls through to
+    // the legacy markdown path completely unchanged, matching the "structured source wins, legacy
+    // field is the fallback" pattern already used for examples above.
+    const { blocks } = await getResolvedContentBlocks(item.id);
+    readingBlocks = blocks;
+  }
+
+  let richContentBlocks: ResolvedBlock[] = [];
+  if (normalized === "vocabulary" || normalized === "grammar" || normalized === "kanji") {
+    const { blocks } = await getResolvedContentBlocks(item.id);
+    richContentBlocks = blocks.filter((b) => RICH_CONTENT_BLOCK_TYPES.includes(b.blockType as RichContentBlockType));
   }
 
   let related: LearnItemForFilter[] = [];
@@ -213,7 +321,10 @@ export async function LearnDetailContent({
   const contentStr = item.content ?? "";
   const reorderedContent = contentStr ? reorderContentExamplesLast(contentStr) : "";
   const contentWithBoldLabels = reorderedContent ? boldContentLabels(reorderedContent) : "";
-  const hasToc = reorderedContent.includes("## ");
+  // Blocks-mode reading has no markdown "## " headings to build a ToC from (section_heading is a
+  // block type, not a markdown heading) — the legacy ToC only applies to the markdown fallback.
+  const isReadingBlocksMode = normalized === "reading" && readingBlocks.length > 0;
+  const hasToc = !isReadingBlocksMode && reorderedContent.includes("## ");
 
   return (
     <div className="py-12 sm:py-16 px-6 sm:px-8 lg:px-12 pb-24 lg:pb-16">
@@ -277,7 +388,9 @@ export async function LearnDetailContent({
                 {normalized === "sounds" && Array.isArray(meta.characters) && (meta.characters as unknown[]).length > 0 && (
                   <SoundsCharactersBlock meta={meta} />
                 )}
-                {contentWithBoldLabels ? (
+                {isReadingBlocksMode ? (
+                  <LessonBlockRenderer blocks={readingBlocks} />
+                ) : contentWithBoldLabels ? (
                   <div className="prose prose-charcoal prose-lg max-w-none text-secondary text-[1rem] [&_h1]:text-4xl [&_h1]:font-heading [&_h1]:!font-bold [&_h2]:text-3xl [&_h2]:font-heading [&_h2]:!font-bold [&_h2]:mt-8 [&_h2]:mb-3 [&_h3]:text-2xl [&_h3]:font-heading [&_h3]:!font-bold [&_h3]:mt-6 [&_h3]:mb-2 [&_p]:text-[1rem] [&_p]:leading-[1.7] [&_p]:mb-4 [&_ul]:mb-4 [&_ol]:mb-4 [&_li]:text-[1rem] [&_li]:leading-[1.7] [&_blockquote]:text-[1rem] [&_blockquote]:leading-[1.7] [&_td]:text-[1rem] [&_strong]:text-[1rem]">
                     <LearnMarkdown content={contentWithBoldLabels} meta={meta} contentType={normalized} />
                   </div>
@@ -287,6 +400,12 @@ export async function LearnDetailContent({
             </div>
 
             <LessonMetaContent contentType={normalized} meta={meta} omitCharactersBlock={normalized === "sounds"} />
+
+            {richContentBlocks.length > 0 && (
+              <section className="mt-8 pt-8 border-t border-[var(--divider)]">
+                <LessonBlockRenderer blocks={richContentBlocks} />
+              </section>
+            )}
 
             <BlogNextStepCta />
 

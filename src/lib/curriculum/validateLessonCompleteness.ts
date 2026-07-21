@@ -1,5 +1,5 @@
 import { sql } from "@/lib/db";
-import { BLOCK_TYPE_LABELS, validateBlockData, type BlockType } from "@/lib/curriculum/blockTypes";
+import { BLOCK_TYPE_LABELS, validateBlockData, type BlockType } from "@/lib/blocks/blockTypes";
 import { getLessonTemplateBlocks } from "@/lib/curriculum/lessonTemplates";
 
 export type CompletenessItem = { blockType: BlockType; label: string; present: boolean };

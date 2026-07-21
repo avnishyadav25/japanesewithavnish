@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 
+// force-dynamic: this query's start_at/end_at NOW() window and active flag must be evaluated
+// fresh on every request — without this, Next's Data Cache can freeze the result (including
+// across dev-server restarts via the on-disk fetch cache), making a banner stay "active" past
+// its end_at or never appear once its start_at arrives.
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   if (!sql) return NextResponse.json({ banner: null });
 

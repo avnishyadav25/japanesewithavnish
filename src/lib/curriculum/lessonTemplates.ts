@@ -1,4 +1,4 @@
-import type { BlockType } from "@/lib/curriculum/blockTypes";
+import type { BlockType } from "@/lib/blocks/blockTypes";
 
 export type TemplateBlock = { block_type: BlockType; block_data: Record<string, unknown> };
 

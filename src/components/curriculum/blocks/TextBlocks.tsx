@@ -1,4 +1,4 @@
-import type { SectionHeadingData, RichTextData, SummaryData, TipData, CultureNoteData, CommonMistakeData } from "@/lib/curriculum/blockTypes";
+import type { SectionHeadingData, RichTextData, SummaryData, TipData, CultureNoteData, CommonMistakeData } from "@/lib/blocks/blockTypes";
 import { LearnMarkdown } from "@/components/learn/LearnMarkdown";
 
 export function SectionHeadingBlock({ data }: { data: SectionHeadingData }) {

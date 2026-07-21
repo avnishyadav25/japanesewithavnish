@@ -23,7 +23,9 @@ import {
   BLOCK_TYPE_CATEGORIES,
   validateBlockData,
   type BlockType,
-} from "@/lib/curriculum/blockTypes";
+} from "@/lib/blocks/blockTypes";
+import type { BlockAccessTier } from "@/lib/auth/blockAccess";
+import { BLOCK_ACCESS_LABELS } from "@/components/admin/ContentBlocksSection";
 
 type Block = {
   id: string;
@@ -31,6 +33,7 @@ type Block = {
   block_data: Record<string, unknown>;
   sort_order: number;
   status: "draft" | "published";
+  block_access?: BlockAccessTier;
   review_status?: "none" | "pending" | "approved" | "rejected";
 };
 
@@ -126,7 +129,7 @@ export function LessonBlocksSection({ lessonId }: { lessonId: string }) {
     }
   }
 
-  async function updateBlock(id: string, patch: Partial<Pick<Block, "block_data" | "sort_order" | "status">>) {
+  async function updateBlock(id: string, patch: Partial<Pick<Block, "block_data" | "sort_order" | "status" | "block_access">>) {
     await fetch(`/api/admin/curriculum/lessons/${lessonId}/blocks/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -215,6 +218,7 @@ export function LessonBlocksSection({ lessonId }: { lessonId: string }) {
                 onToggleEdit={() => setEditingId(editingId === block.id ? null : block.id)}
                 onDelete={() => deleteBlock(block.id)}
                 onSave={(data) => updateBlock(block.id, { block_data: data })}
+                onAccessChange={(access) => updateBlock(block.id, { block_access: access })}
               />
             ))}
           </SortableContext>
@@ -247,6 +251,7 @@ function SortableBlockRow({
   onToggleEdit,
   onDelete,
   onSave,
+  onAccessChange,
 }: {
   block: Block;
   lessonId: string;
@@ -254,6 +259,7 @@ function SortableBlockRow({
   onToggleEdit: () => void;
   onDelete: () => void;
   onSave: (data: Record<string, unknown>) => void;
+  onAccessChange: (access: BlockAccessTier) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id });
   const style = {
@@ -282,7 +288,20 @@ function SortableBlockRow({
           {block.status === "draft" && <span className="text-[10px] text-amber-600 shrink-0">draft</span>}
           {block.review_status === "pending" && <span className="text-[10px] text-primary shrink-0">pending review</span>}
         </div>
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0">
+          <select
+            aria-label="Block access"
+            value={block.block_access ?? "public"}
+            onChange={(e) => onAccessChange(e.target.value as BlockAccessTier)}
+            title={block.block_type === "section_heading" ? "Access tier for this section (nudges new blocks below it toward the same tier)" : "Access tier for this block"}
+            className={`text-[10px] border rounded-bento px-1.5 py-1 bg-white ${
+              block.block_type === "section_heading" ? "border-primary/40 font-semibold text-primary" : "border-[var(--divider)] text-secondary"
+            } ${(block.block_access ?? "public") !== "public" ? "border-amber-400" : ""}`}
+          >
+            {Object.entries(BLOCK_ACCESS_LABELS).map(([tier, label]) => (
+              <option key={tier} value={tier}>{label}</option>
+            ))}
+          </select>
           <button type="button" onClick={onToggleEdit} className="px-2 text-primary hover:underline text-xs">
             {isEditing ? "Close" : "Edit"}
           </button>

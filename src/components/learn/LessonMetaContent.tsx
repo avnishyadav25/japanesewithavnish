@@ -348,6 +348,7 @@ export function LessonMetaContent({
 }) {
   const [showRomaji, setShowRomaji] = useState(false);
   const [showTranslation, setShowTranslation] = useState(false);
+  const [showPassageTranslation, setShowPassageTranslation] = useState(false);
 
   const audioUrl = meta.audio_url != null ? String(meta.audio_url) : "";
   const audioUrls = arr(meta, "audio_urls").filter(Boolean);
@@ -431,6 +432,26 @@ export function LessonMetaContent({
       {/* Sounds: characters rendered at top of page when omitCharactersBlock; otherwise inline for preview etc. */}
       {contentType === "sounds" && !omitCharactersBlock && Array.isArray(meta.characters) && (meta.characters as SoundChar[]).length > 0 && (
         <SoundsCharactersBlock meta={meta} />
+      )}
+
+      {/* Reading passage: whole-passage translation, set from a content_blocks reading_passage
+          block (see LearnDetailContent.tsx) — kept separate from the per-sentence toggle below,
+          which is a different, older meta.sentences exercise format. */}
+      {contentType === "reading" && str(meta, "translation") && (
+        <div className="mb-6 text-center">
+          <button
+            type="button"
+            onClick={() => setShowPassageTranslation((v) => !v)}
+            className="text-[1rem] px-3 py-1.5 rounded-bento border border-[var(--divider)] bg-base hover:bg-[var(--divider)]/30 text-charcoal"
+          >
+            {showPassageTranslation ? "Hide translation" : "Show translation"}
+          </button>
+          {showPassageTranslation && (
+            <p className="text-secondary text-[1rem] mt-3 italic text-left max-w-2xl mx-auto whitespace-pre-wrap">
+              {str(meta, "translation")}
+            </p>
+          )}
+        </div>
       )}
 
       {/* Reading practice: sentences with show/hide romaji and translation */}

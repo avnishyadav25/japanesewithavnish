@@ -45,7 +45,7 @@ export function BlogPostCard({ post, size = "small" }: BlogPostCardProps) {
   return (
     <Link
       href={href}
-      className={`card block h-full hover:no-underline group overflow-hidden ${
+      className={`card block h-full hover:no-underline group overflow-hidden rounded-2xl hover:border-primary transition-all duration-300 ${
         isFeatured ? "bento-span-4 bento-row-2" : isMedium ? "bento-span-2 bento-row-2" : ""
       }`}
     >

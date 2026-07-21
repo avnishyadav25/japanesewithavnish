@@ -8,6 +8,7 @@ import { AdminTable } from "@/components/admin/AdminTable";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
 import { GenerateLearnListButton } from "@/components/admin/GenerateLearnListButton";
+import { GenerateMockTestButton } from "@/components/admin/GenerateMockTestButton";
 import { LearnContentRowActions } from "@/components/admin/LearnContentRowActions";
 
 type UsageLessonBadge = { lesson_id: string; lesson_title: string; lesson_code: string; module_title: string; level_code: string };
@@ -447,11 +448,12 @@ export default async function AdminLearnPage({
         </div>
       </div>
 
-      <div className="mb-4">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
         <GenerateLearnListButton
           contentType={normalized}
           existingItems={items.map((i) => ({ slug: i.slug, title: i.title }))}
         />
+        {normalized === "practice_test" && <GenerateMockTestButton />}
       </div>
 
       {items.length > 0 ? (

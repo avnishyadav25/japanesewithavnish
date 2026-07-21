@@ -16,16 +16,17 @@ export async function GET(
     const scenario = scenarioRows[0];
     if (!scenario) return NextResponse.json({ error: "Scenario not found" }, { status: 404 });
     const questionRows = await sql`
-      SELECT id, question_text, options, correct_index, sort_order
+      SELECT id, question_text, options, correct_index, explanation, sort_order
       FROM listening_questions
       WHERE scenario_id = ${id}
       ORDER BY sort_order, id
-    ` as { id: string; question_text: string; options: unknown; correct_index: number; sort_order: number }[];
+    ` as { id: string; question_text: string; options: unknown; correct_index: number; explanation: string | null; sort_order: number }[];
     const questions = questionRows.map((q) => ({
       id: q.id,
       questionText: q.question_text,
       options: Array.isArray(q.options) ? q.options : (q.options as Record<string, unknown>)?.options ?? [],
       correctIndex: q.correct_index,
+      explanation: q.explanation,
       sortOrder: q.sort_order,
     }));
     return NextResponse.json({

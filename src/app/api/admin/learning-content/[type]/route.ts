@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth/admin";
 import { sql } from "@/lib/db";
 import { LEARN_CONTENT_TYPES, type LearnContentType } from "@/lib/learn-filters";
+import { syncPostToTypeTable, applySidecarOverrides } from "@/lib/admin/syncTypeTables";
 
 export async function POST(
   req: Request,
@@ -17,7 +18,7 @@ export async function POST(
     }
 
     const body = await req.json();
-    const { slug, title, content, jlpt_level, tags, status, sort_order, meta } = body;
+    const { slug, title, content, jlpt_level, tags, status, sort_order, meta, sidecar } = body;
 
     if (!slug || !title) {
       return NextResponse.json({ error: "slug and title required" }, { status: 400 });
@@ -47,10 +48,19 @@ export async function POST(
       const rows = await sql`
         INSERT INTO posts (content_type, slug, title, content, summary, jlpt_level, tags, og_image_url, image_prompt, status, published_at, sort_order, meta)
         VALUES (${type}, ${String(slug).trim()}, ${String(title).trim()}, ${content ?? null}, ${summaryVal}, ${jlptArr}, ${Array.isArray(tags) ? tags : []}, ${ogImageVal}, ${imagePromptVal}, ${statusVal}, ${publishedAtVal}, ${sortOrderVal}, ${metaVal}::jsonb)
-        RETURNING id
-      `;
-      const id = (rows[0] as { id: string })?.id;
-      return NextResponse.json({ id, slug: String(slug).trim() });
+        RETURNING id, content_type, title, jlpt_level, meta
+      ` as { id: string; content_type: string; title: string; jlpt_level: string[] | null; meta: unknown }[];
+      const created = rows[0];
+      if (created) {
+        // Give content types with a dedicated editor a sidecar row from the
+        // very first save, so the edit page's structured fields are usable
+        // immediately rather than only after a second (PUT) save.
+        await syncPostToTypeTable(created);
+        if (sidecar && typeof sidecar === "object" && !Array.isArray(sidecar)) {
+          await applySidecarOverrides(type, created.id, sidecar as Record<string, unknown>);
+        }
+      }
+      return NextResponse.json({ id: created?.id, slug: String(slug).trim() });
     } catch (err: unknown) {
       const e = err as { code?: string };
       if (e?.code === "23505") return NextResponse.json({ error: "Slug already exists" }, { status: 400 });

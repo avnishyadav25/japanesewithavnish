@@ -9,7 +9,9 @@ import { canAccessLesson } from "@/lib/auth/access";
 import { Countdown } from "@/components/learn/Countdown";
 import { getResolvedLessonBlocks } from "@/lib/curriculum/getLessonBlocks";
 import { LessonBlockRenderer } from "@/components/curriculum/LessonBlockRenderer";
+import { resolveViewerAccessContext } from "@/lib/auth/blockAccess";
 import { LessonMaterialsSidebar } from "./LessonMaterialsSidebar";
+import { MobileLessonDrawer } from "@/components/curriculum/MobileLessonDrawer";
 
 export default async function LearnCurriculumLessonPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -17,6 +19,7 @@ export default async function LearnCurriculumLessonPage({ params }: { params: Pr
   if (!sql) notFound();
   const rows = await sql`
     SELECT l.id, l.code, l.title, l.goal, l.introduction, l.description, l.sort_order, l.feature_image_url, l.slug,
+           l.estimated_minutes,
            sm.title AS submodule_title, m.title AS module_title, lv.code AS level_code, m.id AS module_id
     FROM curriculum_lessons l
     JOIN curriculum_submodules sm ON sm.id = l.submodule_id
@@ -24,13 +27,18 @@ export default async function LearnCurriculumLessonPage({ params }: { params: Pr
     JOIN curriculum_levels lv ON lv.id = m.level_id
     WHERE l.id::text = ${id} OR l.slug = ${id} LIMIT 1
   `;
-  const row = (rows as { id: string; code: string; title: string; goal: string | null; introduction: string | null; description: string | null; submodule_title: string; module_title: string; level_code: string; feature_image_url: string | null; module_id: string; slug: string }[])[0];
+  const row = (rows as { id: string; code: string; title: string; goal: string | null; introduction: string | null; description: string | null; submodule_title: string; module_title: string; level_code: string; feature_image_url: string | null; module_id: string; slug: string; estimated_minutes: number | null }[])[0];
   if (!row) notFound();
 
   // Guard lesson access for logged in users
   let accessAllowed = true;
   let lockReason = "";
   let resetAt = "";
+  // Whether this viewer has actually unlocked THIS lesson (premium, always_free, completed,
+  // admin_override, or an available free-daily slot) — feeds per-block gating below. Anonymous
+  // viewers never get this signal (canAccessLesson isn't even called for them today), so they
+  // default to false even though the page itself doesn't block their read of the base lesson.
+  let hasUnlockedOwner = false;
 
   if (session?.email) {
     const access = await canAccessLesson(session.email, row.id);
@@ -38,6 +46,8 @@ export default async function LearnCurriculumLessonPage({ params }: { params: Pr
       accessAllowed = false;
       lockReason = access.reason;
       resetAt = (access as any).resetAt;
+    } else {
+      hasUnlockedOwner = true;
     }
   }
 
@@ -251,7 +261,26 @@ export default async function LearnCurriculumLessonPage({ params }: { params: Pr
     estimated_minutes: number | null;
   }[]) ?? [];
 
-  const lessonBlocks = await getResolvedLessonBlocks(row.id);
+  const viewer = await resolveViewerAccessContext(session?.email ?? null, hasUnlockedOwner);
+  const { blocks: lessonBlocks, lockedAfter } = await getResolvedLessonBlocks(row.id, viewer);
+
+  const totalSections = lessonBlocks.filter((b) => b.blockType === "section_heading").length;
+  let completedSectionIds: string[] = [];
+  if (session?.email && totalSections > 0) {
+    const sectionProgressRows = (await sql`
+      SELECT section_block_id FROM user_section_progress
+      WHERE user_email = ${session.email} AND owner_type = 'lesson' AND owner_id = ${row.id}
+    `) as { section_block_id: string }[];
+    completedSectionIds = sectionProgressRows.map((r) => r.section_block_id);
+  }
+
+  let isSaved = false;
+  if (session?.email) {
+    const savedRows = (await sql`
+      SELECT 1 FROM user_saved_items WHERE user_email = ${session.email} AND owner_type = 'lesson' AND owner_id = ${row.id}
+    `) as unknown[];
+    isSaved = savedRows.length > 0;
+  }
 
   const writingHiraganaChars = kana
     .filter((k) => k.type === "hiragana" && k.character)
@@ -272,9 +301,19 @@ export default async function LearnCurriculumLessonPage({ params }: { params: Pr
         ? Array.from(new Set(writingKatakanaChars))
         : [];
 
+  const tocLinks = [
+    { href: "#intro", label: "Introduction" },
+    { href: "#lesson", label: "Lesson Content" },
+    ...(exercises.length > 0 ? [{ href: "#exercises", label: "Exercises" }] : []),
+    ...(examples.length > 0 ? [{ href: "#examples", label: "Examples" }] : []),
+    { href: "#practice", label: "Practice Drills" },
+    { href: "#lists", label: "Lesson Materials" },
+  ];
+
   return (
     <div className="min-h-screen bg-[var(--base)]">
-      <div className="max-w-[1100px] mx-auto px-4 py-8">
+      <MobileLessonDrawer links={tocLinks} />
+      <div className="max-w-[1100px] mx-auto px-4 py-8 pb-32 lg:pb-8">
         {/* Breadcrumbs */}
         <nav className="text-xs text-secondary mb-4">
           <Link href="/learn/dashboard" className="hover:text-primary">Dashboard</Link>
@@ -286,9 +325,22 @@ export default async function LearnCurriculumLessonPage({ params }: { params: Pr
 
         {/* Lesson Header */}
         <div className="mb-6">
-          <span className="text-[10px] font-bold text-primary uppercase tracking-wider bg-primary/5 px-2.5 py-1 rounded-full border border-primary/10">
-            Lesson {row.code}
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[10px] font-bold text-primary uppercase tracking-wider bg-primary/5 px-2.5 py-1 rounded-full border border-primary/10">
+              Lesson {row.code}
+            </span>
+            <span className="text-[10px] font-bold text-charcoal uppercase tracking-wider bg-[var(--divider)]/15 px-2.5 py-1 rounded-full border border-[var(--divider)]">
+              {row.level_code}
+            </span>
+            <span className="text-[10px] font-semibold text-secondary uppercase tracking-wider bg-[var(--divider)]/15 px-2.5 py-1 rounded-full border border-[var(--divider)]">
+              {row.module_title}
+            </span>
+            {row.estimated_minutes != null && (
+              <span className="text-[10px] font-semibold text-secondary uppercase tracking-wider bg-[var(--divider)]/15 px-2.5 py-1 rounded-full border border-[var(--divider)]">
+                ⏱ {row.estimated_minutes} min
+              </span>
+            )}
+          </div>
           <h1 className="font-heading text-2xl font-bold text-charcoal mt-3 mb-2">{row.title}</h1>
           {row.description && (
             <p className="text-secondary text-sm leading-relaxed max-w-2xl mb-4">
@@ -331,7 +383,11 @@ export default async function LearnCurriculumLessonPage({ params }: { params: Pr
             <section id="lesson" className="scroll-mt-6">
               <h2 className="font-heading text-lg font-semibold text-charcoal mb-3">Lesson Content</h2>
               {lessonBlocks.length > 0 ? (
-                <LessonBlockRenderer blocks={lessonBlocks} />
+                <LessonBlockRenderer
+                  blocks={lessonBlocks}
+                  lockedBoundary={lockedAfter}
+                  progress={session?.email ? { ownerType: "lesson", ownerId: row.id, completedSectionIds } : undefined}
+                />
               ) : (
                 <p className="text-secondary text-xs italic">No main lesson content yet.</p>
               )}
@@ -393,45 +449,26 @@ export default async function LearnCurriculumLessonPage({ params }: { params: Pr
                 On this lesson
               </h3>
               <ul className="space-y-2 text-xs">
-                <li>
-                  <a href="#intro" className="text-charcoal hover:text-primary transition font-medium">
-                    Introduction
-                  </a>
-                </li>
-                <li>
-                  <a href="#lesson" className="text-charcoal hover:text-primary transition font-medium">
-                    Lesson Content
-                  </a>
-                </li>
-                {exercises.length > 0 && (
-                  <li>
-                    <a href="#exercises" className="text-charcoal hover:text-primary transition font-medium">
-                      Exercises
+                {tocLinks.map((link) => (
+                  <li key={link.href}>
+                    <a href={link.href} className="text-charcoal hover:text-primary transition font-medium">
+                      {link.label}
                     </a>
                   </li>
-                )}
-                {examples.length > 0 && (
-                  <li>
-                    <a href="#examples" className="text-charcoal hover:text-primary transition font-medium">
-                      Examples
-                    </a>
-                  </li>
-                )}
-                <li>
-                  <a href="#practice" className="text-charcoal hover:text-primary transition font-medium">
-                    Practice Drills
-                  </a>
-                </li>
-                <li>
-                  <a href="#lists" className="text-charcoal hover:text-primary transition font-medium">
-                    Lesson Materials
-                  </a>
-                </li>
+                ))}
               </ul>
             </div>
 
             {/* Structured Materials Lists */}
-            <LessonMaterialsSidebar vocab={vocab} grammar={grammar} kanji={kanji} kana={kana} />
+            <LessonMaterialsSidebar
+              vocab={vocab}
+              grammar={grammar}
+              kanji={kanji}
+              kana={kana}
+              lessonId={row.id}
+              sectionProgress={session?.email && totalSections > 0 ? { total: totalSections, completed: completedSectionIds.length } : undefined}
+              saved={session?.email ? isSaved : undefined}
+            />
           </div>
         </div>
 

@@ -121,6 +121,7 @@ export function LearnContent({
   const prevHref = currentPage <= 2 ? (prevParams.toString() ? `${basePath}?${prevParams.toString()}` : basePath) : `${basePath}?${prevParams.toString()}`;
 
   const levelsInfo = [
+    { code: "all", title: "All", label: "Every level" },
     { code: "n5", title: "N5", label: "Beginner" },
     { code: "n4", title: "N4", label: "Elementary" },
     { code: "n3", title: "N3", label: "Intermediate" },
@@ -162,45 +163,43 @@ export function LearnContent({
   return (
     <div className="py-12 sm:py-16 px-4 sm:px-6">
       <div className="max-w-[1200px] mx-auto space-y-10">
-        {/* Hero: title left, search + links top right */}
-        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
-          <div>
-            <h1 className="font-heading text-3xl sm:text-4xl font-bold text-charcoal mb-2">
-              {heroTitle}
-            </h1>
-            <p className="text-secondary text-sm">
-              {heroSubtext}
-            </p>
-          </div>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto md:min-w-[280px]">
-            <form onSubmit={handleSearch} className="flex gap-2 flex-1 sm:flex-initial">
-              <input
-                type="search"
-                placeholder={getSearchPlaceholder()}
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                className="flex-1 min-w-0 px-4 py-2.5 border border-[var(--divider)] rounded-md text-charcoal placeholder:text-[#555555] bg-white text-sm"
-              />
-              <button type="submit" className="btn-primary px-4 shrink-0">
-                Search
-              </button>
-            </form>
-            <div className="flex gap-4 text-sm shrink-0">
-              <Link href="/quiz" className="text-primary font-medium hover:underline">
-                Take the Quiz →
-              </Link>
-              <Link href="/jlpt" className="text-primary font-medium hover:underline">
-                Explore JLPT Levels →
-              </Link>
-            </div>
+        {/* Hero: centered title/subtitle (matches Learn Hub), search + links in their own row below */}
+        <div className="text-center">
+          <h1 className="font-heading text-3xl sm:text-4xl font-bold text-charcoal mb-2">
+            {heroTitle}
+          </h1>
+          <p className="text-secondary text-sm">
+            {heroSubtext}
+          </p>
+        </div>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
+          <form onSubmit={handleSearch} className="flex gap-2 w-full sm:w-auto sm:min-w-[320px]">
+            <input
+              type="search"
+              placeholder={getSearchPlaceholder()}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="flex-1 min-w-0 px-4 py-2.5 border border-[var(--divider)] rounded-md text-charcoal placeholder:text-[#555555] bg-white text-sm"
+            />
+            <button type="submit" className="btn-primary px-4 shrink-0">
+              Search
+            </button>
+          </form>
+          <div className="flex gap-4 text-sm shrink-0 justify-center">
+            <Link href="/quiz" className="text-primary font-medium hover:underline">
+              Take the Quiz →
+            </Link>
+            <Link href="/jlpt" className="text-primary font-medium hover:underline">
+              Explore JLPT Levels →
+            </Link>
           </div>
         </div>
 
         {/* Level filter layout */}
         {lockCategory ? (
-          /* Locked Category Page: 5 Level Boxes */
+          /* Locked Category Page: 6 Level Boxes (All + N5-N1) */
           <div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
               {levelsInfo.map((l) => {
                 const active = level.toLowerCase() === l.code;
                 return (
@@ -220,17 +219,6 @@ export function LearnContent({
                 );
               })}
             </div>
-            {level !== "all" && (
-              <div className="mt-4 text-right">
-                <button
-                  type="button"
-                  onClick={() => handleLevelSelect("all")}
-                  className="text-sm text-primary hover:underline font-medium"
-                >
-                  Clear level filter
-                </button>
-              </div>
-            )}
           </div>
         ) : (
           /* General Category Landing Page: Tabs */
@@ -367,7 +355,7 @@ export function LearnContent({
                   {lockCategory === "grammar" && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       {visibleDirectoryItems.map((item) => (
-                        <div key={item.id} className="p-5 rounded-2xl border border-[#EEEEEE] bg-white flex flex-col justify-between hover:shadow-md transition">
+                        <div key={item.id} className="p-5 rounded-2xl border border-[#EEEEEE] bg-white flex flex-col justify-between overflow-hidden hover:shadow-md hover:border-primary transition-all duration-300">
                           <div>
                             <span className="inline-block text-[9px] font-bold text-secondary bg-base border border-[var(--divider)] px-2 py-0.5 rounded uppercase">
                               {level.toUpperCase()} • Grammar
@@ -388,7 +376,7 @@ export function LearnContent({
                   {lockCategory === "vocabulary" && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       {visibleDirectoryItems.map((item) => (
-                        <div key={item.id} className="p-5 rounded-2xl border border-[#EEEEEE] bg-white flex flex-col justify-between hover:shadow-md transition">
+                        <div key={item.id} className="p-5 rounded-2xl border border-[#EEEEEE] bg-white flex flex-col justify-between overflow-hidden hover:shadow-md hover:border-primary transition-all duration-300">
                           <div>
                             <span className="inline-block text-[9px] font-bold text-secondary bg-base border border-[var(--divider)] px-2 py-0.5 rounded uppercase">
                               {level.toUpperCase()} • Vocabulary
@@ -420,7 +408,7 @@ export function LearnContent({
                   {lockCategory === "kanji" && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                       {visibleDirectoryItems.map((item) => (
-                        <div key={item.id} className="p-5 rounded-2xl border border-[#EEEEEE] bg-white flex flex-col justify-between hover:shadow-md transition text-center">
+                        <div key={item.id} className="p-5 rounded-2xl border border-[#EEEEEE] bg-white flex flex-col justify-between overflow-hidden hover:shadow-md hover:border-primary transition-all duration-300 text-center">
                           <div>
                             <span className="text-[42px] font-bold text-charcoal block mb-1">{item.title}</span>
                             <span className="inline-block text-[9px] font-bold text-secondary bg-base border border-[var(--divider)] px-2 py-0.5 rounded mb-2 uppercase">
@@ -455,7 +443,7 @@ export function LearnContent({
                   {lockCategory === "listening" && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       {visibleDirectoryItems.map((item) => (
-                        <div key={item.id} className="p-5 rounded-2xl border border-[#EEEEEE] bg-white hover:shadow-md transition flex flex-col justify-between">
+                        <div key={item.id} className="p-5 rounded-2xl border border-[#EEEEEE] bg-white overflow-hidden hover:shadow-md hover:border-primary transition-all duration-300 flex flex-col justify-between">
                           <div>
                             <span className="inline-block text-[9px] font-bold text-secondary bg-base border border-[var(--divider)] px-2 py-0.5 rounded uppercase">
                               {level.toUpperCase()} • Listening • 3 min
@@ -476,7 +464,7 @@ export function LearnContent({
                   {lockCategory === "writing" && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                       {visibleDirectoryItems.map((item) => (
-                        <div key={item.id} className="p-5 rounded-2xl border border-[#EEEEEE] bg-white flex flex-col justify-between hover:shadow-md transition text-center">
+                        <div key={item.id} className="p-5 rounded-2xl border border-[#EEEEEE] bg-white flex flex-col justify-between overflow-hidden hover:shadow-md hover:border-primary transition-all duration-300 text-center">
                           <div>
                             <span className="text-3xl font-bold text-charcoal block mb-1">{item.title}</span>
                             <span className="inline-block text-[9px] font-bold text-secondary bg-base border border-[var(--divider)] px-2 py-0.5 rounded mb-2 uppercase">

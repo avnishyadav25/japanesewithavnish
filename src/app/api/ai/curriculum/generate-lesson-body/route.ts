@@ -3,7 +3,7 @@ import { getAdminSession } from "@/lib/auth/admin";
 import { sql } from "@/lib/db";
 import { getPromptContent } from "@/lib/ai/load-prompts";
 import { parseProseToBlocks } from "@/lib/curriculum/parseProseToBlocks";
-import { validateBlockData } from "@/lib/curriculum/blockTypes";
+import { validateBlockData } from "@/lib/blocks/blockTypes";
 
 const DEEPSEEK_API = "https://api.deepseek.com/v1/chat/completions";
 const GEMINI_TEXT_MODEL = "gemini-2.0-flash";
