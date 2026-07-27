@@ -155,6 +155,7 @@ const navGroups = [
       { href: "/admin/settings/payments", label: "Payment Settings" },
       { href: "/admin/settings/seo", label: "SEO Settings" },
       { href: "/admin/settings/backup", label: "Database Backup" },
+      { href: "/admin/settings/failover", label: "Database Failover" },
       { href: "/admin/progression", label: "Progression Rules" }
     ]
   }
