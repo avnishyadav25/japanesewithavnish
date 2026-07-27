@@ -59,7 +59,11 @@ async function main() {
   const tableRows = (await sql`
     SELECT table_name FROM information_schema.tables
     WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
-      AND table_name NOT IN ('backup_sync_state', 'backup_sync_log')
+      AND table_name NOT IN (
+        'backup_sync_state', 'backup_sync_log',
+        'db_failover_state', 'db_failover_log', 'replication_poll_state',
+        'sheets_export_state'
+      )
     ORDER BY table_name
   `) as { table_name: string }[];
   const tableNames = tableRows.map((r) => r.table_name);

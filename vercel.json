@@ -17,6 +17,14 @@
       "schedule": "0 * * * *"
     },
     {
+      "path": "/api/cron/replication-poll",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/sheets-export",
+      "schedule": "*/30 * * * *"
+    },
+    {
       "path": "/api/cron/content-review-worker",
       "schedule": "*/10 * * * *"
     }

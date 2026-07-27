@@ -1,7 +1,14 @@
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { sql } from "@/lib/db";
+import { TIGHT_REPLICATION_TABLES } from "@/lib/db/replication-poll";
 
 const BATCH_SIZE = 5;
+
+// Tables under near-real-time polling sync (src/lib/db/replication-poll.ts) already
+// have an up-to-date, PK-matched live replica in Supabase — the old PK-less
+// insert-then-delete snapshot writer below would collide with those rows, so it's
+// skipped for this tier. Turso and R2 are unaffected (still get every table).
+const TIGHT_REPLICATION_TABLE_SET = new Set<string>(TIGHT_REPLICATION_TABLES);
 
 function getR2Client(): S3Client | null {
   const endpoint = process.env.R2_ENDPOINT;
@@ -20,7 +27,11 @@ async function getAllTableNames(): Promise<string[]> {
   const rows = (await sql`
     SELECT table_name FROM information_schema.tables
     WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
-      AND table_name NOT IN ('backup_sync_state', 'backup_sync_log')
+      AND table_name NOT IN (
+        'backup_sync_state', 'backup_sync_log',
+        'db_failover_state', 'db_failover_log', 'replication_poll_state',
+        'sheets_export_state'
+      )
     ORDER BY table_name
   `) as { table_name: string }[];
   return rows.map((r) => r.table_name);
@@ -246,7 +257,9 @@ export async function runBackupSyncBatch(force = false): Promise<BackupSyncResul
         if (page.length < PAGE_SIZE) break;
       }
       const [supabaseResult, tursoResult, r2Result] = await Promise.all([
-        writeToSupabase(tableName, rows, runStartedAt),
+        TIGHT_REPLICATION_TABLE_SET.has(tableName)
+          ? Promise.resolve<WriteResult>({ ok: true })
+          : writeToSupabase(tableName, rows, runStartedAt),
         writeToTurso(tableName, rows, runStartedAt),
         writeToR2(tableName, rows, runStartedAt),
       ]);
