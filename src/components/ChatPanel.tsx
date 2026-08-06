@@ -109,6 +109,7 @@ export function ChatPanel() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Type a message…"
+              aria-label="Chat message"
               className="flex-1 px-3 py-2 border border-[var(--divider)] rounded-bento text-charcoal text-sm"
               disabled={loading}
             />

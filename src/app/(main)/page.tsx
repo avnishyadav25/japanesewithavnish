@@ -1,4 +1,6 @@
 import { headers } from "next/headers";
+import { unstable_cache } from "next/cache";
+import type { Metadata } from "next";
 import { sql } from "@/lib/db";
 import { HomeFaq } from "@/components/HomeFaq";
 import { LeadMagnetForm } from "@/components/LeadMagnetForm";
@@ -30,6 +32,27 @@ const POPULAR_BEGINNER_LESSONS: PopularLesson[] = [
 
 const isComingSoon = process.env.COMING_SOON === "true" || process.env.COMING_SOON === "1";
 
+const HOME_TITLE = "Japanese with Avnish | JLPT N5–N1 Learning";
+const HOME_DESCRIPTION =
+  "Learn Japanese from N5 to N1 with structured lessons, a free placement quiz, daily practice, and premium JLPT bundles. Start your journey to fluency today.";
+
+export const metadata: Metadata = {
+  title: HOME_TITLE,
+  description: HOME_DESCRIPTION,
+  alternates: { canonical: "/" },
+  openGraph: {
+    title: HOME_TITLE,
+    description: HOME_DESCRIPTION,
+    url: "/",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: HOME_TITLE,
+    description: HOME_DESCRIPTION,
+  },
+};
+
 function ComingSoonView() {
   return (
     <div className="min-h-[70vh] flex flex-col items-center justify-center px-4 bg-[#FAF8F5]">
@@ -47,29 +70,40 @@ function ComingSoonView() {
   );
 }
 
+// Active plans + the homepage FAQ change rarely; caching avoids a DB round-trip on
+// every homepage hit (this page is `force-dynamic` for the per-request currency logic
+// below, so without this cache it was re-querying Postgres on every single request).
+const getHomeData = unstable_cache(
+  async () => {
+    if (!sql) return { plans: [] as any[], settings: {} as Record<string, unknown> };
+    const settingsKeys = ["homepage_faq"];
+    const [plansRows, settingsRows] = await Promise.all([
+      sql`
+        SELECT id, name, slug, billing_type, price_inr, price_usd, features, is_popular, sort_order
+        FROM subscription_plans
+        WHERE is_active = true
+        ORDER BY sort_order
+      `,
+      sql`SELECT key, value FROM site_settings WHERE key = ANY(${settingsKeys})`,
+    ]);
+    const settings: Record<string, unknown> = {};
+    (settingsRows as { key: string; value: unknown }[]).forEach((r) => { settings[r.key] = r.value; });
+    return { plans: plansRows ?? [], settings };
+  },
+  ["home-plans-settings"],
+  { revalidate: 60 }
+);
+
 async function FullHomeView() {
   const headersList = await headers();
   const country = headersList.get("x-vercel-ip-country") || "IN";
   const defaultCurrency = country.toUpperCase() === "IN" ? "INR" : "USD";
 
-  const settingsKeys = ["homepage_faq"];
   let plans: any[] = [];
   let settings: Record<string, unknown> = {};
 
   try {
-    if (sql) {
-      const [plansRows, settingsRows] = await Promise.all([
-        sql`
-          SELECT id, name, slug, billing_type, price_inr, price_usd, features, is_popular, sort_order
-          FROM subscription_plans
-          WHERE is_active = true
-          ORDER BY sort_order
-        `,
-        sql`SELECT key, value FROM site_settings WHERE key = ANY(${settingsKeys})`,
-      ]);
-      plans = plansRows ?? [];
-      (settingsRows as { key: string; value: unknown }[]).forEach((r) => { settings[r.key] = r.value; });
-    }
+    ({ plans, settings } = await getHomeData());
   } catch (e) {
     console.error("Homepage queries failed:", e);
   }

@@ -6,6 +6,7 @@ import { OfferBannerBar } from "@/components/OfferBannerBar";
 export const metadata = {
   title: "Pricing | Japanese with Avnish",
   description: "Get unlimited access to structured Japanese learning paths from N5 to N1 with premium plans.",
+  alternates: { canonical: "/pricing" },
 };
 
 export default async function PricingPage() {

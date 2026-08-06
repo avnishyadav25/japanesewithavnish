@@ -363,7 +363,6 @@ export function CurriculumBrowserClient({ initialData }: { initialData: Curricul
                         fill
                         sizes="100px"
                         className="object-cover"
-                        unoptimized
                       />
                       {isLocked && (
                         <div className="absolute inset-0 bg-charcoal/40 flex items-center justify-center">
@@ -613,7 +612,6 @@ export function CurriculumBrowserClient({ initialData }: { initialData: Curricul
                               fill
                               sizes="40px"
                               className="object-cover"
-                              unoptimized
                             />
                           </div>
                           <div className="text-left min-w-0">

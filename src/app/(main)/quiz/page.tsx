@@ -4,6 +4,7 @@ import QuizClient from "./QuizClient";
 export const metadata = {
   title: "Find Your Japanese Level | JLPT Placement Quiz",
   description: "Take our free 25-question adaptive placement quiz covering Grammar, Vocabulary, and Kanji to find your JLPT level in about 5 minutes.",
+  alternates: { canonical: "/quiz" },
 };
 
 export default async function QuizPage() {

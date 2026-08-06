@@ -431,6 +431,7 @@ export async function generateMetadata({
   return {
     title: `${policy.title} | Japanese with Avnish`,
     description: policy.description,
+    alternates: { canonical: `/policies/${slug}` },
   };
 }
 

@@ -8,6 +8,7 @@ async function main() {
   const { generateImageWithGemini } = await import("../src/lib/ai/image-providers/gemini");
   const { generateImageWithHuggingFace } = await import("../src/lib/ai/image-providers/huggingface");
   const { insertAiLog } = await import("../src/lib/ai-logs");
+  const { compressGeneratedImage } = await import("../src/lib/ai/compress-image");
 
   const sql = neon(process.env.DATABASE_URL!);
   const r2 = new S3Client({
@@ -59,7 +60,8 @@ async function main() {
       continue;
     }
 
-    const { buffer, mime, textResponse } = generated;
+    const { textResponse } = generated;
+    const { buffer, mime } = await compressGeneratedImage(generated.buffer);
     const ext = mime.includes("jpeg") || mime.includes("jpg") ? "jpg" : "png";
     const key = `blog/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 

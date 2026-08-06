@@ -373,6 +373,7 @@ export function Header({ isAdmin = false }: { isAdmin?: boolean }) {
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder="Search lessons, vocab, kanji, blog…"
+                      aria-label="Search lessons, vocab, kanji, blog"
                       className="w-full px-3 py-2 text-sm text-charcoal focus:outline-none"
                     />
                   </div>

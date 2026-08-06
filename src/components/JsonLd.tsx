@@ -55,13 +55,16 @@ export function ArticleSchema({
   url,
   image,
   datePublished,
+  authorName,
 }: {
   title: string;
   description?: string;
   url: string;
   image?: string;
   datePublished?: string;
+  authorName?: string;
 }) {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://japanesewithavnish.com";
   const schema = {
     "@context": "https://schema.org",
     "@type": "Article",
@@ -70,6 +73,18 @@ export function ArticleSchema({
     url,
     ...(image && { image: [image] }),
     ...(datePublished && { datePublished }),
+    author: {
+      "@type": "Person",
+      name: authorName || "Japanese with Avnish Editorial Team",
+    },
+    publisher: {
+      "@type": "Organization",
+      name: "Japanese with Avnish",
+      logo: {
+        "@type": "ImageObject",
+        url: `${siteUrl}/logo.png`,
+      },
+    },
   };
   return (
     <script

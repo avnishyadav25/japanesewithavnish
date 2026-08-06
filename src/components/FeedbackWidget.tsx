@@ -70,6 +70,7 @@ export function FeedbackWidget() {
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="Your suggestion or feedback…"
+                aria-label="Your suggestion or feedback"
                 required
                 maxLength={2000}
                 rows={3}
@@ -80,6 +81,7 @@ export function FeedbackWidget() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Your name (optional)"
+                aria-label="Your name (optional)"
                 maxLength={100}
                 className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm text-charcoal placeholder-[#aaa] focus:outline-none focus:border-primary"
               />
@@ -88,6 +90,7 @@ export function FeedbackWidget() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Email (optional)"
+                aria-label="Your email (optional)"
                 className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm text-charcoal placeholder-[#aaa] focus:outline-none focus:border-primary"
               />
               {/* Honeypot field (visually hidden) */}

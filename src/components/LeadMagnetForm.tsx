@@ -4,6 +4,7 @@ import { useState } from "react";
 
 export function LeadMagnetForm() {
   const [email, setEmail] = useState("");
+  const [website, setWebsite] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
 
   async function handleSubmit(e: React.FormEvent) {
@@ -14,7 +15,7 @@ export function LeadMagnetForm() {
       const res = await fetch("/api/subscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), source: "lead_magnet" }),
+        body: JSON.stringify({ email: email.trim(), source: "lead_magnet", website }),
       });
       const data = await res.json();
       if (res.ok && data.success) {
@@ -36,9 +37,22 @@ export function LeadMagnetForm() {
         <p className="text-primary font-medium">Check your email for the download link.</p>
       ) : (
         <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2">
+          {/* Honeypot field for anti-spam (visually hidden) */}
+          <div className="hidden" aria-hidden="true">
+            <label htmlFor="lead-magnet-website">Leave this field blank</label>
+            <input
+              id="lead-magnet-website"
+              type="text"
+              value={website}
+              onChange={(e) => setWebsite(e.target.value)}
+              tabIndex={-1}
+              autoComplete="off"
+            />
+          </div>
           <input
             type="email"
             placeholder="your@email.com"
+            aria-label="Email address"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required

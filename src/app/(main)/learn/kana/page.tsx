@@ -4,6 +4,7 @@ import { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Kana & Kanji Practice Portal | Japanese with Avnish",
   description: "Learn and practice writing Hiragana, Katakana, and Kanji characters with stroke-by-stroke guides, Japanese pronunciation audio, and interactive drawing canvases.",
+  alternates: { canonical: "/learn/kana" },
 };
 
 export default function KanaPortalPage() {

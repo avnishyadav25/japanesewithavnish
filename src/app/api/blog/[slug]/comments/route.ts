@@ -4,6 +4,7 @@ import {
   sendWelcomeNewsletter,
   sendNewCommentNotification,
 } from "@/lib/email";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export async function GET(
   _req: NextRequest,
@@ -36,7 +37,18 @@ export async function POST(
   try {
     const { slug } = await params;
     const body = await req.json();
-    const { name, email, content } = body;
+    const { name, email, content, website } = body;
+
+    // Honeypot: bots fill hidden fields, humans don't. Silent success to avoid tipping them off.
+    if (website && typeof website === "string" && website.trim().length > 0) {
+      return NextResponse.json({ success: true, id: null });
+    }
+
+    const ip = getClientIp(req);
+    const { allowed } = await checkRateLimit(`comment:${ip}`, { max: 5, windowMs: 15 * 60 * 1000 });
+    if (!allowed) {
+      return NextResponse.json({ error: "Too many comments. Please try again later." }, { status: 429 });
+    }
 
     if (!name || typeof name !== "string" || !name.trim()) {
       return NextResponse.json({ error: "Name is required" }, { status: 400 });

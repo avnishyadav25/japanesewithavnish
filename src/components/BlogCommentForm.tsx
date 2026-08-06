@@ -13,6 +13,7 @@ export function BlogCommentForm({ slug, onSuccess }: BlogCommentFormProps) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [content, setContent] = useState("");
+  const [website, setWebsite] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -46,6 +47,7 @@ export function BlogCommentForm({ slug, onSuccess }: BlogCommentFormProps) {
           name: name.trim(),
           email: email.trim().toLowerCase(),
           content: content.trim(),
+          website,
         }),
       });
       const data = await res.json();
@@ -68,6 +70,18 @@ export function BlogCommentForm({ slug, onSuccess }: BlogCommentFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Honeypot field for anti-spam (visually hidden) */}
+      <div className="hidden" aria-hidden="true">
+        <label htmlFor="comment-website">Leave this field blank</label>
+        <input
+          id="comment-website"
+          type="text"
+          value={website}
+          onChange={(e) => setWebsite(e.target.value)}
+          tabIndex={-1}
+          autoComplete="off"
+        />
+      </div>
       <div>
         <label htmlFor="comment-name" className="block text-sm font-medium text-charcoal mb-1">
           Name

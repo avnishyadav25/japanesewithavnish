@@ -4,6 +4,7 @@ import { useState } from "react";
 
 export function NewsletterForm({ variant = "light", source = "footer" }: { variant?: "light" | "dark"; source?: string }) {
   const [email, setEmail] = useState("");
+  const [website, setWebsite] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
 
   async function handleSubmit(e: React.FormEvent) {
@@ -14,7 +15,7 @@ export function NewsletterForm({ variant = "light", source = "footer" }: { varia
       const res = await fetch("/api/subscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), source }),
+        body: JSON.stringify({ email: email.trim(), source, website }),
       });
       const data = await res.json();
       if (res.ok && data.success) {
@@ -31,9 +32,22 @@ export function NewsletterForm({ variant = "light", source = "footer" }: { varia
   const isDark = variant === "dark";
   return (
     <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2 max-w-sm">
+      {/* Honeypot field for anti-spam (visually hidden) */}
+      <div className="hidden" aria-hidden="true">
+        <label htmlFor={`newsletter-website-${source}`}>Leave this field blank</label>
+        <input
+          id={`newsletter-website-${source}`}
+          type="text"
+          value={website}
+          onChange={(e) => setWebsite(e.target.value)}
+          tabIndex={-1}
+          autoComplete="off"
+        />
+      </div>
       <input
         type="email"
         placeholder="Your email"
+        aria-label="Email address"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         required

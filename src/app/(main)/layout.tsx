@@ -26,13 +26,19 @@ export default async function MainLayout({
 
   return (
     <div className="min-h-screen flex flex-col bg-base">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[100] focus:px-4 focus:py-2 focus:rounded-md focus:bg-primary focus:text-white"
+      >
+        Skip to content
+      </a>
       {!isComingSoon && (
         <>
           <AnnouncementBar />
           <Header isAdmin={isAdmin} />
         </>
       )}
-      <main className={`flex-1 ${!isComingSoon && !isTutorRoute ? "pb-16 md:pb-0" : ""}`}>{children}</main>
+      <main id="main-content" className={`flex-1 ${!isComingSoon && !isTutorRoute ? "pb-16 md:pb-0" : ""}`}>{children}</main>
       {!isComingSoon && (
         <Suspense fallback={null}>
           <PageAnalytics />

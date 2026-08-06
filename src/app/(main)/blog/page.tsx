@@ -4,15 +4,52 @@ import { filterPosts, type PostForFilter } from "@/lib/blog-filters";
 import { BlogFilterBar } from "@/components/blog/BlogFilterBar";
 import { BlogHeroWithSearch } from "@/components/blog/BlogHeroWithSearch";
 import { BlogPostCard } from "@/components/blog/BlogPostCard";
+import { clampTitle, clampDescription, canonicalUrl } from "@/lib/seo";
 
 const POSTS_PER_PAGE = 12;
 
 export const dynamic = "force-dynamic";
 
+type BlogSearchParams = { level?: string; type?: string; search?: string; page?: string };
+
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<BlogSearchParams>;
+}) {
+  const params = await searchParams;
+  const level = params.level && params.level !== "all" ? params.level.toUpperCase() : "";
+  const page = Math.max(1, parseInt(params.page || "1", 10));
+  const search = params.search?.trim();
+
+  const parts = ["Japanese Learning Blog"];
+  if (level) parts.push(`${level} Guides`);
+  if (search) parts.push(`"${search}"`);
+  if (page > 1) parts.push(`Page ${page}`);
+  const title = clampTitle(`${parts.join(" · ")} | Japanese with Avnish`);
+  const description = clampDescription(
+    level
+      ? `JLPT ${level} study guides, tips, and roadmaps from Japanese with Avnish.${page > 1 ? ` Page ${page}.` : ""}`
+      : `Guides, study roadmaps, and tips for learning Japanese and passing the JLPT — from absolute beginner to N1.${page > 1 ? ` Page ${page}.` : ""}`
+  );
+
+  const qs = new URLSearchParams();
+  if (level) qs.set("level", level.toLowerCase());
+  if (page > 1) qs.set("page", String(page));
+  const path = qs.toString() ? `/blog?${qs.toString()}` : "/blog";
+
+  return {
+    title,
+    description,
+    alternates: { canonical: path },
+    openGraph: { title, description, url: canonicalUrl(path), type: "website" },
+  };
+}
+
 export default async function BlogPage({
   searchParams,
 }: {
-  searchParams: Promise<{ level?: string; type?: string; search?: string; page?: string }>;
+  searchParams: Promise<BlogSearchParams>;
 }) {
   const params = await searchParams;
   const level = params.level || "all";
