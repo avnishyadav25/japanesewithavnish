@@ -15,6 +15,7 @@ type GuideSection = {
 export const metadata = {
   title: "Site Guide — Japanese with Avnish",
   description: "A quick walkthrough of the curriculum, blog, kanji, vocabulary, Nihongo Navi, and other features of Japanese with Avnish.",
+  alternates: { canonical: "/guide" },
 };
 
 export default async function GuidePage() {

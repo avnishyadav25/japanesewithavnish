@@ -8,6 +8,7 @@ import { BundleContentsTree } from "@/components/BundleContentsTree";
 import { getBundleContents } from "@/data/bundle-contents";
 import { ContentAnalytics } from "@/components/ContentAnalytics";
 import { SamplePreviewTabs } from "./SamplePreviewTabs";
+import { clampTitle, clampDescription, canonicalUrl } from "@/lib/seo";
 
 type ProductWithAssets = {
   id: string;
@@ -62,6 +63,37 @@ const BUNDLE_STATS: Record<string, { value: string; label: string }[]> = {
     { value: "5", label: "Mock tests" },
   ],
 };
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+  if (!sql) return {};
+
+  const rows = (await sql`
+    SELECT name, description FROM products WHERE slug = ${slug} LIMIT 1
+  `) as { name: string; description: string | null }[];
+  const product = rows[0];
+  if (!product) return {};
+
+  const title = clampTitle(`${product.name} | Japanese with Avnish`);
+  const description = clampDescription(
+    product.description || `${product.name} — structured Japanese learning material from Japanese with Avnish.`
+  );
+
+  return {
+    title,
+    description,
+    alternates: { canonical: `/product/${slug}` },
+    openGraph: {
+      title,
+      description,
+      url: canonicalUrl(`/product/${slug}`),
+    },
+  };
+}
 
 export default async function ProductPage({
   params,

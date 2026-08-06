@@ -5,6 +5,7 @@ import { getCurriculumData, getCurriculumOverview } from "@/lib/curriculum-data"
 export const metadata = {
   title: "Curriculum",
   description: "Browse the full Japanese curriculum by level, module, and lesson — Japanese with Avnish",
+  alternates: { canonical: "/learn/curriculum" },
 };
 
 export default async function LearnCurriculumPage() {

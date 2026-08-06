@@ -177,6 +177,7 @@ export function LearnContent({
             <input
               type="search"
               placeholder={getSearchPlaceholder()}
+              aria-label={getSearchPlaceholder()}
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               className="flex-1 min-w-0 px-4 py-2.5 border border-[var(--divider)] rounded-md text-charcoal placeholder:text-[#555555] bg-white text-sm"
@@ -292,6 +293,7 @@ export function LearnContent({
                   <select
                     value={posFilter}
                     onChange={(e) => setPosFilter(e.target.value)}
+                    aria-label="Filter by part of speech"
                     className="text-xs border border-[var(--divider)] rounded-lg px-3 py-2 text-charcoal bg-white"
                   >
                     <option value="all">All parts of speech</option>
@@ -302,6 +304,7 @@ export function LearnContent({
                   <select
                     value={scriptFilter}
                     onChange={(e) => setScriptFilter(e.target.value as typeof scriptFilter)}
+                    aria-label="Filter by kana or kanji script"
                     className="text-xs border border-[var(--divider)] rounded-lg px-3 py-2 text-charcoal bg-white"
                   >
                     <option value="all">Kana &amp; Kanji words</option>
@@ -311,6 +314,7 @@ export function LearnContent({
                   <select
                     value={learnedFilter}
                     onChange={(e) => setLearnedFilter(e.target.value as typeof learnedFilter)}
+                    aria-label="Filter by learned status"
                     className="text-xs border border-[var(--divider)] rounded-lg px-3 py-2 text-charcoal bg-white"
                   >
                     <option value="all">Learned &amp; not learned</option>

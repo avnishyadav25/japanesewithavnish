@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
 import {
@@ -27,6 +28,7 @@ import { LessonBlockRenderer } from "@/components/curriculum/LessonBlockRenderer
 import { getResolvedContentBlocks } from "@/lib/blocks/getContentBlocks";
 import type { ResolvedBlock } from "@/lib/curriculum/getLessonBlocks";
 import type { BlockType as RichContentBlockType } from "@/lib/blocks/blockTypes";
+import { clampTitle, clampDescription } from "@/lib/seo";
 
 const RICH_CONTENT_BLOCK_TYPES: RichContentBlockType[] = [
   "kanji_radicals",
@@ -97,13 +99,17 @@ export async function getLearnDetailMetadata({
   const p = rows[0];
   if (!p) return {};
 
-  const title = p.seo_title?.trim() || p.title;
-  const description = p.seo_description?.trim() || undefined;
-  const url = `${BASE}${canonicalBase}/${normalized}/${encodeURIComponent(postSlug)}`;
+  const rawTitle = p.seo_title?.trim() || p.title;
+  const title = rawTitle ? clampTitle(`${rawTitle} | Japanese with Avnish`) : undefined;
+  const rawDescription = p.seo_description?.trim() || rawTitle;
+  const description = rawDescription ? clampDescription(rawDescription) : undefined;
+  const canonicalPath = `${canonicalBase}/${normalized}/${encodeURIComponent(postSlug)}`;
+  const url = `${BASE}${canonicalPath}`;
 
   return {
-    title: title ? `${title} | Japanese with Avnish` : undefined,
+    title,
     description,
+    alternates: { canonical: canonicalPath },
     openGraph: {
       title: title || undefined,
       description: description || undefined,
@@ -369,11 +375,13 @@ export async function LearnDetailContent({
             </h1>
 
             {featureImageUrl && (
-              <div className="mb-8 rounded-[10px] overflow-hidden border border-[var(--divider)]">
-                <img
+              <div className="mb-8 rounded-[10px] overflow-hidden border border-[var(--divider)] relative aspect-video">
+                <Image
                   src={featureImageUrl}
                   alt=""
-                  className="w-full aspect-video object-cover object-top"
+                  fill
+                  sizes="(max-width: 1024px) 100vw, 1120px"
+                  className="object-cover object-top"
                 />
               </div>
             )}

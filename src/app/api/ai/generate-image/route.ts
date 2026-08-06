@@ -7,6 +7,7 @@ import { insertAiLog } from "@/lib/ai-logs";
 import { generateImageWithGemini, type GeneratedImage } from "@/lib/ai/image-providers/gemini";
 import { generateImageWithHuggingFace } from "@/lib/ai/image-providers/huggingface";
 import { generateImageWithDeepSeekHtml } from "@/lib/ai/image-providers/deepseek-html";
+import { compressGeneratedImage } from "@/lib/ai/compress-image";
 
 const validImageTypes: ImageType[] = ["product", "blog", "newsletter", "page", "learning", "curriculum"];
 
@@ -126,7 +127,8 @@ Use the reference image for style and mood. Clean flat-vector educational style.
       return NextResponse.json({ error: `Image generation failed on all providers: ${providerErrors.join("; ")}` }, { status: 502 });
     }
 
-    const { buffer, mime, textResponse } = generated;
+    const { textResponse } = generated;
+    const { buffer, mime } = await compressGeneratedImage(generated.buffer);
     const ext = mime.includes("jpeg") || mime.includes("jpg") ? "jpg" : "png";
     const folder = imageType;
     const key = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;

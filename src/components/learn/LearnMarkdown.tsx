@@ -215,6 +215,13 @@ export function LearnMarkdown({
               />
             </span>
           ),
+          // The page template already renders the item title as the page's single H1;
+          // demote any H1 inside DB markdown content to H2 to avoid a duplicate H1.
+          h1: ({ children, ...props }) => (
+            <SectionWithAudio level={2} {...props}>
+              {children}
+            </SectionWithAudio>
+          ),
           h2: ({ children, ...props }) => (
             <SectionWithAudio level={2} {...props}>
               {children}

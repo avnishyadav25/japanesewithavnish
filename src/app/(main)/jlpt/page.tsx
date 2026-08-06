@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { sql } from "@/lib/db";
 import { JLPTContent } from "@/components/jlpt/JLPTContent";
-import { JLPT_LEVELS, type JLPTLevel } from "@/data/jlpt-levels";
+import { JLPT_LEVELS, LEVEL_NAMES, LEVEL_SUMMARIES, type JLPTLevel } from "@/data/jlpt-levels";
+import { clampTitle, clampDescription, canonicalUrl } from "@/lib/seo";
 
 type Post = {
   id: string;
@@ -23,6 +24,27 @@ function filterPostsByLevel(posts: Post[], level: JLPTLevel): Post[] {
     }
     return postLevels.includes(level.toUpperCase());
   });
+}
+
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ level?: string }>;
+}) {
+  const { level: levelParam } = await searchParams;
+  const level: JLPTLevel =
+    levelParam && JLPT_LEVELS.includes(levelParam.toLowerCase() as JLPTLevel)
+      ? (levelParam.toLowerCase() as JLPTLevel)
+      : "n5";
+  const title = clampTitle(`JLPT ${LEVEL_NAMES[level]} | Japanese with Avnish`);
+  const description = clampDescription(LEVEL_SUMMARIES[level]);
+  const path = `/jlpt?level=${level}`;
+  return {
+    title,
+    description,
+    alternates: { canonical: path },
+    openGraph: { title, description, url: canonicalUrl(path), type: "website" },
+  };
 }
 
 export default async function JLPTPage({

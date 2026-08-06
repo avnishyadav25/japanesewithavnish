@@ -33,6 +33,7 @@ export function BlogHeroWithSearch({ initialSearch = "" }: { initialSearch?: str
         <input
           type="search"
           placeholder="Search grammar, kanji, vocab, roadmap…"
+          aria-label="Search grammar, kanji, vocab, roadmap"
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           className="flex-1 min-w-0 px-4 py-2.5 border border-[var(--divider)] rounded-md text-charcoal placeholder:text-[#555555] bg-white text-sm"

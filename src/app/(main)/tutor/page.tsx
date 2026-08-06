@@ -436,6 +436,7 @@ export default function TutorPage() {
                 <select
                   value={selectedMode}
                   onChange={(e) => setSelectedMode(e.target.value)}
+                  aria-label="Chat mode"
                   className="bg-[#FAF8F5] border border-[var(--divider)] rounded-lg px-2.5 py-1 text-[10px] font-bold text-charcoal focus:outline-none"
                 >
                   {CHAT_MODES.map((m) => (
@@ -464,6 +465,7 @@ export default function TutorPage() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Ask Nihongo Navi about grammar, vocab, kanji, or sentence correction..."
+                aria-label="Ask Nihongo Navi"
                 className="flex-1 h-11 px-4 border border-[var(--divider)] rounded-xl text-xs text-charcoal focus:border-primary focus:outline-none"
                 disabled={loading}
               />

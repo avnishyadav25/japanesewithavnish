@@ -1,10 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { sendWelcomeNewsletter } from "@/lib/email";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   try {
-    const { email, name, source } = await req.json();
+    const { email, name, source, website } = await req.json();
+
+    // Honeypot: bots fill hidden fields, humans don't. Silent success to avoid tipping them off.
+    if (website && typeof website === "string" && website.trim().length > 0) {
+      return NextResponse.json({ success: true });
+    }
+
+    const ip = getClientIp(req);
+    const { allowed } = await checkRateLimit(`subscribe:${ip}`, { max: 10, windowMs: 15 * 60 * 1000 });
+    if (!allowed) {
+      return NextResponse.json({ error: "Too many attempts. Please try again later." }, { status: 429 });
+    }
+
     if (!email || typeof email !== "string") {
       return NextResponse.json({ error: "Email required" }, { status: 400 });
     }

@@ -1,6 +1,8 @@
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
+import { clampTitle, clampDescription, canonicalUrl } from "@/lib/seo";
 import { BlogCommentForm } from "@/components/BlogCommentForm";
 import { BlogCommentList } from "@/components/BlogCommentList";
 import { BlogStickyCta } from "@/components/blog/BlogStickyCta";
@@ -15,28 +17,36 @@ import { filterPosts, type PostForFilter } from "@/lib/blog-filters";
 import { ContentAnalytics } from "@/components/ContentAnalytics";
 import { ArticleSchema } from "@/components/JsonLd";
 
-const BASE = process.env.NEXT_PUBLIC_SITE_URL || "https://japanesewithavnish.com";
-
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   if (!sql) return {};
   const rows = await sql`
-    SELECT title, seo_title, seo_description, og_image_url
+    SELECT title, seo_title, seo_description, summary, og_image_url
     FROM posts WHERE slug = ${slug} AND status = 'published' AND (content_type IS NULL OR content_type = 'blog') LIMIT 1
-  ` as { title: string; seo_title: string | null; seo_description: string | null; og_image_url: string | null }[];
+  ` as { title: string; seo_title: string | null; seo_description: string | null; summary: string | null; og_image_url: string | null }[];
   const p = rows[0];
   if (!p) return {};
-  const title = p.seo_title?.trim() || p.title;
-  const description = p.seo_description?.trim() || undefined;
+  const rawTitle = p.seo_title?.trim() || p.title;
+  const title = clampTitle(`${rawTitle} | Japanese with Avnish`);
+  const rawDescription = p.seo_description?.trim() || p.summary?.trim() || rawTitle;
+  const description = clampDescription(rawDescription);
+  const canonical = `/blog/${slug}`;
   return {
-    title: title ? `${title} | Japanese with Avnish` : undefined,
+    title,
     description,
+    alternates: { canonical },
     openGraph: {
-      title: title || undefined,
-      description: description || undefined,
+      title,
+      description,
       images: p.og_image_url ? [{ url: p.og_image_url }] : undefined,
       type: "article",
-      url: `${BASE}/blog/${slug}`,
+      url: canonicalUrl(canonical),
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: p.og_image_url ? [p.og_image_url] : undefined,
     },
   };
 }
@@ -102,7 +112,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
   const readTime = contentStr ? estimateReadTime(contentStr) : 0;
   const isMarkdown = contentStr && !contentStr.trim().startsWith("<");
 
-  const postUrl = `${BASE}/blog/${slug}`;
+  const postUrl = canonicalUrl(`/blog/${slug}`);
   return (
     <div className="py-12 sm:py-16 px-6 sm:px-8 lg:px-12 pb-24 lg:pb-16">
       <ArticleSchema
@@ -111,6 +121,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
         url={postUrl}
         image={post.og_image_url || undefined}
         datePublished={post.published_at || undefined}
+        authorName={authorName}
       />
       <ContentAnalytics content_type="blog" content_id={post.id as string} trackDuration />
       <div className="max-w-[1400px] mx-auto">
@@ -186,11 +197,14 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
 
             {/* Featured image */}
             {post.og_image_url && (
-              <div className="mb-8 rounded-[10px] overflow-hidden border border-[var(--divider)]">
-                <img
+              <div className="mb-8 rounded-[10px] overflow-hidden border border-[var(--divider)] relative aspect-video">
+                <Image
                   src={post.og_image_url}
-                  alt=""
-                  className="w-full aspect-video object-cover object-top"
+                  alt={post.title}
+                  fill
+                  sizes="(max-width: 1024px) 100vw, 1120px"
+                  className="object-cover object-top"
+                  priority
                 />
               </div>
             )}

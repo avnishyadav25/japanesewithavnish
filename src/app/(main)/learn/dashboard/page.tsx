@@ -170,6 +170,7 @@ export default function LearnDashboardPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[var(--base)] flex items-center justify-center">
+        <h1 className="sr-only">My Learning Dashboard</h1>
         <p className="text-secondary">Loading learning dashboard…</p>
       </div>
     );

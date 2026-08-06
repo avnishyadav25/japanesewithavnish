@@ -2,6 +2,23 @@ import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
 import { GrammarDrillsClient } from "./GrammarDrillsClient";
 import { GrammarDrillsPreview } from "./GrammarDrillsPreview";
+import { clampTitle, clampDescription, canonicalUrl } from "@/lib/seo";
+
+const TITLE = clampTitle("Grammar Drills | Japanese with Avnish");
+const DESCRIPTION = clampDescription(
+  "Practice Japanese grammar with interactive drills — choose the correct particle or conjugation, linked to your lessons and grammar points."
+);
+
+export const metadata = {
+  title: TITLE,
+  description: DESCRIPTION,
+  alternates: { canonical: "/learn/grammar-drills" },
+  openGraph: {
+    title: TITLE,
+    description: DESCRIPTION,
+    url: canonicalUrl("/learn/grammar-drills"),
+  },
+};
 
 export default async function GrammarDrillsPage({
   searchParams,

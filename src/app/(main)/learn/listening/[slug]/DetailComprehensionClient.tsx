@@ -134,6 +134,7 @@ export function DetailComprehensionClient({ scenarios, sessionEmail }: Props) {
             <select
               value={playbackRate}
               onChange={(e) => setPlaybackRate(parseFloat(e.target.value))}
+              aria-label="Playback speed"
               className="bg-white border border-[var(--divider)] rounded-lg px-2 py-1 text-xs font-bold text-charcoal focus:outline-none"
             >
               <option value="0.75">0.75x</option>

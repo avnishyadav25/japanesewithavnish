@@ -104,6 +104,7 @@ export function JLPTLessonsSection({
         <input
           type="search"
           placeholder="Search grammar, kanji, vocab…"
+          aria-label="Search grammar, kanji, vocab"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="flex-1 px-4 py-2 border border-[var(--divider)] rounded-md text-charcoal placeholder:text-secondary"

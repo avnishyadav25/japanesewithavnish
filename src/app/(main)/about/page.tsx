@@ -4,6 +4,7 @@ import { sql } from "@/lib/db";
 export const metadata = {
   title: "About — Japanese with Avnish",
   description: "The person and the process behind Japanese with Avnish — structured Japanese learning from N5 to N1.",
+  alternates: { canonical: "/about" },
 };
 
 const JOURNEY_POST_SLUGS = [

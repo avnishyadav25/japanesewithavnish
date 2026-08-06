@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { getSummary, type LearnItemForFilter } from "@/lib/learn-filters";
 
 const TYPE_LABELS: Record<string, string> = {
@@ -47,8 +48,8 @@ export function LearnLessonCard({ item, variant = "card" }: LearnLessonCardProps
         className="flex items-center gap-4 p-4 hover:no-underline group border-b border-[var(--divider)] last:border-b-0 hover:bg-[var(--divider)]/10 transition"
       >
         {featureImageUrl ? (
-          <div className="w-24 h-16 sm:w-28 sm:h-20 flex-shrink-0 rounded overflow-hidden bg-[var(--divider)]/20">
-            <img src={featureImageUrl} alt="" className="w-full h-full object-cover" />
+          <div className="relative w-24 h-16 sm:w-28 sm:h-20 flex-shrink-0 rounded overflow-hidden bg-[var(--divider)]/20">
+            <Image src={featureImageUrl} alt="" fill sizes="(max-width: 640px) 96px, 112px" className="object-cover" />
           </div>
         ) : (
           <div className="w-24 h-16 sm:w-28 sm:h-20 flex-shrink-0 rounded bg-[var(--divider)]/20 flex items-center justify-center text-secondary text-xs font-bold font-heading">
@@ -150,8 +151,14 @@ export function LearnLessonCard({ item, variant = "card" }: LearnLessonCardProps
       >
         <div>
           {featureImageUrl ? (
-            <div className="aspect-video w-full rounded-lg overflow-hidden bg-[var(--divider)]/20 mb-3">
-              <img src={featureImageUrl} alt="" className="w-full h-full object-cover" />
+            <div className="relative aspect-video w-full rounded-lg overflow-hidden bg-[var(--divider)]/20 mb-3">
+              <Image
+                src={featureImageUrl}
+                alt=""
+                fill
+                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                className="object-cover"
+              />
             </div>
           ) : (
             <span className="text-[42px] font-bold text-charcoal block mb-2 mt-2 leading-none font-heading group-hover:scale-105 transition-transform duration-200">
@@ -235,7 +242,13 @@ export function LearnLessonCard({ item, variant = "card" }: LearnLessonCardProps
     >
       <div className="aspect-video w-full bg-[var(--divider)]/20 relative overflow-hidden">
         {featureImageUrl ? (
-          <img src={featureImageUrl} alt="" className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-200" />
+          <Image
+            src={featureImageUrl}
+            alt=""
+            fill
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            className="object-cover group-hover:scale-102 transition-transform duration-200"
+          />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-gradient-to-br from-[#FFF7F7] to-[#FAF8F5] border-b border-[var(--divider)]">
             <span className="text-secondary font-bold text-sm tracking-wide uppercase">{typeLabel}</span>

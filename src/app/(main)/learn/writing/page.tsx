@@ -1,16 +1,36 @@
 import Link from "next/link";
 import { LearnBundleCta } from "@/components/learn/LearnBundleCta";
 import { getWritingSetsForLevel } from "@/lib/learn/writing-sets";
+import { clampTitle, clampDescription, canonicalUrl } from "@/lib/seo";
 
-export const metadata = {
-  title: "Writing Practice | Japanese with Avnish",
-  description: "Practice hiragana, katakana, and kanji with correct stroke order guides.",
-};
+type WritingSearchParams = { level?: string; search?: string };
+
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams?: Promise<WritingSearchParams>;
+}) {
+  const sp = (await searchParams) || {};
+  const level = sp.level && sp.level !== "all" ? sp.level.toUpperCase() : "";
+  const title = clampTitle(
+    `Writing Practice${level ? ` · ${level}` : ""} | Japanese with Avnish`
+  );
+  const description = clampDescription(
+    `Practice hiragana, katakana, and kanji with correct stroke order guides${level ? ` for JLPT ${level}` : ""}.`
+  );
+  const path = level ? `/learn/writing?level=${level.toLowerCase()}` : "/learn/writing";
+  return {
+    title,
+    description,
+    alternates: { canonical: path },
+    openGraph: { title, description, url: canonicalUrl(path), type: "website" },
+  };
+}
 
 export default async function LearnWritingPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ level?: string; search?: string }>;
+  searchParams?: Promise<WritingSearchParams>;
 }) {
   const sp = await searchParams;
   const level = (sp?.level || "all").toLowerCase();
@@ -53,6 +73,7 @@ export default async function LearnWritingPage({
                 name="search"
                 defaultValue={search}
                 placeholder="Search writing practice..."
+                aria-label="Search writing practice"
                 className="flex-1 min-w-0 px-4 py-2.5 border border-[var(--divider)] rounded-md text-charcoal bg-white text-sm"
               />
               <button type="submit" className="btn-primary px-4 shrink-0">

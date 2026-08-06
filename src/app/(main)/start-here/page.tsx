@@ -3,8 +3,25 @@ import { sql } from "@/lib/db";
 import { StartHereAnnouncement } from "@/components/StartHereAnnouncement";
 import { StartHereCuratedBlog } from "@/components/StartHereCuratedBlog";
 import { HomeFaq } from "@/components/HomeFaq";
+import { clampTitle, clampDescription, canonicalUrl } from "@/lib/seo";
 
 const LEVELS = ["N5", "N4", "N3", "N2", "N1"] as const;
+
+const TITLE = clampTitle("Start Here | Japanese with Avnish");
+const DESCRIPTION = clampDescription(
+  "New to Japanese with Avnish? Take the placement quiz to find your JLPT level, create a free account, and start structured Japanese learning from N5 to N1."
+);
+
+export const metadata = {
+  title: TITLE,
+  description: DESCRIPTION,
+  alternates: { canonical: "/start-here" },
+  openGraph: {
+    title: TITLE,
+    description: DESCRIPTION,
+    url: canonicalUrl("/start-here"),
+  },
+};
 
 export default async function StartHerePage() {
   const settings: Record<string, unknown> = {};

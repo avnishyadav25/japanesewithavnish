@@ -3,9 +3,35 @@ import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
 import { DetailComprehensionClient } from "./DetailComprehensionClient";
+import { clampTitle, clampDescription, canonicalUrl } from "@/lib/seo";
 
 interface Props {
   params: Promise<{ slug: string }>;
+}
+
+export async function generateMetadata({ params }: Props) {
+  const { slug } = await params;
+  const path = `/learn/listening/${slug}`;
+  if (!sql) return { alternates: { canonical: path } };
+
+  const posts = (await sql`
+    SELECT title, (jlpt_level)[1] AS level
+    FROM posts WHERE slug = ${slug} AND content_type = 'listening' AND status = 'published'
+    LIMIT 1
+  `) as { title: string; level: string | null }[];
+  const post = posts[0];
+  if (!post) return { alternates: { canonical: path } };
+
+  const title = clampTitle(`${post.title} Listening Practice | Japanese with Avnish`);
+  const description = clampDescription(
+    `Japanese listening comprehension practice: "${post.title}"${post.level ? ` (JLPT ${post.level.toUpperCase()})` : ""}, with audio and questions.`
+  );
+  return {
+    title,
+    description,
+    alternates: { canonical: path },
+    openGraph: { title, description, url: canonicalUrl(path), type: "article" },
+  };
 }
 
 export default async function ListeningDetailPage({ params }: Props) {

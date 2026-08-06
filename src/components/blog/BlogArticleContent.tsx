@@ -29,6 +29,21 @@ export function BlogArticleContent({ content, title }: BlogArticleContentProps) 
   return (
     <ReactMarkdown
       components={{
+        // The page template already renders the post title as the page's single H1.
+        // Any H1 inside the markdown body (regardless of wording) is demoted to H2
+        // so we never ship a duplicate H1.
+        h1: ({ children, ...props }) => {
+          const text = Array.isArray(children)
+            ? children.map((c) => (typeof c === "string" ? c : "")).join("")
+            : typeof children === "string"
+              ? children
+              : "";
+          return (
+            <h2 id={slugify(text) || "h2"} className="scroll-mt-24" {...props}>
+              {children}
+            </h2>
+          );
+        },
         h2: ({ children, ...props }) => {
           const text = Array.isArray(children)
             ? children.map((c) => (typeof c === "string" ? c : "")).join("")

@@ -1,5 +1,25 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  async headers() {
+    return [
+      {
+        // Deliberately no Content-Security-Policy here — the site loads Razorpay
+        // checkout, Segment analytics, and Monetag ads; a wrong CSP could silently
+        // break checkout. Scope CSP as its own follow-up with careful testing
+        // against every third-party script domain instead of bundling it in here.
+        source: "/:path*",
+        headers: [
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=()",
+          },
+        ],
+      },
+    ];
+  },
   async redirects() {
     return [
       // Canonical hostname: apex only, no www — avoids duplicate-content/split-SEO

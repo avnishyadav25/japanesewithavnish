@@ -5,6 +5,7 @@ import { ContactForm } from "./ContactForm";
 export const metadata = {
   title: "Support Center | Japanese with Avnish",
   description: "Need help with premium passes, billing, your account, or learning content? Visit our Support Center.",
+  alternates: { canonical: "/contact" },
 };
 
 async function getContactEmail() {

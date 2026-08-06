@@ -1,30 +1,17 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { sendContactFormNotification } from "@/lib/email";
-
-// Simple in-memory rate limiter
-const ipSubmissions = new Map<string, { count: number; resetTime: number }>();
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    
-    // 1. IP Rate Limiting
-    const ip = req.headers.get("x-nf-client-connection-ip") || req.headers.get("x-forwarded-for") || "unknown";
-    const now = Date.now();
-    const limitInfo = ipSubmissions.get(ip);
-    
-    if (limitInfo) {
-      if (now < limitInfo.resetTime) {
-        if (limitInfo.count >= 5) {
-          return NextResponse.json({ error: "Too many submissions. Please try again in 15 minutes." }, { status: 429 });
-        }
-        limitInfo.count += 1;
-      } else {
-        ipSubmissions.set(ip, { count: 1, resetTime: now + 15 * 60 * 1000 });
-      }
-    } else {
-      ipSubmissions.set(ip, { count: 1, resetTime: now + 15 * 60 * 1000 });
+
+    // 1. IP Rate Limiting (durable — see migration 133_rate_limits.sql)
+    const ip = getClientIp(req);
+    const { allowed } = await checkRateLimit(`contact:${ip}`, { max: 5, windowMs: 15 * 60 * 1000 });
+    if (!allowed) {
+      return NextResponse.json({ error: "Too many submissions. Please try again in 15 minutes." }, { status: 429 });
     }
 
     // 2. Honeypot Check (bots fill this, humans don't)

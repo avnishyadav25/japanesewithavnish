@@ -6,9 +6,48 @@ import { WritingGuestDemo } from "../WritingGuestDemo";
 import { resolveWritingSet } from "@/lib/learn/writing-sets";
 import { WritingComposition } from "./WritingComposition";
 import { getResolvedContentBlocks } from "@/lib/blocks/getContentBlocks";
+import { clampTitle, clampDescription, canonicalUrl } from "@/lib/seo";
 
 interface Props {
   params: Promise<{ slug: string }>;
+}
+
+export async function generateMetadata({ params }: Props) {
+  const { slug } = await params;
+  const path = `/learn/writing/${slug}`;
+
+  if (sql) {
+    const postRows = (await sql`
+      SELECT title, (jlpt_level)[1] AS level
+      FROM posts WHERE slug = ${slug} AND content_type = 'writing' AND status = 'published'
+      LIMIT 1
+    `) as { title: string; level: string | null }[];
+    const post = postRows[0];
+    if (post) {
+      const title = clampTitle(`${post.title} Writing Practice | Japanese with Avnish`);
+      const description = clampDescription(
+        `Guided writing practice for "${post.title}"${post.level ? ` (JLPT ${post.level.toUpperCase()})` : ""} with stroke-order canvases.`
+      );
+      return {
+        title,
+        description,
+        alternates: { canonical: path },
+        openGraph: { title, description, url: canonicalUrl(path), type: "article" },
+      };
+    }
+  }
+
+  const activeSet = await resolveWritingSet(slug);
+  const title = clampTitle(`${activeSet?.title || slug} Stroke Order Practice | Japanese with Avnish`);
+  const description = clampDescription(
+    activeSet?.desc || `Practice tracing "${slug}" stroke sequences on a guided drawing canvas.`
+  );
+  return {
+    title,
+    description,
+    alternates: { canonical: path },
+    openGraph: { title, description, url: canonicalUrl(path), type: "article" },
+  };
 }
 
 export default async function WritingDetailPage({ params }: Props) {

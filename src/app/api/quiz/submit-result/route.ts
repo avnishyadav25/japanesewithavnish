@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { sendQuizResults } from "@/lib/email";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 const THRESHOLDS = [
   { level: "N5", minScore: 0 },
@@ -13,8 +14,14 @@ const THRESHOLDS = [
 export async function POST(req: Request) {
   try {
     const { email, score, total, newsletterOptIn } = await req.json();
-    if (!email || typeof email !== "string") {
-      return NextResponse.json({ error: "Email required" }, { status: 400 });
+    if (!email || typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      return NextResponse.json({ error: "A valid email is required" }, { status: 400 });
+    }
+
+    const ip = getClientIp(req);
+    const { allowed } = await checkRateLimit(`quiz:${ip}`, { max: 10, windowMs: 15 * 60 * 1000 });
+    if (!allowed) {
+      return NextResponse.json({ error: "Too many attempts. Please try again later." }, { status: 429 });
     }
 
     const rec = [...THRESHOLDS].reverse().find((t) => (score || 0) >= t.minScore) || THRESHOLDS[0];

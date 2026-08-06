@@ -2,16 +2,41 @@ import { getLearnCatalog } from "@/lib/learn/getLearnCatalog";
 import { getDirectoryItems } from "@/lib/learn/getDirectoryItems";
 import { normalizeLearnLevel } from "@/lib/learn-filters";
 import { LearnContent } from "@/components/learn/LearnContent";
+import { clampTitle, clampDescription, canonicalUrl } from "@/lib/seo";
 
-export const metadata = {
-  title: "Japanese Listening Practice by JLPT Level | Japanese with Avnish",
-  description: "Practice listening comprehension with Japanese audio scenarios organized by JLPT level.",
-};
+type ListeningSearchParams = { level?: string; search?: string; sort?: string; page?: string };
+
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<ListeningSearchParams>;
+}) {
+  const sp = await searchParams;
+  const level = sp.level && sp.level !== "all" ? sp.level.toUpperCase() : "";
+  const page = Math.max(1, parseInt(sp.page || "1", 10));
+  const titleParts = ["Japanese Listening Practice"];
+  if (level) titleParts.push(`JLPT ${level}`);
+  if (page > 1) titleParts.push(`Page ${page}`);
+  const title = clampTitle(`${titleParts.join(" · ")} | Japanese with Avnish`);
+  const description = clampDescription(
+    `Practice listening comprehension with Japanese audio scenarios${level ? ` for JLPT ${level}` : " organized by JLPT level"}.${page > 1 ? ` Page ${page}.` : ""}`
+  );
+  const qs = new URLSearchParams();
+  if (level) qs.set("level", level.toLowerCase());
+  if (page > 1) qs.set("page", String(page));
+  const path = qs.toString() ? `/learn/listening?${qs.toString()}` : "/learn/listening";
+  return {
+    title,
+    description,
+    alternates: { canonical: path },
+    openGraph: { title, description, url: canonicalUrl(path), type: "website" },
+  };
+}
 
 export default async function LearnListeningPage({
   searchParams,
 }: {
-  searchParams: Promise<{ level?: string; search?: string; sort?: string; page?: string }>;
+  searchParams: Promise<ListeningSearchParams>;
 }) {
   const sp = await searchParams;
   const level = normalizeLearnLevel(sp.level || "all");
