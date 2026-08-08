@@ -17,6 +17,7 @@ export const metadata = {
     title: TITLE,
     description: DESCRIPTION,
     url: canonicalUrl("/learn/grammar-drills"),
+    images: ["/og-default.png"],
   },
 };
 

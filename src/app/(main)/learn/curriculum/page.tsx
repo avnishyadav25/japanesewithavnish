@@ -3,7 +3,7 @@ import { CurriculumBrowserClient } from "./CurriculumBrowserClient";
 import { getCurriculumData, getCurriculumOverview } from "@/lib/curriculum-data";
 
 export const metadata = {
-  title: "Curriculum",
+  title: "Curriculum | Japanese with Avnish",
   description: "Browse the full Japanese curriculum by level, module, and lesson — Japanese with Avnish",
   alternates: { canonical: "/learn/curriculum" },
 };
@@ -28,6 +28,17 @@ export default async function LearnCurriculumPage() {
           Browse all levels and lessons. Your next lesson is on your{" "}
           <Link href="/learn/dashboard" className="text-primary hover:underline">dashboard</Link>.
         </p>
+        <div className="flex flex-wrap gap-2 mb-8">
+          {["n5", "n4", "n3", "n2", "n1"].map((level) => (
+            <Link
+              key={level}
+              href={`/learn/curriculum/${level}`}
+              className="px-4 py-2 rounded-full border border-[var(--divider)] bg-white text-sm font-bold uppercase text-charcoal hover:border-primary hover:text-primary transition"
+            >
+              {level} full outline
+            </Link>
+          ))}
+        </div>
         {initialData ? (
           <CurriculumBrowserClient initialData={initialData} />
         ) : (

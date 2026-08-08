@@ -20,6 +20,7 @@ export const metadata = {
     title: TITLE,
     description: DESCRIPTION,
     url: canonicalUrl("/start-here"),
+    images: ["/og-default.png"],
   },
 };
 

@@ -1,0 +1,117 @@
+{
+  "summary": {
+    "health_score": 54,
+    "business_type": "EdTech / SaaS — Japanese learning (JLPT N5–N1), content-type deep dive",
+    "audit_date": "2026-08-08",
+    "top_findings": [
+      "The site is 78% vocabulary pages, and 88% of them (4,613 of 5,224) have no example sentences — thin content at massive scale.",
+      "Content-generation scripts never populate seo_title/seo_description, so ~90% of learn pages fall back to the bare page title as their meta description (vocab desc = 'ときどき', kanji = '尻 - butt').",
+      "No structured data on any learn/study-guide/JLPT/curriculum page — only the site-wide Organization block. ArticleSchema exists but only blog/[slug] uses it.",
+      "0 of 8,935 learn posts have an author — no E-E-A-T authorship on a person-branded education site.",
+      "~2,250 pages (incl. 1,833 kanji) are written but sitting in draft — a large produced asset not yet earning traffic."
+    ],
+    "quick_wins": [
+      "Add the summary fallback to learn-detail descriptions (LearnDetailContent.tsx:104) — one line, ~6,000 pages.",
+      "Add BreadcrumbList schema (visual breadcrumbs already exist site-wide).",
+      "Reuse existing ArticleSchema on study guides and learn detail pages.",
+      "Add /learn/kana*, /learn/curriculum, /scoreboard, and JLPT ?level variants to the sitemap.",
+      "Fix category canonical to drop the default sort=newest param ([type]/page.tsx:82)."
+    ]
+  },
+  "categories": [
+    {
+      "name": "Vocabulary (5,229 pages, 78% of site)",
+      "score": 42,
+      "what_works": ["Fully crawlable (always_free)", "Correct percent-encoded canonicals for Japanese slugs", "Excellent internal linking (breadcrumb + related-lessons)", "ISR (revalidate=60)"],
+      "findings": [
+        {"title": "88% of vocabulary pages have no example sentences", "severity": "High", "description": "DB: 4,613 of 5,224 published vocab items have zero examples; 4,611 have no examples and no notes. They render as word + reading + meaning only (~50-80 words). The 12% with examples average 6 good sentences.", "recommendation": "Generate/curate 3-6 example sentences (JA+romaji+EN) per word using the existing examples table + template. Highest content ROI on the site."},
+        {"title": "Stub meta descriptions on 93% of vocab pages", "severity": "High", "description": "Only 363/5,229 have seo_description; the rest fall back to the word itself. LearnDetailContent.tsx:104.", "recommendation": "Backfill seo_description from word/reading/meaning; add summary fallback immediately."},
+        {"title": "No structured data", "severity": "High", "description": "Only Organization schema renders. No DefinedTerm/LearningResource/BreadcrumbList.", "recommendation": "Add DefinedTerm + BreadcrumbList."}
+      ]
+    },
+    {
+      "name": "Kanji (423 published / 1,833 draft)",
+      "score": 58,
+      "what_works": ["Best-templated learn type: consistent ~845-char bodies with readings, stroke count, frequency, grade, stroke-order data"],
+      "findings": [
+        {"title": "1,833 kanji stuck in draft", "severity": "High", "description": "4x the live count is written but unpublished.", "recommendation": "QA and publish in batches with seo_description populated; ~5x the kanji corpus."},
+        {"title": "72% missing seo_description; no schema; 5% have examples", "severity": "Medium", "description": "120/423 have seo_description; only 117/2,186 items have examples.", "recommendation": "Backfill descriptions; add DefinedTerm schema; add example words."}
+      ]
+    },
+    {
+      "name": "Grammar (560 pages)",
+      "score": 52,
+      "what_works": ["67% have example sentences (best coverage of structured types)", "Strong category-page metadata"],
+      "findings": [
+        {"title": "Thinnest bodies on the site (avg 145 chars, 54% under 200)", "severity": "High", "description": "303/560 grammar pages have bodies under 200 chars — too thin for a high-intent JLPT category.", "recommendation": "Expand each with explanation, structure breakdown, when_to_use notes (column exists), common mistakes, and examples."},
+        {"title": "No schema", "severity": "Medium", "description": "No LearningResource/BreadcrumbList.", "recommendation": "Add schema."}
+      ]
+    },
+    {
+      "name": "Study guides (392 pages)",
+      "score": 55,
+      "what_works": ["Genuinely rich, structured content (avg 1,451 chars; richer via lesson_blocks)", "Strongest AI-citation asset on the site"],
+      "findings": [
+        {"title": "Good content, broken packaging", "severity": "High", "description": "Renders via LearnDetailContent so emits NO Article schema (unlike /blog/[slug]); 0/392 have OG images; only 25% have seo_description (title-stub descriptions); no author/date.", "recommendation": "Add Article schema, OG images, real descriptions, author/date. Highest-leverage GEO win."}
+      ]
+    },
+    {
+      "name": "Blog (21 editorial posts)",
+      "score": 82,
+      "what_works": ["Reference implementation: full metadata, Article+Person+ImageObject schema, author fallback, dates, related posts, og:type=article", "All 21 have seo_description + OG images", "Authentic first-person E-E-A-T"],
+      "findings": [
+        {"title": "Low volume + missing dateModified/BreadcrumbList", "severity": "Medium", "description": "Only 21 posts across 6 categories; schema lacks dateModified though updated_at exists; author Person is name-only.", "recommendation": "Build a content pipeline; add dateModified + BreadcrumbList; enrich author with url/sameAs."}
+      ]
+    },
+    {
+      "name": "JLPT level pages (N5-N1)",
+      "score": 60,
+      "what_works": ["Unique title/description per level", "Self-referencing canonical per level", "High commercial intent"],
+      "findings": [
+        {"title": "No Course schema; N4-N1 not in sitemap; client-rendered", "severity": "Medium", "description": "JLPTContent is a client component so only the requested level's HTML is crawlable; sitemap lists only bare /jlpt.", "recommendation": "Add Course/ItemList schema; sitemap all level variants. Do NOT add FAQPage for rich results (retired May 2026); keep FAQ as on-page/GEO content."}
+      ]
+    },
+    {
+      "name": "Curriculum (432 lessons)",
+      "score": 48,
+      "what_works": ["Strong taxonomy: 5 levels / 54 modules / 96 submodules / 432 lessons"],
+      "findings": [
+        {"title": "Large asset neither indexed nor clearly gated", "severity": "Medium", "description": "Individual lessons are personalized/gated and not in sitemap; hub is client-rendered with thin SSR; title lacks brand suffix; no Course schema.", "recommendation": "Decide indexation strategy: server-render a crawlable free-preview outline + Course schema + sitemap, or keep fully premium."}
+      ]
+    },
+    {
+      "name": "Reading / Listening / Writing / Sounds / Kana",
+      "score": 57,
+      "what_works": ["Healthy bodies (sounds ~2,000 chars); listening has audio+transcript+questions SSR'd", "Most have seo_description"],
+      "findings": [
+        {"title": "No schema; low volume; kana practice pages thin in SSR + missing canonicals", "severity": "Medium", "description": "Kana practice pages (hiragana/katakana/kanji) are client-rendered, lack canonicals, and are absent from the sitemap despite high search volume. 29 listening drafts unpublished.", "recommendation": "Add canonicals + sitemap entries + server-rendered content for kana pages; add AudioObject/LearningResource schema; publish listening drafts."}
+      ]
+    },
+    {
+      "name": "Rewards / XP / Gamification",
+      "score": 50,
+      "what_works": ["Rich system: 102 badges, 9 achievements, streaks, monthly leaderboard reward engine"],
+      "findings": [
+        {"title": "Rich system with almost no indexable surface", "severity": "Medium", "description": "Dashboard/badge pages are login-gated; the 100-badge catalog is never exposed; /scoreboard is public but client-only and not in the sitemap; guide sections are seeded published=false (a re-seed would unpublish the live explainers).", "recommendation": "Publish + harden guide sections; server-render /scoreboard top-N and sitemap it (privacy via show_on_scoreboard opt-in); build a public /badges catalog page."}
+      ]
+    },
+    {
+      "name": "Cross-cutting: metadata & schema pipeline",
+      "score": 45,
+      "what_works": ["Shared seo.ts helpers (clampTitle/clampDescription/canonicalUrl)", "metadataBase set correctly", "All content server-rendered and crawlable"],
+      "findings": [
+        {"title": "Generation scripts never write seo_title/seo_description", "severity": "High", "description": "scripts/generate-*.ts insert content/summary/og_image but not SEO metadata, so descriptions default to title (learn) or formulaic summary (blog).", "recommendation": "Update generators to set seo fields + one-off backfill of the existing corpus."},
+        {"title": "Inconsistent description fallback chains", "severity": "Medium", "description": "Blog: seo_description||summary||title. Learn: seo_description||title (no summary). Guide: short_description only (no clamp/fallback).", "recommendation": "Unify on seo_description||summary||built-description||title and always clamp."}
+      ]
+    }
+  ],
+  "action_plan": {
+    "phases": [
+      {"name": "Phase 1: High-leverage code fixes", "timeframe": "Week 1", "items": ["Add summary fallback to learn-detail descriptions (LearnDetailContent.tsx:104)", "Add BreadcrumbList schema site-wide", "Add Article/LearningResource schema to study guides + learn detail", "Add dateModified to Article schema", "Fix category canonical default-sort pollution ([type]/page.tsx:82)", "Add missing canonicals (kana pages) + brand title (curriculum)", "Fix sitemap coverage (kana, curriculum, scoreboard, JLPT variants)"]},
+      {"name": "Phase 2: Populate SEO metadata at scale", "timeframe": "Weeks 2-4", "items": ["Backfill seo_description + seo_title from structured fields (~6,000 pages)", "Update generation scripts to set SEO columns going forward", "Generate + backfill OG images per content type"]},
+      {"name": "Phase 3: Content depth", "timeframe": "Month 2+", "items": ["Raise vocabulary example-sentence coverage from 12% toward full (biggest ROI)", "Deepen grammar explanations (560 pages)", "Publish the 1,833-kanji draft backlog with QA", "Establish authorship/E-E-A-T: /about + bylines + Person schema + Organization sameAs/logo"]},
+      {"name": "Phase 4: Structural opportunities", "timeframe": "Ongoing", "items": ["JLPT: add Course schema + sitemap level variants", "Curriculum: decide + implement indexation strategy", "Rewards: publish guide sections, server-render + sitemap /scoreboard, build public /badges catalog", "Grow reading/listening/writing/sounds; publish listening drafts"]}
+    ]
+  },
+  "artifacts": {"findings_dir": "findings/", "screenshots_dir": "screenshots/"}
+}

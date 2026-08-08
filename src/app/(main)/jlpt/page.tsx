@@ -3,6 +3,7 @@ import { sql } from "@/lib/db";
 import { JLPTContent } from "@/components/jlpt/JLPTContent";
 import { JLPT_LEVELS, LEVEL_NAMES, LEVEL_SUMMARIES, type JLPTLevel } from "@/data/jlpt-levels";
 import { clampTitle, clampDescription, canonicalUrl } from "@/lib/seo";
+import { BreadcrumbListSchema } from "@/components/JsonLd";
 
 type Post = {
   id: string;
@@ -43,7 +44,7 @@ export async function generateMetadata({
     title,
     description,
     alternates: { canonical: path },
-    openGraph: { title, description, url: canonicalUrl(path), type: "website" },
+    openGraph: { title, description, url: canonicalUrl(path), type: "website", images: ["/og-default.png"] },
   };
 }
 
@@ -75,6 +76,12 @@ export default async function JLPTPage({
 
   return (
     <div className="py-12 sm:py-16 px-4 sm:px-6">
+      <BreadcrumbListSchema
+        items={[
+          { name: "Home", url: canonicalUrl("/") },
+          { name: "JLPT", url: canonicalUrl(`/jlpt?level=${initialLevel}`) },
+        ]}
+      />
       <div className="max-w-[1200px] mx-auto">
         <nav className="text-sm text-secondary mb-8">
           <Link href="/" className="hover:text-primary">

@@ -15,7 +15,7 @@ import { BlogNextStepCta } from "@/components/blog/BlogNextStepCta";
 import { BlogPostCard } from "@/components/blog/BlogPostCard";
 import { filterPosts, type PostForFilter } from "@/lib/blog-filters";
 import { ContentAnalytics } from "@/components/ContentAnalytics";
-import { ArticleSchema } from "@/components/JsonLd";
+import { ArticleSchema, BreadcrumbListSchema } from "@/components/JsonLd";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -38,7 +38,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     openGraph: {
       title,
       description,
-      images: p.og_image_url ? [{ url: p.og_image_url }] : undefined,
+      images: [{ url: p.og_image_url || "/og-default.png" }],
       type: "article",
       url: canonicalUrl(canonical),
     },
@@ -46,7 +46,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       card: "summary_large_image",
       title,
       description,
-      images: p.og_image_url ? [p.og_image_url] : undefined,
+      images: [p.og_image_url || "/og-default.png"],
     },
   };
 }
@@ -121,7 +121,15 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
         url={postUrl}
         image={post.og_image_url || undefined}
         datePublished={post.published_at || undefined}
+        dateModified={post.updated_at || undefined}
         authorName={authorName}
+      />
+      <BreadcrumbListSchema
+        items={[
+          { name: "Home", url: canonicalUrl("/") },
+          { name: "Blog", url: canonicalUrl("/blog") },
+          { name: post.title, url: postUrl },
+        ]}
       />
       <ContentAnalytics content_type="blog" content_id={post.id as string} trackDuration />
       <div className="max-w-[1400px] mx-auto">

@@ -15,7 +15,10 @@
       "Bash(curl -s http://localhost:3000/pricing)",
       "Bash(curl -s -o /dev/null -w \"status=%{http_code}\\\\n\" http://localhost:3000/store)",
       "Bash(curl -s -o /dev/null -w \"status=%{http_code}\\\\n\" http://localhost:3000/product/anything)",
-      "Bash(curl -s -I http://localhost:3000/store)"
+      "Bash(curl -s -I http://localhost:3000/store)",
+      "Bash(claude-seo --help)",
+      "Bash(claude-seo doctor *)",
+      "Bash(claude-seo setup *)"
     ]
   }
 }

@@ -23,7 +23,23 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { path: "/policies/refunds", priority: 0.4, changeFrequency: "monthly" },
     { path: "/policies/cookies", priority: 0.4, changeFrequency: "monthly" },
     { path: "/jlpt", priority: 0.8, changeFrequency: "weekly" },
+    { path: "/jlpt?level=n4", priority: 0.8, changeFrequency: "weekly" },
+    { path: "/jlpt?level=n3", priority: 0.8, changeFrequency: "weekly" },
+    { path: "/jlpt?level=n2", priority: 0.8, changeFrequency: "weekly" },
+    { path: "/jlpt?level=n1", priority: 0.8, changeFrequency: "weekly" },
     { path: "/guide", priority: 0.6, changeFrequency: "monthly" },
+    { path: "/learn/kana", priority: 0.6, changeFrequency: "monthly" },
+    { path: "/learn/kana/hiragana", priority: 0.7, changeFrequency: "monthly" },
+    { path: "/learn/kana/katakana", priority: 0.7, changeFrequency: "monthly" },
+    { path: "/learn/kana/kanji", priority: 0.7, changeFrequency: "monthly" },
+    { path: "/learn/curriculum", priority: 0.6, changeFrequency: "weekly" },
+    { path: "/learn/curriculum/n5", priority: 0.7, changeFrequency: "monthly" },
+    { path: "/learn/curriculum/n4", priority: 0.7, changeFrequency: "monthly" },
+    { path: "/learn/curriculum/n3", priority: 0.7, changeFrequency: "monthly" },
+    { path: "/learn/curriculum/n2", priority: 0.7, changeFrequency: "monthly" },
+    { path: "/learn/curriculum/n1", priority: 0.7, changeFrequency: "monthly" },
+    { path: "/scoreboard", priority: 0.4, changeFrequency: "weekly" },
+    { path: "/badges", priority: 0.5, changeFrequency: "monthly" },
   ];
 
   const staticEntries: MetadataRoute.Sitemap = staticPages.map(({ path, priority, changeFrequency }) => ({

@@ -42,7 +42,7 @@ export async function generateMetadata({
     title,
     description,
     alternates: { canonical: path },
-    openGraph: { title, description, url: canonicalUrl(path), type: "website" },
+    openGraph: { title, description, url: canonicalUrl(path), type: "website", images: ["/og-default.png"] },
   };
 }
 

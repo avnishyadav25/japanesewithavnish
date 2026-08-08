@@ -28,7 +28,8 @@ import { LessonBlockRenderer } from "@/components/curriculum/LessonBlockRenderer
 import { getResolvedContentBlocks } from "@/lib/blocks/getContentBlocks";
 import type { ResolvedBlock } from "@/lib/curriculum/getLessonBlocks";
 import type { BlockType as RichContentBlockType } from "@/lib/blocks/blockTypes";
-import { clampTitle, clampDescription } from "@/lib/seo";
+import { clampTitle, clampDescription, canonicalUrl } from "@/lib/seo";
+import { ArticleSchema, BreadcrumbListSchema } from "@/components/JsonLd";
 
 const RICH_CONTENT_BLOCK_TYPES: RichContentBlockType[] = [
   "kanji_radicals",
@@ -90,18 +91,18 @@ export async function getLearnDetailMetadata({
   if (!sql) return {};
 
   const rows = (await sql`
-    SELECT title, seo_title, seo_description, og_image_url
+    SELECT title, seo_title, seo_description, summary, og_image_url
     FROM posts
     WHERE content_type = ${normalized} AND slug = ${postSlug} AND status = 'published'
     LIMIT 1
-  `) as { title: string; seo_title: string | null; seo_description: string | null; og_image_url: string | null }[];
+  `) as { title: string; seo_title: string | null; seo_description: string | null; summary: string | null; og_image_url: string | null }[];
 
   const p = rows[0];
   if (!p) return {};
 
   const rawTitle = p.seo_title?.trim() || p.title;
   const title = rawTitle ? clampTitle(`${rawTitle} | Japanese with Avnish`) : undefined;
-  const rawDescription = p.seo_description?.trim() || rawTitle;
+  const rawDescription = p.seo_description?.trim() || p.summary?.trim() || rawTitle;
   const description = rawDescription ? clampDescription(rawDescription) : undefined;
   const canonicalPath = `${canonicalBase}/${normalized}/${encodeURIComponent(postSlug)}`;
   const url = `${BASE}${canonicalPath}`;
@@ -113,7 +114,7 @@ export async function getLearnDetailMetadata({
     openGraph: {
       title: title || undefined,
       description: description || undefined,
-      images: p.og_image_url ? [{ url: p.og_image_url }] : undefined,
+      images: [{ url: p.og_image_url || "/og-default.png" }],
       type: "article",
       url,
     },
@@ -136,7 +137,7 @@ export async function LearnDetailContent({
 
   if (!sql) notFound();
   const rows = await sql`
-    SELECT id, slug, title, content, content_type, (jlpt_level)[1] AS jlpt_level, tags, meta, status, sort_order, created_at, updated_at, og_image_url
+    SELECT id, slug, title, content, content_type, (jlpt_level)[1] AS jlpt_level, tags, meta, status, sort_order, created_at, updated_at, published_at, seo_description, summary, og_image_url
     FROM posts
     WHERE content_type = ${normalized} AND slug = ${slug} AND status = 'published'
     LIMIT 1
@@ -153,6 +154,9 @@ export async function LearnDetailContent({
     sort_order?: number;
     created_at?: string | null;
     updated_at?: string | null;
+    published_at?: string | null;
+    seo_description?: string | null;
+    summary?: string | null;
     og_image_url?: string | null;
   } | undefined;
   if (!item) notFound();
@@ -332,8 +336,27 @@ export async function LearnDetailContent({
   const isReadingBlocksMode = normalized === "reading" && readingBlocks.length > 0;
   const hasToc = !isReadingBlocksMode && reorderedContent.includes("## ");
 
+  const pageUrl = canonicalUrl(`${breadcrumbBase}/${normalized}/${encodeURIComponent(slug)}`);
+  const typeLabel = LEARN_TYPE_LABELS[normalized as LearnContentType];
+
   return (
     <div className="py-12 sm:py-16 px-6 sm:px-8 lg:px-12 pb-24 lg:pb-16">
+      <ArticleSchema
+        title={item.title}
+        description={item.seo_description || item.summary || undefined}
+        url={pageUrl}
+        image={featureImageUrl || undefined}
+        datePublished={item.published_at || item.created_at || undefined}
+        dateModified={item.updated_at || undefined}
+      />
+      <BreadcrumbListSchema
+        items={[
+          { name: "Home", url: canonicalUrl("/") },
+          { name: breadcrumbBase === "/blog" ? "Blog" : "Learn", url: canonicalUrl(breadcrumbBase) },
+          { name: typeLabel, url: canonicalUrl(`${breadcrumbBase}/${normalized}`) },
+          { name: item.title, url: pageUrl },
+        ]}
+      />
       <div className="max-w-[1400px] mx-auto">
         <div className="grid lg:grid-cols-[1fr_280px] gap-8">
           <div>
