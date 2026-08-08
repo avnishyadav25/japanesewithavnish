@@ -91,6 +91,7 @@ export async function generateMetadata({
       title,
       description,
       url: canonicalUrl(`/product/${slug}`),
+      images: ["/og-default.png"],
     },
   };
 }

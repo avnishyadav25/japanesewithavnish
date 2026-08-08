@@ -155,9 +155,12 @@ async function main() {
 
       const bodyWithScreenshot = `${section.body}\n\n![Screenshot of ${section.targetPath}](${screenshotUrl})`;
 
+      // Do not touch `published` here — this script only refreshes body/screenshot content.
+      // It previously force-set published = false unconditionally, which would silently
+      // unpublish already-live guide sections (default is published = true) on every re-run.
       await sql`
         UPDATE platform_guide_sections
-        SET body = ${bodyWithScreenshot}, published = false, updated_at = NOW()
+        SET body = ${bodyWithScreenshot}, updated_at = NOW()
         WHERE slug = ${section.slug}
       `;
       console.log(`[${section.slug}] OK -> ${screenshotUrl}`);

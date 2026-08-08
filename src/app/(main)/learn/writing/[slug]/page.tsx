@@ -32,7 +32,7 @@ export async function generateMetadata({ params }: Props) {
         title,
         description,
         alternates: { canonical: path },
-        openGraph: { title, description, url: canonicalUrl(path), type: "article" },
+        openGraph: { title, description, url: canonicalUrl(path), type: "article", images: ["/og-default.png"] },
       };
     }
   }

@@ -79,7 +79,7 @@ export async function generateMetadata({
 
   const qs = new URLSearchParams();
   if (level) qs.set("level", level.toLowerCase());
-  if (sp.sort) qs.set("sort", sp.sort);
+  if (sp.sort && sp.sort !== "newest") qs.set("sort", sp.sort);
   if (page > 1) qs.set("page", String(page));
   const path = qs.toString() ? `/learn/${type}?${qs.toString()}` : `/learn/${type}`;
 
@@ -87,7 +87,7 @@ export async function generateMetadata({
     title,
     description,
     alternates: { canonical: path },
-    openGraph: { title, description, url: canonicalUrl(path), type: "website" },
+    openGraph: { title, description, url: canonicalUrl(path), type: "website", images: ["/og-default.png"] },
   };
 }
 

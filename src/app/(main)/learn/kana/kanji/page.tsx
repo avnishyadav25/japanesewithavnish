@@ -7,6 +7,7 @@ import path from "path";
 export const metadata: Metadata = {
   title: "JLPT Kanji Sheets & Drawing Practice | Japanese with Avnish",
   description: "Browse Kanji characters organized by JLPT level. View Onyomi, Kunyomi, stroke counts, and trace character shapes on the canvas.",
+  alternates: { canonical: "/learn/kana/kanji" },
 };
 
 export default async function KanjiPracticePage() {
