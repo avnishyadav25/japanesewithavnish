@@ -35,7 +35,7 @@ export function PageAnalytics() {
   const sentDurationRef = useRef(false);
 
   useEffect(() => {
-    if (!pathname || !shouldTrack(pathname)) return;
+    if (!pathname || !searchParams || !shouldTrack(pathname)) return;
     const sessionId = getSessionId();
     const query = searchParams.toString();
     const path = query ? `${pathname}?${query}` : pathname;
