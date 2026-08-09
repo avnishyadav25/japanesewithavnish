@@ -50,3 +50,7 @@ google-cloud-cli-*.tar.gz
 # backups
 /backups
 /scripts/backups
+
+japanesewithavnish.com-audit/*
+japanesewithavnish.com-audit
+japanesewithavnish.com-audit

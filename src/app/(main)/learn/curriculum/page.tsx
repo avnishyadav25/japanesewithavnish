@@ -1,11 +1,16 @@
 import Link from "next/link";
 import { CurriculumBrowserClient } from "./CurriculumBrowserClient";
 import { getCurriculumData, getCurriculumOverview } from "@/lib/curriculum-data";
+import { canonicalUrl } from "@/lib/seo";
+
+const TITLE = "Curriculum | Japanese with Avnish";
+const DESCRIPTION = "Browse the full Japanese curriculum by level, module, and lesson — Japanese with Avnish";
 
 export const metadata = {
-  title: "Curriculum | Japanese with Avnish",
-  description: "Browse the full Japanese curriculum by level, module, and lesson — Japanese with Avnish",
+  title: TITLE,
+  description: DESCRIPTION,
   alternates: { canonical: "/learn/curriculum" },
+  openGraph: { title: TITLE, description: DESCRIPTION, url: canonicalUrl("/learn/curriculum"), type: "website", images: ["/og-default.png"] },
 };
 
 export default async function LearnCurriculumPage() {

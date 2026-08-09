@@ -1,10 +1,15 @@
 import { getQuizQuestions } from "@/lib/quiz-data";
 import QuizClient from "./QuizClient";
+import { canonicalUrl } from "@/lib/seo";
+
+const TITLE = "Find Your Japanese Level | JLPT Placement Quiz";
+const DESCRIPTION = "Take our free 25-question adaptive placement quiz covering Grammar, Vocabulary, and Kanji to find your JLPT level in about 5 minutes.";
 
 export const metadata = {
-  title: "Find Your Japanese Level | JLPT Placement Quiz",
-  description: "Take our free 25-question adaptive placement quiz covering Grammar, Vocabulary, and Kanji to find your JLPT level in about 5 minutes.",
+  title: TITLE,
+  description: DESCRIPTION,
   alternates: { canonical: "/quiz" },
+  openGraph: { title: TITLE, description: DESCRIPTION, url: canonicalUrl("/quiz"), type: "website", images: ["/og-default.png"] },
 };
 
 export default async function QuizPage() {

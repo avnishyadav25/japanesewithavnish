@@ -1,10 +1,16 @@
 import Link from "next/link";
 import { Metadata } from "next";
+import { canonicalUrl } from "@/lib/seo";
+
+const TITLE = "Kana & Kanji Practice Portal | Japanese with Avnish";
+const DESCRIPTION =
+  "Learn and practice writing Hiragana, Katakana, and Kanji characters with stroke-by-stroke guides, Japanese pronunciation audio, and interactive drawing canvases.";
 
 export const metadata: Metadata = {
-  title: "Kana & Kanji Practice Portal | Japanese with Avnish",
-  description: "Learn and practice writing Hiragana, Katakana, and Kanji characters with stroke-by-stroke guides, Japanese pronunciation audio, and interactive drawing canvases.",
+  title: TITLE,
+  description: DESCRIPTION,
   alternates: { canonical: "/learn/kana" },
+  openGraph: { title: TITLE, description: DESCRIPTION, url: canonicalUrl("/learn/kana"), type: "website", images: ["/og-default.png"] },
 };
 
 export default function KanaPortalPage() {

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
+import { canonicalUrl } from "@/lib/seo";
 
 /* ────────────────────────────────────────────────────────────
    Policy content – comprehensive, subscription-aware, legally sound
@@ -428,10 +429,13 @@ export async function generateMetadata({
   const { slug } = await params;
   const policy = POLICIES[slug];
   if (!policy) return {};
+  const title = `${policy.title} | Japanese with Avnish`;
+  const path = `/policies/${slug}`;
   return {
-    title: `${policy.title} | Japanese with Avnish`,
+    title,
     description: policy.description,
-    alternates: { canonical: `/policies/${slug}` },
+    alternates: { canonical: path },
+    openGraph: { title, description: policy.description, url: canonicalUrl(path), type: "website", images: ["/og-default.png"] },
   };
 }
 
