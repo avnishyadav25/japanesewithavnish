@@ -1,9 +1,15 @@
 import Link from "next/link";
 import { LeadMagnetForm } from "@/components/LeadMagnetForm";
+import { canonicalUrl } from "@/lib/seo";
+
+const TITLE = "Free N5 Kana Practice Pack | Japanese with Avnish";
+const DESCRIPTION = "Get your free N5 Hiragana and Katakana practice pack. Instant download. No spam.";
 
 export const metadata = {
-  title: "Free N5 Kana Practice Pack | Japanese with Avnish",
-  description: "Get your free N5 Hiragana and Katakana practice pack. Instant download. No spam.",
+  title: TITLE,
+  description: DESCRIPTION,
+  alternates: { canonical: "/free-n5-pack" },
+  openGraph: { title: TITLE, description: DESCRIPTION, url: canonicalUrl("/free-n5-pack"), type: "website", images: ["/og-default.png"] },
 };
 
 export default function FreeN5PackPage() {

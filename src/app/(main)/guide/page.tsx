@@ -1,5 +1,10 @@
 import Link from "next/link";
 import { sql } from "@/lib/db";
+import { canonicalUrl } from "@/lib/seo";
+
+const TITLE = "Site Guide — Japanese with Avnish";
+const DESCRIPTION =
+  "A quick walkthrough of the curriculum, blog, kanji, vocabulary, Nihongo Navi, and other features of Japanese with Avnish.";
 
 type GuideSection = {
   id: string;
@@ -13,9 +18,10 @@ type GuideSection = {
 };
 
 export const metadata = {
-  title: "Site Guide — Japanese with Avnish",
-  description: "A quick walkthrough of the curriculum, blog, kanji, vocabulary, Nihongo Navi, and other features of Japanese with Avnish.",
+  title: TITLE,
+  description: DESCRIPTION,
   alternates: { canonical: "/guide" },
+  openGraph: { title: TITLE, description: DESCRIPTION, url: canonicalUrl("/guide"), type: "website", images: ["/og-default.png"] },
 };
 
 export default async function GuidePage() {

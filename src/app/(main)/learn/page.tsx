@@ -1,10 +1,17 @@
 import Link from "next/link";
 import Image from "next/image";
 import { Metadata } from "next";
+import { canonicalUrl } from "@/lib/seo";
+
+const TITLE = "Learn Japanese | Japanese with Avnish";
+const DESCRIPTION =
+  "Browse Japanese learning resources organized by study area. Hiragana, Katakana, Kanji, Grammar, Vocab, Listening, Reading, and Writing.";
 
 export const metadata: Metadata = {
-  title: "Learn Japanese | Japanese with Avnish",
-  description: "Browse Japanese learning resources organized by study area. Hiragana, Katakana, Kanji, Grammar, Vocab, Listening, Reading, and Writing.",
+  title: TITLE,
+  description: DESCRIPTION,
+  alternates: { canonical: "/learn" },
+  openGraph: { title: TITLE, description: DESCRIPTION, url: canonicalUrl("/learn"), type: "website", images: ["/og-default.png"] },
 };
 
 interface HubCard {

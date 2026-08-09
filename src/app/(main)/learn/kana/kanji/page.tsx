@@ -3,11 +3,16 @@ import { KanjiClient, type KanjiDbItem } from "./KanjiClient";
 import { Metadata } from "next";
 import fs from "fs";
 import path from "path";
+import { canonicalUrl } from "@/lib/seo";
+
+const TITLE = "JLPT Kanji Sheets & Drawing Practice | Japanese with Avnish";
+const DESCRIPTION = "Browse Kanji characters organized by JLPT level. View Onyomi, Kunyomi, stroke counts, and trace character shapes on the canvas.";
 
 export const metadata: Metadata = {
-  title: "JLPT Kanji Sheets & Drawing Practice | Japanese with Avnish",
-  description: "Browse Kanji characters organized by JLPT level. View Onyomi, Kunyomi, stroke counts, and trace character shapes on the canvas.",
+  title: TITLE,
+  description: DESCRIPTION,
   alternates: { canonical: "/learn/kana/kanji" },
+  openGraph: { title: TITLE, description: DESCRIPTION, url: canonicalUrl("/learn/kana/kanji"), type: "website", images: ["/og-default.png"] },
 };
 
 export default async function KanjiPracticePage() {

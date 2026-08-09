@@ -56,6 +56,7 @@ function formatMoney(amount: number, currency: string) {
 export const metadata = {
   title: "Billing | Japanese with Avnish",
   alternates: { canonical: "/billing" },
+  robots: { index: false, follow: false },
 };
 
 export default async function BillingPage() {

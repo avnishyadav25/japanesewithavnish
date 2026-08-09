@@ -1,11 +1,16 @@
 import Link from "next/link";
 import { sql } from "@/lib/db";
 import { ContactForm } from "./ContactForm";
+import { canonicalUrl } from "@/lib/seo";
+
+const TITLE = "Support Center | Japanese with Avnish";
+const DESCRIPTION = "Need help with premium passes, billing, your account, or learning content? Visit our Support Center.";
 
 export const metadata = {
-  title: "Support Center | Japanese with Avnish",
-  description: "Need help with premium passes, billing, your account, or learning content? Visit our Support Center.",
+  title: TITLE,
+  description: DESCRIPTION,
   alternates: { canonical: "/contact" },
+  openGraph: { title: TITLE, description: DESCRIPTION, url: canonicalUrl("/contact"), type: "website", images: ["/og-default.png"] },
 };
 
 async function getContactEmail() {
