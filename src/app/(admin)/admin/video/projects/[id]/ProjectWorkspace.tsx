@@ -25,11 +25,21 @@ interface Props {
   initialJobs: VideoRenderJobRow[];
   initialRenders: RenderRow[];
   themeTokens: Record<string, unknown> | null;
+  bgmUrl: string | null;
+  bgmTitle: string | null;
 }
 
 const ACTIVE_JOB_STATUSES = new Set(["queued", "claimed", "running"]);
 
-export function ProjectWorkspace({ project, storyboards, initialJobs, initialRenders, themeTokens }: Props) {
+export function ProjectWorkspace({
+  project,
+  storyboards,
+  initialJobs,
+  initialRenders,
+  themeTokens,
+  bgmUrl,
+  bgmTitle,
+}: Props) {
   const router = useRouter();
 
   const [lang, setLang] = useState<NarrationLang>(project.narrationLangs[0] ?? "en");
@@ -40,6 +50,7 @@ export function ProjectWorkspace({ project, storyboards, initialJobs, initialRen
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
+  const [previewBgm, setPreviewBgm] = useState(false);
   const playerRef = useRef<PlayerHandle | null>(null);
   const playheadSeconds = usePlayerTime(playerRef, FORMAT_SPECS[previewFormat].fps);
 
@@ -371,6 +382,8 @@ export function ProjectWorkspace({ project, storyboards, initialJobs, initialRen
                   format={previewFormat}
                   themeTokens={(themeTokens as Partial<VideoThemeTokens>) ?? null}
                   playerRef={playerRef}
+                  bgmUrl={bgmUrl}
+                  previewBgm={previewBgm}
                 />
               )}
               <p className="text-xs text-secondary mt-2">
@@ -378,6 +391,14 @@ export function ProjectWorkspace({ project, storyboards, initialJobs, initialRen
                   ? "Timing from measured voiceover — this matches the rendered file."
                   : "Provisional timing. Exact scene lengths are set from the voiceover during the first render."}
               </p>
+              {bgmUrl && (
+                <label className="flex items-center gap-2 text-xs text-secondary mt-2">
+                  <input type="checkbox" checked={previewBgm} onChange={(e) => setPreviewBgm(e.target.checked)} />
+                  {/* Off by default because every seek restarts the track, which makes scrubbing
+                      unpleasant. The render always includes it either way. */}
+                  Play “{bgmTitle}” in the preview
+                </label>
+              )}
             </AdminCard>
 
             <AdminCard>

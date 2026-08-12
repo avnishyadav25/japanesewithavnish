@@ -37,9 +37,12 @@ interface Props {
   format: VideoFormat;
   themeTokens: Partial<VideoThemeTokens> | null;
   playerRef?: React.MutableRefObject<PlayerHandle | null>;
+  bgmUrl?: string | null;
+  /** Music is muted while scrubbing by default — every seek restarts the track. */
+  previewBgm?: boolean;
 }
 
-export function StoryboardPlayer({ storyboard, format, themeTokens, playerRef }: Props) {
+export function StoryboardPlayer({ storyboard, format, themeTokens, playerRef, bgmUrl, previewBgm }: Props) {
   const spec = FORMAT_SPECS[format];
 
   // A storyboard that has never been rendered has no resolved timeline (durations come from
@@ -52,8 +55,8 @@ export function StoryboardPlayer({ storyboard, format, themeTokens, playerRef }:
   }, [storyboard, format]);
 
   const inputProps = useMemo(
-    () => ({ storyboard, layout: spec.layout, themeTokens, bgmUrl: null, preview: true }),
-    [storyboard, spec.layout, themeTokens]
+    () => ({ storyboard, layout: spec.layout, themeTokens, bgmUrl: bgmUrl ?? null, preview: true, previewBgm }),
+    [storyboard, spec.layout, themeTokens, bgmUrl, previewBgm]
   );
 
   return (

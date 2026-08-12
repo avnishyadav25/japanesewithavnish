@@ -22,11 +22,16 @@ export default async function VideoProjectPage({ params }: { params: Promise<{ i
   const project = await getProject(id);
   if (!project) notFound();
 
-  const [storyboards, jobs, renders, themeRow] = await Promise.all([
+  const [storyboards, jobs, renders, themeRow, bgmRow] = await Promise.all([
     listStoryboards(id),
     listJobs({ projectId: id, limit: 25 }),
     listRenders({ projectId: id, limit: 25 }),
     sql`SELECT tokens FROM video_themes WHERE key = ${project.themeKey}` as Promise<{ tokens: Record<string, unknown> }[]>,
+    project.bgmTrackId
+      ? (sql`SELECT audio_url, title FROM video_bgm_tracks WHERE id = ${project.bgmTrackId}::uuid` as Promise<
+          { audio_url: string; title: string }[]
+        >)
+      : Promise.resolve([] as { audio_url: string; title: string }[]),
   ]);
 
   return (
@@ -65,6 +70,8 @@ export default async function VideoProjectPage({ params }: { params: Promise<{ i
         initialJobs={jobs}
         initialRenders={renders}
         themeTokens={(themeRow[0]?.tokens as Record<string, unknown>) ?? null}
+        bgmUrl={bgmRow[0]?.audio_url ?? null}
+        bgmTitle={bgmRow[0]?.title ?? null}
       />
     </div>
   );

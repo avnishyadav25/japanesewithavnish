@@ -14,9 +14,17 @@ import { sql } from "@/lib/db";
 import { getResolvedContentBlocks } from "@/lib/blocks/getContentBlocks";
 import { getResolvedLessonBlocks } from "@/lib/curriculum/getLessonBlocks";
 import type { BlockType } from "@/lib/blocks/blockTypes";
-import type { ContentItem, ContentSnapshot, ExampleSentence, ScopeKind, ScopeRef } from "./types";
+import type { ContentItem, ContentSnapshot, ExampleSentence, ScopeKind, ScopeRef, VocabItem } from "./types";
 
-/** Sidecar table + the columns worth putting on screen, per content_type. */
+/**
+ * Sidecar table + the columns worth putting on screen, per content_type.
+ *
+ * Not every learn content type has one. `study_guide` and `conversation` are posts-only — their
+ * substance lives in `posts.content` and `posts.meta` rather than a typed table. Those are
+ * handled by omission here: `queryPosts` skips the JOIN entirely when a type is absent, rather
+ * than the type being rejected. See LEARN_CONTENT_TYPES in src/lib/learn-filters.ts for the
+ * full list the admin wizard offers.
+ */
 const SIDECARS: Record<string, { table: string; columns: string[]; exampleFk?: string }> = {
   vocabulary: {
     table: "vocabulary",
@@ -107,10 +115,65 @@ async function fetchSidecarExamples(contentType: string, sidecarIds: string[]): 
   return byId;
 }
 
+/**
+ * Real vocabulary that contains a given kanji.
+ *
+ * Only 117 of 2,185 published kanji have example sentences of their own, so a kanji video built
+ * purely from `examples` would be a stroke animation and two readings for 95% of the catalogue —
+ * technically correct and not much use to a learner. Words that actually use the character are
+ * the thing that makes a reading stick, and we already have 5,215 of them sitting in
+ * `vocabulary`. One batched query covers a whole video's worth of kanji.
+ */
+async function fetchKanjiExampleWords(characters: string[]): Promise<Map<string, VocabItem[]>> {
+  const byChar = new Map<string, VocabItem[]>();
+  if (!sql || characters.length === 0) return byChar;
+
+  for (const character of characters) {
+    const rows = (await sql.query(
+      `SELECT v.word, v.reading, v.romaji, v.meaning
+       FROM vocabulary v
+       JOIN posts p ON p.id = v.post_id
+       WHERE p.status = 'published'
+         AND v.word LIKE '%' || $1 || '%'
+         AND v.meaning IS NOT NULL
+         -- Entries like 〜本 are counter/suffix templates, not words. A voice reads the tilde
+         -- aloud, and a learner cannot use one in a sentence.
+         AND v.word !~ '[〜～~・（(]'
+       ORDER BY
+         -- A word with a stored reading is one the voice cannot mispronounce, because the kana
+         -- goes into spokenAs. Prefer those over ones it would have to guess at.
+         (v.reading IS NULL OR btrim(v.reading) = ''),
+         -- Then shortest: 山 teaches better than 富士山麓鸚鵡.
+         char_length(v.word),
+         v.word
+       LIMIT 3`,
+      [character]
+    )) as { word: string; reading: string | null; romaji: string | null; meaning: string }[];
+
+    if (rows.length > 0) {
+      byChar.set(
+        character,
+        rows.map((r) => ({
+          word: r.word,
+          reading: r.reading ?? undefined,
+          romaji: r.romaji ?? undefined,
+          meaning: r.meaning,
+        }))
+      );
+    }
+  }
+  return byChar;
+}
+
 async function toContentItems(rows: PostRow[], contentType: string, includeBlocks: boolean): Promise<ContentItem[]> {
   const spec = SIDECARS[contentType];
   const sidecarIds = rows.map((r) => r.sidecar_id).filter((id): id is string => Boolean(id));
   const examplesBySidecar = await fetchSidecarExamples(contentType, sidecarIds);
+
+  const exampleWordsByChar =
+    contentType === "kanji"
+      ? await fetchKanjiExampleWords(rows.map((r) => String(r.character ?? "")).filter(Boolean))
+      : new Map<string, VocabItem[]>();
 
   const items: ContentItem[] = [];
   for (const row of rows) {
@@ -127,6 +190,8 @@ async function toContentItems(rows: PostRow[], contentType: string, includeBlock
       blocks = resolved.blocks.map((b) => ({ blockType: b.blockType, data: { ...b.data, __resolved: b.resolved } }));
     }
 
+    const exampleWords = exampleWordsByChar.get(String(row.character ?? "")) ?? [];
+
     items.push({
       kind: contentType as ContentItem["kind"],
       postId: row.id,
@@ -135,7 +200,7 @@ async function toContentItems(rows: PostRow[], contentType: string, includeBlock
       title: row.title,
       summary: row.summary ?? undefined,
       jlptLevel: row.jlpt_level ?? undefined,
-      data: { ...data, meta: row.meta ?? {} },
+      data: { ...data, meta: row.meta ?? {}, ...(exampleWords.length > 0 ? { exampleWords } : {}) },
       examples,
       blocks,
     });
@@ -151,10 +216,16 @@ async function queryPosts(params: {
   postIds?: string[];
 }): Promise<PostRow[]> {
   if (!sql) return [];
-  const spec = SIDECARS[params.contentType];
-  if (!spec) throw new Error(`Unsupported content type for video generation: ${params.contentType}`);
+  // A type with no sidecar (study_guide, conversation) is queried straight off `posts` rather
+  // than rejected — its content lives in posts.content/posts.meta, which the generic skeleton
+  // and examplesFromMeta already know how to read.
+  const spec: { table: string; columns: string[]; exampleFk?: string } | undefined = SIDECARS[params.contentType];
 
-  const sidecarCols = spec.columns.map((c) => `s.${c}`).join(", ");
+  const selectCols = spec
+    ? `s.id AS sidecar_id, ${spec.columns.map((c) => `s.${c}`).join(", ")}`
+    : `NULL::uuid AS sidecar_id`;
+  const joinClause = spec ? `JOIN ${spec.table} s ON s.post_id = p.id` : "";
+
   const where: string[] = ["p.content_type = $1", "p.status = 'published'"];
   const values: unknown[] = [params.contentType];
 
@@ -180,9 +251,9 @@ async function queryPosts(params: {
 
   return (await sql.query(
     `SELECT p.id, p.slug, p.title, p.summary, (p.jlpt_level)[1] AS jlpt_level, p.content_type, p.meta,
-            s.id AS sidecar_id, ${sidecarCols}
+            ${selectCols}
      FROM posts p
-     JOIN ${spec.table} s ON s.post_id = p.id
+     ${joinClause}
      WHERE ${where.join(" AND ")}
      ORDER BY p.sort_order, p.created_at
      ${limitClause}`,

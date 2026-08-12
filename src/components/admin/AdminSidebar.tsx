@@ -144,7 +144,8 @@ const navGroups = [
       { href: "/admin/video/projects", label: "Projects" },
       { href: "/admin/video/projects?status=script_pending_review", label: "Scripts to Review" },
       { href: "/admin/video/jobs", label: "Render Queue" },
-      { href: "/admin/video/renders", label: "Finished Videos" }
+      { href: "/admin/video/renders", label: "Finished Videos" },
+      { href: "/admin/video/assets", label: "Music & Assets" }
     ]
   },
   {

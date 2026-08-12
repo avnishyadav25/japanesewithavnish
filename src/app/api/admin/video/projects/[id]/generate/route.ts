@@ -3,7 +3,7 @@ import { getAdminSession } from "@/lib/auth/admin";
 import { sql } from "@/lib/db";
 import { insertAiLog } from "@/lib/ai-logs";
 import { resolveScope } from "@/lib/video/scopeResolver";
-import { generateStoryboard } from "@/lib/video/storyboard";
+import { generateStoryboard, outroSiteUrl } from "@/lib/video/storyboard";
 import {
   getProject,
   insertStoryboardVersion,
@@ -51,7 +51,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       bgm: project.bgmTrackId ? { trackId: project.bgmTrackId, gainDb: -18, duckDb: -12 } : undefined,
       includeBroll: project.includeBroll,
       siteName: "JapaneseWithAvnish",
-      siteUrl: (process.env.NEXT_PUBLIC_SITE_URL ?? "https://japanesewithavnish.com").replace(/^https?:\/\//, ""),
+      siteUrl: outroSiteUrl(),
     });
 
     // The policy decides whether this can go straight to rendering or has to be read first.

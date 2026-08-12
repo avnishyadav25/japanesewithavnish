@@ -114,6 +114,25 @@ export const KanjiStrokeScene: React.FC<{ visual: KanjiStrokeVisual }> = ({ visu
     </div>
   );
 
+  // For ~95% of kanji this is the only concrete usage the video can show, since so few have
+  // example sentences of their own. Words carry the reading far better than a reading list does.
+  const words = (visual.exampleWords ?? []).slice(0, 3);
+  const wordList =
+    words.length > 0 ? (
+      <div style={{ width: "100%", display: "grid", gap: scale.gap * 0.3 }}>
+        {words.map((word, i) => (
+          <FadeUp key={i} delay={32 + i * 6} distance={16}>
+            <Surface style={{ display: "flex", alignItems: "baseline", gap: scale.gap * 0.5, padding: scale.gap * 0.55 }}>
+              <JapaneseText text={word.word} reading={word.reading} size={scale.body * 1.05} weight={700} />
+              <div style={{ fontFamily: fontStackSans(theme), fontSize: scale.caption * 0.82, color: theme.textMuted }}>
+                {word.meaning}
+              </div>
+            </Surface>
+          </FadeUp>
+        ))}
+      </div>
+    ) : null;
+
   const glyph = hasStrokes ? (
     <StrokeOrder paths={visual.strokePaths} size={glyphSize} color={theme.text} ghostColor={theme.border} />
   ) : (
@@ -142,6 +161,7 @@ export const KanjiStrokeScene: React.FC<{ visual: KanjiStrokeVisual }> = ({ visu
               </div>
             </FadeUp>
             {readings}
+            {wordList}
           </div>
         </div>
       ) : (
@@ -161,6 +181,7 @@ export const KanjiStrokeScene: React.FC<{ visual: KanjiStrokeVisual }> = ({ visu
             </div>
           </FadeUp>
           {readings}
+          {wordList}
         </>
       )}
     </SceneFrame>

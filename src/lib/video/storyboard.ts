@@ -94,10 +94,37 @@ function toVocabItem(item: ContentItem): VocabItem {
   };
 }
 
+/**
+ * Some `reading` values list alternatives — 良い is stored as "いい / よい", and a few use 、 or a
+ * comma. On screen that is useful information, but handed to a voice it is read aloud verbatim
+ * as "ii slash yoi". Only the first reading is spoken; the display keeps whatever the DB holds.
+ */
+export function primaryReading(reading?: string | null): string | undefined {
+  if (!reading) return undefined;
+  const first = reading.split(/[/／、,]/)[0].trim();
+  return first || undefined;
+}
+
+/** Strips kanji-dictionary notation from on/kun readings so they can be spoken: `す.き` is the
+ * word すき with the okurigana boundary marked, and `-がわ` marks a suffix reading. */
+export function speakableReadings(readings: string[]): string | undefined {
+  const cleaned = readings
+    .map((r) => r.replace(/[.．]/g, "").replace(/^[-−–—]+|[-−–—]+$/g, "").trim())
+    .filter(Boolean);
+  return cleaned.length > 0 ? cleaned.join("、") : undefined;
+}
+
 /** Japanese narration segment. `spokenAs` carries the kana reading when we have one, which is
  * what keeps the ja-JP voice from guessing between readings of the same kanji. */
 function jaSegment(id: string, text: string, reading?: string, leadIn = 0.15): NarrationSegment {
-  return { id, text, lang: "ja", spokenAs: reading || undefined, leadInSeconds: leadIn, speakingRate: 0.9 };
+  return {
+    id,
+    text,
+    lang: "ja",
+    spokenAs: primaryReading(reading),
+    leadInSeconds: leadIn,
+    speakingRate: 0.9,
+  };
 }
 
 function blankSegment(id: string, lang: NarrationLang, leadIn = 0): NarrationSegment {
@@ -281,6 +308,7 @@ function kanjiSkeleton(snapshot: ContentSnapshot, config: GenerateStoryboardConf
       : strArray((strokeRaw as { paths?: unknown } | null)?.paths);
 
     const base = `sc-k${i + 1}`;
+    const exampleWords = Array.isArray(d.exampleWords) ? (d.exampleWords as VocabItem[]) : [];
     const narration: NarrationSegment[] = [];
 
     const leadId = `${base}-lead`;
@@ -291,8 +319,31 @@ function kanjiSkeleton(snapshot: ContentSnapshot, config: GenerateStoryboardConf
       maxWords: 24,
     });
 
-    if (onyomi.length) narration.push(jaSegment(`${base}-on`, onyomi.join("、"), undefined, 0.3));
-    if (kunyomi.length) narration.push(jaSegment(`${base}-kun`, kunyomi.join("、"), undefined, 0.3));
+    // On/kun are stored in dictionary notation — す.き marks where the okurigana starts, and a
+    // leading/trailing hyphen marks a prefix/suffix reading. Those marks belong on screen (the
+    // scene renders the raw arrays) but a voice reads them aloud as "su dot ki", so speech gets
+    // a cleaned copy via spokenAs.
+    if (onyomi.length) {
+      narration.push(jaSegment(`${base}-on`, onyomi.join("、"), speakableReadings(onyomi), 0.3));
+    }
+    if (kunyomi.length) {
+      narration.push(jaSegment(`${base}-kun`, kunyomi.join("、"), speakableReadings(kunyomi), 0.3));
+    }
+
+    // Words that actually use the character. For most kanji this is the only concrete usage the
+    // video can show, since only ~5% have example sentences of their own.
+    if (exampleWords.length > 0) {
+      const wordsLeadId = `${base}-words`;
+      narration.push(blankSegment(wordsLeadId, lang, 0.3));
+      blanks.push({
+        id: wordsLeadId,
+        hint: `Introduce real words that use ${character}: ${exampleWords.map((w) => `${w.word} (${w.meaning})`).join(", ")}. Give the meanings; a native voice says the words.`,
+        maxWords: 26,
+      });
+      exampleWords.forEach((word, wi) => {
+        narration.push(jaSegment(`${base}-w${wi}`, word.word, word.reading, 0.25));
+      });
+    }
 
     scenes.push({
       id: base,
@@ -311,7 +362,7 @@ function kanjiSkeleton(snapshot: ContentSnapshot, config: GenerateStoryboardConf
         kunyomi,
         strokeCount: typeof d.stroke_count === "number" ? d.stroke_count : undefined,
         strokePaths,
-        exampleWords: [],
+        exampleWords,
       },
     });
 
@@ -720,4 +771,20 @@ export async function generateStoryboard(
 /** Stable id for a scene added by hand in the editor. */
 export function newSceneId(): string {
   return `sc-${randomUUID().slice(0, 8)}`;
+}
+
+const PRODUCTION_DOMAIN = "japanesewithavnish.com";
+
+/**
+ * The domain shown on screen in the outro card.
+ *
+ * Deliberately NOT just `NEXT_PUBLIC_SITE_URL`: on a developer machine that is
+ * `http://localhost:3000`, and a video generated there would burn "localhost:3000" into a card
+ * that ends up on YouTube. A dev-only host is ignored in favour of the real domain, since the
+ * outro is brand copy rather than a functional link.
+ */
+export function outroSiteUrl(): string {
+  const raw = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (!raw || /localhost|127\.0\.0\.1|0\.0\.0\.0|\.local(?::|\/|$)/i.test(raw)) return PRODUCTION_DOMAIN;
+  return raw.replace(/^https?:\/\//, "").replace(/\/$/, "");
 }

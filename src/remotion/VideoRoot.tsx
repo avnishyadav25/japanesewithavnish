@@ -21,12 +21,25 @@ export interface VideoRootProps {
   layout: SceneLayout;
   themeTokens?: Partial<VideoThemeTokens> | null;
   bgmUrl?: string | null;
-  /** Preview mode skips BGM so scrubbing in the admin isn't a wall of overlapping music. */
+  /**
+   * Scrubbing the admin Player restarts the music on every seek, which is unpleasant, so the
+   * preview mutes BGM by default and the editor offers a toggle to hear it. Renders always
+   * include it.
+   */
   preview?: boolean;
+  /** Play BGM even in preview, for checking the mix. */
+  previewBgm?: boolean;
 }
 
-/** Linear gain ramp for the BGM under speech. Full sidechain ducking happens in ffmpeg at the
- * post stage; this is the approximation the preview hears. */
+/**
+ * Per-frame gain for the music under speech.
+ *
+ * This IS the ducking, not an approximation of it — Remotion evaluates `volume` per frame and
+ * bakes the result into the rendered audio, so the preview and the output apply exactly the
+ * same curve. It reads from the resolved caption cues, which are themselves derived from
+ * measured narration length, so the music drops on the syllable the voice starts rather than on
+ * an amplitude threshold the way an ffmpeg sidechain compressor would.
+ */
 function bgmVolumeAt(timeline: ResolvedTimeline, frame: number, baseGain: number, duckDb: number): number {
   const t = frame / timeline.fps;
   const speaking = timeline.cues.some((c) => t >= c.start - 0.15 && t < c.end + 0.35);
@@ -34,7 +47,14 @@ function bgmVolumeAt(timeline: ResolvedTimeline, frame: number, baseGain: number
   return Math.min(1, Math.max(0, Math.pow(10, db / 20)));
 }
 
-export const VideoRoot: React.FC<VideoRootProps> = ({ storyboard, layout, themeTokens, bgmUrl, preview }) => {
+export const VideoRoot: React.FC<VideoRootProps> = ({
+  storyboard,
+  layout,
+  themeTokens,
+  bgmUrl,
+  preview,
+  previewBgm,
+}) => {
   const { fps } = useVideoConfig();
   const theme = resolveTheme(themeTokens);
 
@@ -67,7 +87,7 @@ export const VideoRoot: React.FC<VideoRootProps> = ({ storyboard, layout, themeT
           );
         })}
 
-        {!preview && bgmUrl && storyboard.bgm ? (
+        {(!preview || previewBgm) && bgmUrl && storyboard.bgm ? (
           <Audio
             src={bgmUrl}
             loop

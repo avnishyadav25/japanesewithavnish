@@ -50,10 +50,14 @@ const PRICE_PER_MILLION_CHARS: Record<string, number> = {
   Chirp: 30,
 };
 
+/** Mirrors the fallback that `getAccessToken()` below actually performs. Checking only the
+ * GOOGLE_TTS_* pair would report "not configured" for a setup that works perfectly well off the
+ * Sheets service account, which is the documented shortcut in .env.example. */
 export function ttsConfigured(): boolean {
-  return Boolean(
-    process.env.GOOGLE_TTS_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_TTS_SERVICE_ACCOUNT_PRIVATE_KEY
-  );
+  const email = process.env.GOOGLE_TTS_SERVICE_ACCOUNT_EMAIL || process.env.GOOGLE_SHEETS_SERVICE_ACCOUNT_EMAIL;
+  const key =
+    process.env.GOOGLE_TTS_SERVICE_ACCOUNT_PRIVATE_KEY || process.env.GOOGLE_SHEETS_SERVICE_ACCOUNT_PRIVATE_KEY;
+  return Boolean(email && key);
 }
 
 // ---------------------------------------------------------------------------
