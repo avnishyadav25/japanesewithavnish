@@ -6,7 +6,14 @@ import { AdminCard } from "@/components/admin/AdminCard";
 type Message = { role: "user" | "assistant"; content: string };
 
 export function AdminChatTest() {
-  const [sessionId] = useState(() => crypto.randomUUID());
+  // Generated post-mount, not as a useState initializer: crypto.randomUUID() would otherwise
+  // run independently during SSR and during the client's first render, producing two different
+  // values for the same text node (Session: {sessionId.slice(0, 8)} below) and triggering a
+  // hydration mismatch.
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  useEffect(() => {
+    setSessionId(crypto.randomUUID());
+  }, []);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -99,7 +106,7 @@ export function AdminChatTest() {
         </div>
       </div>
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
-      <p className="mt-2 text-xs text-secondary">Session: {sessionId.slice(0, 8)}…</p>
+      {sessionId && <p className="mt-2 text-xs text-secondary">Session: {sessionId.slice(0, 8)}…</p>}
     </AdminCard>
   );
 }

@@ -87,12 +87,10 @@ export default function TutorPage() {
       .catch(() => setSessionEmail(null));
   }, []);
 
-  // Fetch Tutor Logs History
+  // Fetch Tutor Logs History — the route derives the caller's identity from their own
+  // session cookie, so no email needs to be (or can be) passed from the client.
   const fetchHistory = () => {
-    const url = sessionEmail
-      ? `/api/ai/tutor/history?user_email=${encodeURIComponent(sessionEmail)}`
-      : "/api/ai/tutor/history";
-    fetch(url)
+    fetch("/api/ai/tutor/history")
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => setHistory(Array.isArray(d?.items) ? d.items : []))
       .catch(() => setHistory([]));
@@ -137,7 +135,6 @@ export default function TutorPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages: [...messages, { role: "user", content: toSend }],
-          user_email: sessionEmail || undefined,
           mode: selectedMode,
           use_context: useContext,
         }),

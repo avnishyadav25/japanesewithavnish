@@ -70,16 +70,32 @@ export async function POST(req: Request) {
       }
     }
     if (kind === "exercise_complete") {
-      await sql`
-        INSERT INTO reward_events (user_email, reward_type, points) VALUES (${session.email}, 'exercise_complete', 5)
+      const existingExercise = await sql`
+        SELECT 1 FROM reward_events
+        WHERE user_email = ${session.email} AND reward_type = 'exercise_complete'
+          AND created_at >= (CURRENT_DATE AT TIME ZONE 'UTC')
+        LIMIT 1
       `;
+      if (!Array.isArray(existingExercise) || existingExercise.length === 0) {
+        await sql`
+          INSERT INTO reward_events (user_email, reward_type, points) VALUES (${session.email}, 'exercise_complete', 5)
+        `;
+      }
     }
     if (STREAK_MILESTONES.includes(newStreak)) {
-      await sql`
-        INSERT INTO reward_events (user_email, reward_type, points)
-        VALUES (${session.email}, ${`streak_${newStreak}`}, ${newStreak * 5})
-      `;
       const code = `streak_${newStreak}`;
+      const existingMilestone = await sql`
+        SELECT 1 FROM reward_events
+        WHERE user_email = ${session.email} AND reward_type = ${code}
+          AND created_at >= (CURRENT_DATE AT TIME ZONE 'UTC')
+        LIMIT 1
+      `;
+      if (!Array.isArray(existingMilestone) || existingMilestone.length === 0) {
+        await sql`
+          INSERT INTO reward_events (user_email, reward_type, points)
+          VALUES (${session.email}, ${code}, ${newStreak * 5})
+        `;
+      }
       const defRows = await sql`SELECT id FROM achievement_definitions WHERE code = ${code} LIMIT 1` as { id: string }[];
       if (defRows[0]) {
         await sql`

@@ -58,8 +58,12 @@ export async function POST(req: Request) {
         triggerType: "bulk_sweep",
         requestedBy: admin.email,
       });
-      if ("id" in created) succeeded++;
-      else skipped.push(`${item.entityId}: ${created.error}`);
+      if ("id" in created) {
+        await logAuditEvent({ actor: admin.email, action: "run_review", entityType: item.entityType, entityId: item.entityId, detail: { source: "bulk" } });
+        succeeded++;
+      } else {
+        skipped.push(`${item.entityId}: ${created.error}`);
+      }
     } else if (action === "mark_false_positive") {
       const rows = await sql`
         SELECT f.id FROM posts p
@@ -73,6 +77,7 @@ export async function POST(req: Request) {
           VALUES (${row.id}, 'false_positive', 'Bulk action from Review Queue', ${admin.email})
         `;
       }
+      await logAuditEvent({ actor: admin.email, action: "mark_false_positive", entityType: item.entityType, entityId: item.entityId, detail: { source: "bulk" } });
       succeeded++;
     }
   }

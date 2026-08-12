@@ -68,10 +68,14 @@ export async function fulfillOrder(
   `;
 
   if (order.coupon_code) {
+    // Atomic check-and-increment — re-checks max_uses at the moment of increment rather than
+    // trusting the earlier validate/order-creation-time check, closing the TOCTOU window
+    // between order creation and payment completion.
     const couponRows = await sql`
       UPDATE coupons
       SET used_count = COALESCE(used_count, 0) + 1
       WHERE code = ${order.coupon_code}
+        AND (max_uses IS NULL OR COALESCE(used_count, 0) < max_uses)
       RETURNING id
     ` as { id: string }[];
     const couponId = couponRows[0]?.id;

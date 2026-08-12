@@ -1,5 +1,5 @@
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { sql } from "@/lib/db";
+import { isR2Configured, uploadToR2 } from "@/lib/r2";
 import { TIGHT_REPLICATION_TABLES } from "@/lib/db/replication-poll";
 
 const BATCH_SIZE = 5;
@@ -9,18 +9,6 @@ const BATCH_SIZE = 5;
 // insert-then-delete snapshot writer below would collide with those rows, so it's
 // skipped for this tier. Turso and R2 are unaffected (still get every table).
 const TIGHT_REPLICATION_TABLE_SET = new Set<string>(TIGHT_REPLICATION_TABLES);
-
-function getR2Client(): S3Client | null {
-  const endpoint = process.env.R2_ENDPOINT;
-  const accessKey = process.env.R2_ACCESS_KEY_ID;
-  const secretKey = process.env.R2_SECRET_ACCESS_KEY;
-  if (!endpoint || !accessKey || !secretKey) return null;
-  return new S3Client({
-    region: "auto",
-    endpoint,
-    credentials: { accessKeyId: accessKey, secretAccessKey: secretKey },
-  });
-}
 
 async function getAllTableNames(): Promise<string[]> {
   if (!sql) return [];
@@ -147,18 +135,16 @@ async function writeToTurso(tableName: string, rows: Record<string, unknown>[], 
 }
 
 async function writeToR2(tableName: string, rows: unknown[], runStartedAt: string): Promise<WriteResult> {
-  const r2 = getR2Client();
-  const bucket = process.env.R2_BUCKET_NAME;
-  if (!r2 || !bucket) return { ok: false, error: "R2 not configured" };
+  if (!isR2Configured()) return { ok: false, error: "R2 not configured" };
   try {
     const key = `db-backups/${tableName}.json`;
-    await r2.send(
-      new PutObjectCommand({
-        Bucket: bucket,
-        Key: key,
-        Body: JSON.stringify({ table_name: tableName, row_count: rows.length, run_started_at: runStartedAt, rows }),
-        ContentType: "application/json",
-      })
+    // A backup snapshot is overwritten in place at a stable key, so it must NOT be cached —
+    // the immutable default would be actively wrong here.
+    await uploadToR2(
+      key,
+      JSON.stringify({ table_name: tableName, row_count: rows.length, run_started_at: runStartedAt, rows }),
+      "application/json",
+      { cacheControl: null }
     );
     return { ok: true };
   } catch (e) {

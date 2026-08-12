@@ -8,7 +8,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!sql) return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
   const { id: lessonId, blockId } = await params;
-  const body = await req.json();
+  const body = await req.json().catch(() => null);
+  if (!body) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
 
   const existingRows = await sql`SELECT block_type FROM lesson_blocks WHERE id = ${blockId} AND lesson_id = ${lessonId}`;
   const existing = (existingRows as { block_type: BlockType }[])[0];

@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   try {
+    const ip = getClientIp(req);
+    const { allowed } = await checkRateLimit(`coupon-validate:${ip}`, { max: 20, windowMs: 15 * 60 * 1000 });
+    if (!allowed) {
+      return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
+    }
+
     const { code, productId, isPlan, currency: requestedCurrency } = await req.json();
     const currency = String(requestedCurrency || "INR").toUpperCase() === "USD" ? "USD" : "INR";
     if (!code || !productId) {

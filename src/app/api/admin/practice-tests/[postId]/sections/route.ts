@@ -9,7 +9,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ postId:
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!sql) return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
   const { postId } = await params;
-  const body = await req.json();
+  const body = await req.json().catch(() => null);
+  if (!body) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
 
   const sectionType = SECTION_TYPES.has(body.section_type) ? body.section_type : "vocabulary";
   const title = typeof body.title === "string" && body.title.trim() ? body.title.trim() : "New section";

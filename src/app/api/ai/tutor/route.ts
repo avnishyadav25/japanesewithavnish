@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { getPromptContent } from "@/lib/ai/load-prompts";
+import { getSession } from "@/lib/auth/session";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 const DEEPSEEK_API = "https://api.deepseek.com/v1/chat/completions";
 
@@ -103,17 +105,25 @@ export async function POST(req: Request) {
       { role: "user", content: userMessage },
     ];
 
-    const userEmail =
-      typeof body.user_email === "string" ? body.user_email.trim() || undefined : undefined;
-    const userMessageCount = messages.filter((m) => m.role === "user").length;
+    // Identity and the guest quota both come from server-verified sources — the client
+    // can no longer claim a fake email or omit prior turns to dodge the limit.
+    const session = await getSession();
+    const userEmail = session?.email;
     const isGuest = !userEmail;
     const GUEST_MESSAGE_LIMIT = 5;
-    if (isGuest && userMessageCount >= GUEST_MESSAGE_LIMIT) {
-      return NextResponse.json({
-        reply: "You've used 5 free messages. Create a free account to continue chatting with Nihongo Navi, save your progress, and access rewards. Sign up or log in to keep learning!",
-        role: "assistant",
-        prompt_register: true,
+    if (isGuest) {
+      const ip = getClientIp(req);
+      const { allowed } = await checkRateLimit(`tutor-guest:${ip}`, {
+        max: GUEST_MESSAGE_LIMIT,
+        windowMs: 24 * 60 * 60 * 1000,
       });
+      if (!allowed) {
+        return NextResponse.json({
+          reply: "You've used 5 free messages. Create a free account to continue chatting with Nihongo Navi, save your progress, and access rewards. Sign up or log in to keep learning!",
+          role: "assistant",
+          prompt_register: true,
+        });
+      }
     }
 
     const normalizedQuestion = userMessage.trim().toLowerCase();

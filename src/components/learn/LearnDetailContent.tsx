@@ -30,6 +30,8 @@ import type { ResolvedBlock } from "@/lib/curriculum/getLessonBlocks";
 import type { BlockType as RichContentBlockType } from "@/lib/blocks/blockTypes";
 import { clampTitle, clampDescription, canonicalUrl } from "@/lib/seo";
 import { ArticleSchema, BreadcrumbListSchema } from "@/components/JsonLd";
+import { getVideosForPost } from "@/lib/video/embeds";
+import { ContentVideoSection } from "@/components/learn/ContentVideo";
 
 const RICH_CONTENT_BLOCK_TYPES: RichContentBlockType[] = [
   "kanji_radicals",
@@ -338,6 +340,9 @@ export async function LearnDetailContent({
 
   const pageUrl = canonicalUrl(`${breadcrumbBase}/${normalized}/${encodeURIComponent(slug)}`);
   const typeLabel = LEARN_TYPE_LABELS[normalized as LearnContentType];
+  // Video Studio renders explicitly published to this page. Empty for almost every page today,
+  // and ContentVideoSection renders nothing when the list is empty.
+  const videos = await getVideosForPost(item.id);
 
   return (
     <div className="py-12 sm:py-16 px-6 sm:px-8 lg:px-12 pb-24 lg:pb-16">
@@ -437,6 +442,8 @@ export async function LearnDetailContent({
                 <LessonBlockRenderer blocks={richContentBlocks} />
               </section>
             )}
+
+            <ContentVideoSection videos={videos} pageUrl={pageUrl} />
 
             <BlogNextStepCta />
 

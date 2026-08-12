@@ -28,7 +28,12 @@
     "content:import-n3-n2-n1-vocab": "node scripts/import-japanesetest4you-n3-n2-n1-vocab.mjs",
     "content:import-kanshudo-kanji": "node scripts/import-kanshudo-jlpt-kanji.mjs",
     "content:check-links": "node scripts/check-links.mjs",
-    "db:check-parity": "tsx scripts/check-schema-parity.ts"
+    "db:check-parity": "tsx scripts/check-schema-parity.ts",
+    "video:worker": "tsx scripts/video-worker.ts",
+    "video:render": "tsx scripts/video-render.ts",
+    "video:studio": "remotion studio remotion/index.ts",
+    "video:capture": "tsx scripts/video-capture.ts",
+    "video:doctor": "tsx scripts/video-doctor.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1000.0",
@@ -36,6 +41,11 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@neondatabase/serverless": "^1.0.2",
+    "@remotion/bundler": "^4.0.507",
+    "@remotion/cli": "^4.0.507",
+    "@remotion/google-fonts": "^4.0.507",
+    "@remotion/player": "^4.0.507",
+    "@remotion/renderer": "^4.0.507",
     "framer-motion": "^12.34.3",
     "jose": "^6.1.3",
     "next": "14.2.35",
@@ -47,6 +57,7 @@
     "react-markdown": "^10.1.0",
     "remark-breaks": "^4.0.0",
     "remark-gfm": "^4.0.1",
+    "remotion": "^4.0.507",
     "satori-html": "^0.3.2",
     "sharp": "^0.35.3",
     "stripe": "^22.3.0"

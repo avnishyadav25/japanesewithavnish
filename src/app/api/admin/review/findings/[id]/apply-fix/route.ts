@@ -11,8 +11,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // before applying it, per the spec's distinct Accept-Fix vs Edit-Fix actions.
   const body = await req.json().catch(() => null);
   const hasEditedValue = body && Object.prototype.hasOwnProperty.call(body, "editedValue");
+  const dryRun = body?.dryRun === true || new URL(req.url).searchParams.get("dryRun") === "true";
 
-  const result = await applyFindingFix(id, hasEditedValue ? body.editedValue : undefined);
+  const result = await applyFindingFix(id, hasEditedValue ? body.editedValue : undefined, admin.email, dryRun);
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, dryRun, preview: result.preview });
 }

@@ -24,7 +24,7 @@ export async function GET(req: Request) {
   const key = url.searchParams.get("key");
   const authHeader = req.headers.get("authorization");
   const bearerMatches = CRON_SECRET && authHeader === `Bearer ${CRON_SECRET}`;
-  if (CRON_SECRET && key !== CRON_SECRET && !bearerMatches) {
+  if (!CRON_SECRET || (key !== CRON_SECRET && !bearerMatches)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

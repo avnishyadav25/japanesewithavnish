@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth/admin";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 const DEEPSEEK_API = "https://api.deepseek.com/v1/chat/completions";
 
@@ -16,6 +17,12 @@ export async function POST(req: Request) {
   try {
     const key = process.env.DEEPSEEK_API_KEY;
     if (!key) return NextResponse.json({ error: "Chat not configured" }, { status: 503 });
+
+    const ip = getClientIp(req);
+    const { allowed } = await checkRateLimit(`ai-chat:${ip}`, { max: 30, windowMs: 15 * 60 * 1000 });
+    if (!allowed) {
+      return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
+    }
 
     const body = await req.json();
     const messages = Array.isArray(body.messages) ? body.messages : [];

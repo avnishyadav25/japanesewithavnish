@@ -7,7 +7,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!sql) return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
   const { id } = await params;
-  const body = await req.json();
+  const body = await req.json().catch(() => null);
+  if (!body) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   const sentence_ja = typeof body.sentence_ja === "string" ? body.sentence_ja.trim() : undefined;
   const sentence_romaji = body.sentence_romaji !== undefined ? (typeof body.sentence_romaji === "string" ? body.sentence_romaji.trim() || null : null) : undefined;
   const sentence_en = typeof body.sentence_en === "string" ? body.sentence_en.trim() : undefined;

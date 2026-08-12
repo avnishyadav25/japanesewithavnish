@@ -24,9 +24,6 @@ export async function POST(req: Request) {
   if (trialCode.expires_at && new Date(trialCode.expires_at) < new Date()) {
     return NextResponse.json({ error: "This trial code has expired" }, { status: 400 });
   }
-  if (trialCode.max_uses != null && trialCode.uses_count >= trialCode.max_uses) {
-    return NextResponse.json({ error: "This trial code has reached its usage limit" }, { status: 400 });
-  }
 
   const existingRedemption = (await sql`
     SELECT 1 FROM trial_code_redemptions WHERE trial_code_id = ${trialCode.id} AND user_email = ${session.email} LIMIT 1
@@ -35,19 +32,32 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "You've already redeemed this code" }, { status: 400 });
   }
 
+  // Atomic check-and-increment: the earlier max_uses read is just a fast-path hint, this
+  // conditional UPDATE is what actually prevents concurrent requests from all passing the
+  // limit check before any of them increments (the TOCTOU the separate read+write had).
+  const incremented = (await sql`
+    UPDATE trial_codes SET uses_count = uses_count + 1, updated_at = NOW()
+    WHERE id = ${trialCode.id} AND (max_uses IS NULL OR uses_count < max_uses)
+    RETURNING id
+  `) as { id: string }[];
+  if (incremented.length === 0) {
+    return NextResponse.json({ error: "This trial code has reached its usage limit" }, { status: 400 });
+  }
+
   try {
     await sql`
       INSERT INTO trial_code_redemptions (trial_code_id, user_email) VALUES (${trialCode.id}, ${session.email})
     `;
   } catch (e: unknown) {
     const err = e as { code?: string };
-    if (err?.code === "23505") return NextResponse.json({ error: "You've already redeemed this code" }, { status: 400 });
+    if (err?.code === "23505") {
+      // Same user redeemed concurrently and won the race — undo our increment, it wasn't a
+      // real new redemption.
+      await sql`UPDATE trial_codes SET uses_count = uses_count - 1, updated_at = NOW() WHERE id = ${trialCode.id}`;
+      return NextResponse.json({ error: "You've already redeemed this code" }, { status: 400 });
+    }
     throw e;
   }
-
-  await sql`
-    UPDATE trial_codes SET uses_count = uses_count + 1, updated_at = NOW() WHERE id = ${trialCode.id}
-  `;
 
   await sql`
     UPDATE profiles
