@@ -12,7 +12,7 @@ const CRON_SECRET = process.env.CRON_SECRET;
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const key = url.searchParams.get("key");
-  if (CRON_SECRET && key !== CRON_SECRET) {
+  if (!CRON_SECRET || key !== CRON_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

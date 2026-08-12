@@ -2,14 +2,20 @@ import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { getSession, createEmailVerificationToken } from "@/lib/auth/session";
 import { sendEmailVerificationEmail } from "@/lib/email";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://japanesewithavnish.com";
 const RESEND_COOLDOWN_MS = 5 * 60 * 1000;
 
-export async function POST() {
+export async function POST(req: Request) {
   const session = await getSession();
   if (!session?.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const ip = getClientIp(req);
+  const { allowed } = await checkRateLimit(`resend-verification:${ip}`, { max: 5, windowMs: 15 * 60 * 1000 });
+  if (!allowed) {
+    return NextResponse.json({ error: "Too many requests. Please try again in 15 minutes." }, { status: 429 });
   }
   if (!sql) {
     return NextResponse.json({ error: "Database unavailable" }, { status: 503 });

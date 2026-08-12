@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { getSession } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: Request) {
+export async function GET() {
   try {
     if (!sql) return NextResponse.json({ items: [] });
 
-    const { searchParams } = new URL(req.url);
-    const userEmail = searchParams.get("user_email")?.trim() || null;
+    const session = await getSession();
+    const userEmail = session?.email ?? null;
 
     const publicRows = await sql`
       SELECT question, answer, ask_count, user_email, last_asked_at

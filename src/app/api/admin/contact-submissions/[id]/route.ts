@@ -30,7 +30,8 @@ export async function PATCH(
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
-  const body = await req.json();
+  const body = await req.json().catch(() => null);
+  if (!body) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   const status = body.status as string;
   if (!["read", "replied"].includes(status)) {
     return NextResponse.json({ error: "Invalid status" }, { status: 400 });

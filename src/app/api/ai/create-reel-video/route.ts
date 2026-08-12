@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth/admin";
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { R2_NOT_CONFIGURED_MESSAGE, getR2, uploadToR2 } from "@/lib/r2";
 import { spawn } from "child_process";
 import fs from "fs/promises";
 import path from "path";
@@ -8,18 +8,6 @@ import os from "os";
 
 const SECONDS_PER_IMAGE = 3;
 const FPS = 30;
-
-function getR2Client(): S3Client | null {
-  const endpoint = process.env.R2_ENDPOINT;
-  const accessKey = process.env.R2_ACCESS_KEY_ID;
-  const secretKey = process.env.R2_SECRET_ACCESS_KEY;
-  if (!endpoint || !accessKey || !secretKey) return null;
-  return new S3Client({
-    region: "auto",
-    endpoint,
-    credentials: { accessKeyId: accessKey, secretAccessKey: secretKey },
-  });
-}
 
 function runFfmpeg(args: string[], cwd: string): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -49,15 +37,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "imageUrls array required" }, { status: 400 });
     }
 
-    const r2 = getR2Client();
-    const bucket = process.env.R2_BUCKET_NAME;
-    const bucketUrl = process.env.R2_BUCKET_URL?.replace(/\/$/, "");
-    if (!r2 || !bucket || !bucketUrl) {
-      return NextResponse.json(
-        { error: "R2 not configured. Set R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME, R2_BUCKET_URL." },
-        { status: 503 }
-      );
-    }
+    if (!getR2()) return NextResponse.json({ error: R2_NOT_CONFIGURED_MESSAGE }, { status: 503 });
 
     const tmpDir = path.join(os.tmpdir(), `reel-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     await fs.mkdir(tmpDir, { recursive: true });
@@ -106,16 +86,7 @@ export async function POST(req: Request) {
 
       const videoBuf = await fs.readFile(outPath);
       const key = `reels/${Date.now()}-${Math.random().toString(36).slice(2)}.mp4`;
-      await r2.send(
-        new PutObjectCommand({
-          Bucket: bucket,
-          Key: key,
-          Body: videoBuf,
-          ContentType: "video/mp4",
-        })
-      );
-
-      const videoUrl = `${bucketUrl}/${key}`;
+      const videoUrl = await uploadToR2(key, videoBuf, "video/mp4", { cacheControl: null });
       return NextResponse.json({ videoUrl });
     } finally {
       await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});

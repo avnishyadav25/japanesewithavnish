@@ -53,7 +53,8 @@ export async function PUT(
   if (!sql) return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
 
   const { id } = await params;
-  const body = await req.json();
+  const body = await req.json().catch(() => null);
+  if (!body) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   const replyBody = typeof body.reply === "string" ? body.reply.trim() : "";
   if (!replyBody) return NextResponse.json({ error: "Reply body required" }, { status: 400 });
 

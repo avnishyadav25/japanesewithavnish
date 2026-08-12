@@ -16,7 +16,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ email: 
   const { email: rawEmail } = await params;
   const userEmail = decodeURIComponent(rawEmail);
 
-  const body = await req.json();
+  const body = await req.json().catch(() => null);
+  if (!body) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   const action = body.action === "send" ? "send" : "preview";
   const mode = body.mode === "template" ? "template" : "manual";
 

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getAdminSession } from "@/lib/auth/admin";
+import { R2_NOT_CONFIGURED_MESSAGE, getR2, uploadToR2 } from "@/lib/r2";
 import { getImagePrompt, type ImageType } from "@/lib/ai/image-prompts";
 import { getPromptContent } from "@/lib/ai/load-prompts";
 import { insertAiLog } from "@/lib/ai-logs";
@@ -14,18 +14,6 @@ const validImageTypes: ImageType[] = ["product", "blog", "newsletter", "page", "
 // Content types with their own DB-editable image prompt (ai_prompts key
 // "learning_{type}_image") — see ALLOWED_PROMPT_KEYS in src/lib/ai/load-prompts.ts.
 const LEARNING_IMAGE_PROMPT_TYPES = new Set(["vocabulary", "grammar", "kanji"]);
-
-function getR2Client(): S3Client | null {
-  const endpoint = process.env.R2_ENDPOINT;
-  const accessKey = process.env.R2_ACCESS_KEY_ID;
-  const secretKey = process.env.R2_SECRET_ACCESS_KEY;
-  if (!endpoint || !accessKey || !secretKey) return null;
-  return new S3Client({
-    region: "auto",
-    endpoint,
-    credentials: { accessKeyId: accessKey, secretAccessKey: secretKey },
-  });
-}
 
 export async function POST(req: Request) {
   try {
@@ -133,27 +121,10 @@ Use the reference image for style and mood. Clean flat-vector educational style.
     const folder = imageType;
     const key = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
-    const r2 = getR2Client();
-    const bucket = process.env.R2_BUCKET_NAME;
-    const bucketUrl = process.env.R2_BUCKET_URL?.replace(/\/$/, "");
+    if (!getR2()) return NextResponse.json({ error: R2_NOT_CONFIGURED_MESSAGE }, { status: 503 });
 
-    if (!r2 || !bucket || !bucketUrl) {
-      return NextResponse.json(
-        { error: "R2 not configured. Set R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME, R2_BUCKET_URL." },
-        { status: 503 }
-      );
-    }
-
-    await r2.send(
-      new PutObjectCommand({
-        Bucket: bucket,
-        Key: key,
-        Body: buffer,
-        ContentType: mime,
-      })
-    );
-
-    const publicUrl = `${bucketUrl}/${key}`;
+    // cacheControl: null preserves the pre-refactor behaviour of sending no Cache-Control.
+    const publicUrl = await uploadToR2(key, buffer, mime, { cacheControl: null });
     await insertAiLog({
       log_type: "image_generate",
       content_type: imageType,

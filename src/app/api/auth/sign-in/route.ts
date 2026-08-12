@@ -4,9 +4,16 @@ import { verifyPassword } from "@/lib/auth/password";
 import { createSessionToken, getSessionCookieName } from "@/lib/auth/session";
 import { recordLoginEvent } from "@/lib/auth/loginEvents";
 import { logError } from "@/lib/error-log";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(req: Request) {
   try {
+    const ip = getClientIp(req);
+    const { allowed } = await checkRateLimit(`sign-in:${ip}`, { max: 5, windowMs: 15 * 60 * 1000 });
+    if (!allowed) {
+      return NextResponse.json({ error: "Too many login attempts. Please try again in 15 minutes." }, { status: 429 });
+    }
+
     const body = await req.json().catch(() => ({}));
     const { email, password, redirect: redirectParam } = body as { email?: string; password?: string; redirect?: string };
     const trimmed = typeof email === "string" ? email.trim().toLowerCase() : "";

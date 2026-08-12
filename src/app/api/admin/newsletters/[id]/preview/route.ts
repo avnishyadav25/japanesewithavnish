@@ -12,14 +12,14 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const admin = await getAdminSession();
-  if (!admin) return new NextResponse("Unauthorized", { status: 401 });
-  if (!sql) return new NextResponse("Service unavailable", { status: 503 });
+  if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!sql) return NextResponse.json({ error: "Service unavailable" }, { status: 503 });
   const { id } = await params;
   const rows = await sql`
     SELECT subject, body_html FROM newsletters WHERE id = ${id} LIMIT 1
   ` as { subject: string; body_html: string }[];
   const newsletter = rows[0];
-  if (!newsletter) return new NextResponse("Not found", { status: 404 });
+  if (!newsletter) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const products = await getProductsForEmail();
   const productList = productListHtml(products, SITE_URL);
   const html = emailWrapper(newsletter.body_html, productList);

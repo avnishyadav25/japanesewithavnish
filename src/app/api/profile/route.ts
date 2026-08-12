@@ -131,10 +131,7 @@ export async function PATCH(req: Request) {
       RETURNING *
     `;
 
-    const resultArr = [query, ...params];
-    Object.defineProperty(resultArr, "raw", { value: [query] });
-    
-    const rows = await sql(resultArr as any);
+    const rows = await sql.query(query, params);
 
     if (!rows || rows.length === 0) {
       return NextResponse.json({ error: "Profile not found" }, { status: 404 });

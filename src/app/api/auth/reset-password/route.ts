@@ -3,11 +3,18 @@ import { sql } from "@/lib/db";
 import { hashPassword } from "@/lib/auth/password";
 import { verifyResetToken } from "@/lib/auth/session";
 import { createSessionToken, getSessionCookieName } from "@/lib/auth/session";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 const MIN_PASSWORD_LENGTH = 8;
 
 export async function POST(req: Request) {
   try {
+    const ip = getClientIp(req);
+    const { allowed } = await checkRateLimit(`reset-password:${ip}`, { max: 5, windowMs: 15 * 60 * 1000 });
+    if (!allowed) {
+      return NextResponse.json({ error: "Too many attempts. Please try again in 15 minutes." }, { status: 429 });
+    }
+
     const body = await req.json().catch(() => ({}));
     const { token, newPassword } = body as { token?: string; newPassword?: string };
     if (!token || typeof token !== "string") {

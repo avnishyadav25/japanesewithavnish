@@ -21,13 +21,20 @@ export type EligibleNudgeUser = {
 export async function findEligibleNudgeUsers(): Promise<EligibleNudgeUser[]> {
   if (!sql) return [];
   const today = new Date().toISOString().slice(0, 10);
+  // Computed here rather than as `${today}::date - ${NUDGE_COOLDOWN_DAYS}` in SQL — that form
+  // hit "operator does not exist: date <= integer" through the Neon driver's parameterization
+  // (confirmed live via direct curl + server-log stack trace), so the offset is precomputed
+  // and passed as a single already-typed date value instead.
+  const cooldownCutoff = new Date(Date.now() - NUDGE_COOLDOWN_DAYS * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
 
   const profileRows = (await sql`
     SELECT email, display_name, current_streak
     FROM profiles
     WHERE (last_activity_date IS NULL OR last_activity_date < ${today}::date)
       AND (streak_reminder_email_opt_out IS NULL OR streak_reminder_email_opt_out = FALSE)
-      AND (last_nudge_sent_at IS NULL OR last_nudge_sent_at <= ${today}::date - ${NUDGE_COOLDOWN_DAYS})
+      AND (last_nudge_sent_at IS NULL OR last_nudge_sent_at <= ${cooldownCutoff}::date)
   `) as { email: string; display_name: string | null; current_streak: number | null }[];
 
   const users: EligibleNudgeUser[] = [];

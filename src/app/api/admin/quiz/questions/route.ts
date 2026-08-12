@@ -6,7 +6,8 @@ export async function POST(req: NextRequest) {
   const admin = await getAdminSession();
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body = await req.json();
+  const body = await req.json().catch(() => null);
+  if (!body) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   const { question_text, options, correct_answer, correct_index, jlpt_level, sort_order } = body;
   const correctIdx = typeof correct_index === "number" ? correct_index : (typeof correct_answer === "string" && /^[A-Z]$/.test(correct_answer) ? correct_answer.charCodeAt(0) - 65 : 0);
 

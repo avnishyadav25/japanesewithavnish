@@ -2,9 +2,16 @@ import { NextResponse } from "next/server";
 import { createSessionToken } from "@/lib/auth/session";
 import { sendMagicLink } from "@/lib/email";
 import { sql } from "@/lib/db";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(req: Request) {
   try {
+    const ip = getClientIp(req);
+    const { allowed } = await checkRateLimit(`magic-link:${ip}`, { max: 5, windowMs: 15 * 60 * 1000 });
+    if (!allowed) {
+      return NextResponse.json({ error: "Too many requests. Please try again in 15 minutes." }, { status: 429 });
+    }
+
     const { email } = await req.json();
     if (!email || typeof email !== "string") {
       return NextResponse.json({ error: "Email required" }, { status: 400 });

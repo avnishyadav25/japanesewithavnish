@@ -14,6 +14,7 @@ export function LearnCommentForm({ contentType, slug, onSuccess }: LearnCommentF
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [content, setContent] = useState("");
+  const [website, setWebsite] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -47,6 +48,7 @@ export function LearnCommentForm({ contentType, slug, onSuccess }: LearnCommentF
           name: name.trim(),
           email: email.trim().toLowerCase(),
           content: content.trim(),
+          website,
         }),
       });
       const data = await res.json();
@@ -69,6 +71,18 @@ export function LearnCommentForm({ contentType, slug, onSuccess }: LearnCommentF
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Honeypot field for anti-spam (visually hidden) */}
+      <div className="hidden" aria-hidden="true">
+        <label htmlFor="learn-comment-website">Leave this field blank</label>
+        <input
+          id="learn-comment-website"
+          type="text"
+          value={website}
+          onChange={(e) => setWebsite(e.target.value)}
+          tabIndex={-1}
+          autoComplete="off"
+        />
+      </div>
       <div>
         <label htmlFor="learn-comment-name" className="block text-sm font-medium text-charcoal mb-1">
           Name

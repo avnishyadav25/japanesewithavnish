@@ -137,6 +137,17 @@ const navGroups = [
     ]
   },
   {
+    label: "Video Studio",
+    items: [
+      { href: "/admin/video", label: "Dashboard" },
+      { href: "/admin/video/new", label: "New Video" },
+      { href: "/admin/video/projects", label: "Projects" },
+      { href: "/admin/video/projects?status=script_pending_review", label: "Scripts to Review" },
+      { href: "/admin/video/jobs", label: "Render Queue" },
+      { href: "/admin/video/renders", label: "Finished Videos" }
+    ]
+  },
+  {
     label: "Analytics",
     items: [
       { href: "/admin/analytics", label: "Overview" },

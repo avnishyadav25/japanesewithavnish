@@ -42,7 +42,8 @@ export async function POST(req: Request) {
   const admin = await getAdminSession();
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!sql) return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
-  const body = await req.json();
+  const body = await req.json().catch(() => null);
+  if (!body) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   const { lesson_id, vocabulary_id, grammar_id, kanji_id, sentence_ja, sentence_romaji, sentence_en, notes, sort_order } = body;
   if (!sentence_ja || typeof sentence_ja !== "string" || !sentence_en || typeof sentence_en !== "string") {
     return NextResponse.json({ error: "sentence_ja and sentence_en required" }, { status: 400 });

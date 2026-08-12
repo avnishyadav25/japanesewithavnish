@@ -6,7 +6,8 @@ export async function POST(req: Request) {
   const admin = await getAdminSession();
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body = await req.json();
+  const body = await req.json().catch(() => null);
+  if (!body) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   const user = body.user as EligibleNudgeUser;
   if (!user?.email) return NextResponse.json({ error: "user required" }, { status: 400 });
 

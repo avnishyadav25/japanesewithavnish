@@ -11,7 +11,8 @@ export async function PUT(
   if (!sql) return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
 
   const { key } = await params;
-  const body = await req.json();
+  const body = await req.json().catch(() => null);
+  if (!body) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   const subject = typeof body.subject === "string" ? body.subject.trim() : "";
   const bodyHtml = typeof body.body_html === "string" ? body.body_html : "";
   if (!subject || !bodyHtml) {

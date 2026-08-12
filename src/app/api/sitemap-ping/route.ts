@@ -8,16 +8,17 @@ const SITEMAP_URL = `${BASE}/sitemap.xml`;
  * GET /api/sitemap-ping
  * Notifies Google and Bing that the sitemap has been updated.
  * Allowed: admin session (e.g. from dashboard) or ?key=CRON_SECRET (cron/deploy).
- * If CRON_SECRET is unset, endpoint is public.
+ * If CRON_SECRET is unset, the key path is simply unusable — an admin session is
+ * still required either way, so a missing secret can't make this endpoint public.
  */
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const key = searchParams.get("key");
   const secret = process.env.CRON_SECRET;
   const admin = await getAdminSession();
-  const allowedByKey = secret != null && secret !== "" && key === secret;
+  const allowedByKey = !!secret && key === secret;
   const allowedByAdmin = !!admin;
-  if (secret != null && secret !== "" && !allowedByKey && !allowedByAdmin) {
+  if (!allowedByKey && !allowedByAdmin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

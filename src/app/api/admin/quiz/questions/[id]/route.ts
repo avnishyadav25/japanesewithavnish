@@ -20,7 +20,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
-  const body = await req.json();
+  const body = await req.json().catch(() => null);
+  if (!body) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   const correctIdx = typeof body.correct_index === "number" ? body.correct_index : (typeof body.correct_answer === "string" && /^[A-Z]$/.test(body.correct_answer) ? body.correct_answer.charCodeAt(0) - 65 : 0);
   if (!sql) return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
 

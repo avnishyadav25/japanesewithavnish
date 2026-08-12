@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
 import { getPromptContent } from "@/lib/ai/load-prompts";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 const DEEPSEEK_API = "https://api.deepseek.com/v1/chat/completions";
 
@@ -19,6 +20,12 @@ export async function POST(req: Request) {
   try {
     const key = process.env.DEEPSEEK_API_KEY;
     if (!key) return NextResponse.json({ error: "Correction not configured" }, { status: 503 });
+
+    const ip = getClientIp(req);
+    const { allowed } = await checkRateLimit(`correct-sentence:${ip}`, { max: 20, windowMs: 15 * 60 * 1000 });
+    if (!allowed) {
+      return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
+    }
 
     const body = await req.json();
     const text = typeof body.text === "string" ? body.text.trim() : "";

@@ -41,6 +41,14 @@ export const ALLOWED_PROMPT_KEYS = [
   "content_review_example_sentence_reviewer",
   "content_review_seo_reviewer",
   "content_review_trust_claims_reviewer",
+  "video_narration_shared",
+  "video_narration_vocabulary",
+  "video_narration_kanji",
+  "video_narration_grammar",
+  "video_narration_reading",
+  "video_narration_listening",
+  "video_narration_lesson",
+  "video_metadata_seo",
 ] as const;
 
 export type PromptKey = (typeof ALLOWED_PROMPT_KEYS)[number];
@@ -80,6 +88,18 @@ const POLICY_EXCLUDED_KEYS = new Set<string>([
   "content_review_example_sentence_reviewer",
   "content_review_seo_reviewer",
   "content_review_trust_claims_reviewer",
+  // Video Studio narration prompts carry their own rule set (src/lib/video/storyboard.ts).
+  // The shared content policy is written for on-page prose and permits markdown; these prompts
+  // produce words that go straight into a text-to-speech voice, where a stray asterisk or
+  // heading marker is read aloud. Their accuracy rules are stated inline instead.
+  "video_narration_shared",
+  "video_narration_vocabulary",
+  "video_narration_kanji",
+  "video_narration_grammar",
+  "video_narration_reading",
+  "video_narration_listening",
+  "video_narration_lesson",
+  "video_metadata_seo",
 ]);
 
 async function getRawPromptContent(key: string): Promise<string | null> {

@@ -22,7 +22,25 @@ type StatusVariant =
   | "approved"
   | "publish_ready"
   | "rejected"
-  | "archived";
+  | "archived"
+  // video_projects.status
+  | "generating_script"
+  | "script_ready"
+  | "script_pending_review"
+  | "queued_render"
+  | "rendering"
+  | "render_ready"
+  | "video_pending_review"
+  | "publishing"
+  // video_render_jobs.status
+  | "claimed"
+  | "running"
+  | "completed"
+  | "cancelled"
+  // video_renders.approval_status / video_storyboards.approval_status
+  | "not_required"
+  | "pending_review"
+  | "superseded";
 
 const variantStyles: Record<StatusVariant, string> = {
   paid: "bg-emerald-50 text-emerald-700 border-emerald-200",
@@ -47,6 +65,21 @@ const variantStyles: Record<StatusVariant, string> = {
   publish_ready: "bg-emerald-50 text-emerald-700 border-emerald-200",
   rejected: "bg-red-50 text-red-700 border-red-200",
   archived: "bg-slate-100 text-slate-600 border-slate-200",
+  generating_script: "bg-blue-50 text-blue-700 border-blue-200",
+  script_ready: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  script_pending_review: "bg-amber-50 text-amber-700 border-amber-200",
+  queued_render: "bg-blue-50 text-blue-700 border-blue-200",
+  rendering: "bg-blue-50 text-blue-700 border-blue-200",
+  render_ready: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  video_pending_review: "bg-amber-50 text-amber-700 border-amber-200",
+  publishing: "bg-blue-50 text-blue-700 border-blue-200",
+  claimed: "bg-blue-50 text-blue-700 border-blue-200",
+  running: "bg-blue-50 text-blue-700 border-blue-200",
+  completed: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  cancelled: "bg-slate-100 text-slate-600 border-slate-200",
+  not_required: "bg-slate-100 text-slate-600 border-slate-200",
+  pending_review: "bg-amber-50 text-amber-700 border-amber-200",
+  superseded: "bg-slate-100 text-slate-600 border-slate-200",
 };
 
 interface StatusBadgeProps {

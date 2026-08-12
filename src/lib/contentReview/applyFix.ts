@@ -4,6 +4,7 @@ import type { ReviewEntityType } from "./types";
 export interface ApplyFixResult {
   ok: boolean;
   error?: string;
+  preview?: { entityType: ReviewEntityType; postId: string; fieldName: string; valueToApply: unknown };
 }
 
 /** Applies one finding's suggested_value (or a human-edited replacement of it, per the
@@ -16,7 +17,7 @@ export interface ApplyFixResult {
  * @param editedValue When provided (the human used "Edit Fix" rather than "Apply Fix" as-is),
  *   this is written instead of the finding's own suggested_value — the finding record itself
  *   is untouched, so the original AI suggestion stays visible in history. */
-export async function applyFindingFix(findingId: string, editedValue?: unknown): Promise<ApplyFixResult> {
+export async function applyFindingFix(findingId: string, editedValue: unknown | undefined, actor: string, dryRun = false): Promise<ApplyFixResult> {
   if (!sql) return { ok: false, error: "Database unavailable" };
 
   const findingRows = (await sql`
@@ -40,8 +41,12 @@ export async function applyFindingFix(findingId: string, editedValue?: unknown):
   }
 
   const entityType = finding.entity_type as ReviewEntityType;
-  const applied = await applyFieldValue(entityType, finding.entity_id, finding.field_name, valueToApply);
+  const applied = await applyFieldValue(entityType, finding.entity_id, finding.field_name, valueToApply, dryRun);
   if (!applied.ok) return applied;
+
+  if (dryRun) {
+    return { ok: true, preview: { entityType, postId: finding.entity_id, fieldName: finding.field_name, valueToApply } };
+  }
 
   const decisionNote =
     editedValue !== undefined
@@ -50,7 +55,7 @@ export async function applyFindingFix(findingId: string, editedValue?: unknown):
   await sql`UPDATE content_review_findings SET status = 'fixed', applied_fix_at = NOW() WHERE id = ${findingId}`;
   await sql`
     INSERT INTO content_review_decisions (finding_id, decision, decision_note, decided_by)
-    VALUES (${findingId}, 'mark_fixed', ${decisionNote}, 'system:apply-fix')
+    VALUES (${findingId}, 'mark_fixed', ${decisionNote}, ${actor})
   `;
   return { ok: true };
 }
@@ -69,58 +74,63 @@ async function applyFieldValue(
   entityType: ReviewEntityType,
   postId: string,
   fieldName: string,
-  value: unknown
+  value: unknown,
+  dryRun = false
 ): Promise<ApplyFixResult> {
   if (!sql) return { ok: false, error: "Database unavailable" };
 
   if (POSTS_FIELDS.has(fieldName)) {
-    return applyPostsField(postId, fieldName, value);
+    return applyPostsField(postId, fieldName, value, dryRun);
   }
 
   switch (entityType) {
     case "vocabulary":
-      return applySidecarField("vocabulary", postId, fieldName, value, ["word", "reading", "meaning", "romaji", "part_of_speech", "transitivity", "notes"]);
+      return applySidecarField("vocabulary", postId, fieldName, value, ["word", "reading", "meaning", "romaji", "part_of_speech", "transitivity", "notes"], dryRun);
     case "grammar":
-      return applySidecarField("grammar", postId, fieldName, value, ["pattern", "structure", "level", "notes"]);
+      return applySidecarField("grammar", postId, fieldName, value, ["pattern", "structure", "level", "notes"], dryRun);
     case "kanji":
-      return applySidecarField("kanji", postId, fieldName, value, ["character", "onyomi", "kunyomi", "meaning", "meaning_extended", "stroke_count"]);
+      return applySidecarField("kanji", postId, fieldName, value, ["character", "onyomi", "kunyomi", "meaning", "meaning_extended", "stroke_count"], dryRun);
     case "reading":
-      return applySidecarField("reading", postId, fieldName, value, ["title", "notes"]);
+      return applySidecarField("reading", postId, fieldName, value, ["title", "notes"], dryRun);
     case "listening":
-      return applySidecarField("listening", postId, fieldName, value, ["title", "notes", "audio_url"]);
+      return applySidecarField("listening", postId, fieldName, value, ["title", "notes", "audio_url"], dryRun);
     case "writing":
-      return applySidecarField("writing", postId, fieldName, value, ["title", "notes"]);
+      return applySidecarField("writing", postId, fieldName, value, ["title", "notes"], dryRun);
     case "sounds":
-      return applySidecarField("sounds", postId, fieldName, value, ["title", "notes"]);
+      return applySidecarField("sounds", postId, fieldName, value, ["title", "notes"], dryRun);
     default:
       return { ok: false, error: `Unrecognized entity type: ${entityType}` };
   }
 }
 
-async function applyPostsField(postId: string, fieldName: string, value: unknown): Promise<ApplyFixResult> {
+/** No-op stand-in for `sql` used in dry-run mode — every switch case below calls `write`
+ * instead of `sql` so the exact same validation runs but no UPDATE actually executes. */
+type SqlTag = NonNullable<typeof sql>;
+async function applyPostsField(postId: string, fieldName: string, value: unknown, dryRun = false): Promise<ApplyFixResult> {
   if (!sql) return { ok: false, error: "Database unavailable" };
+  const write: SqlTag = dryRun ? (async () => []) as unknown as SqlTag : sql;
   switch (fieldName) {
     case "title":
       if (typeof value !== "string" || !value.trim()) return { ok: false, error: "suggested_value must be a non-empty string" };
-      await sql`UPDATE posts SET title = ${value.trim()}, updated_at = NOW() WHERE id = ${postId}`;
+      await write`UPDATE posts SET title = ${value.trim()}, updated_at = NOW() WHERE id = ${postId}`;
       return { ok: true };
     case "summary":
-      await sql`UPDATE posts SET summary = ${typeof value === "string" ? value : null}, updated_at = NOW() WHERE id = ${postId}`;
+      await write`UPDATE posts SET summary = ${typeof value === "string" ? value : null}, updated_at = NOW() WHERE id = ${postId}`;
       return { ok: true };
     case "seo_title":
-      await sql`UPDATE posts SET seo_title = ${typeof value === "string" ? value : null}, updated_at = NOW() WHERE id = ${postId}`;
+      await write`UPDATE posts SET seo_title = ${typeof value === "string" ? value : null}, updated_at = NOW() WHERE id = ${postId}`;
       return { ok: true };
     case "seo_description":
-      await sql`UPDATE posts SET seo_description = ${typeof value === "string" ? value : null}, updated_at = NOW() WHERE id = ${postId}`;
+      await write`UPDATE posts SET seo_description = ${typeof value === "string" ? value : null}, updated_at = NOW() WHERE id = ${postId}`;
       return { ok: true };
     case "tags":
       if (!Array.isArray(value)) return { ok: false, error: "suggested_value for tags must be an array" };
-      await sql`UPDATE posts SET tags = ${value.map(String)}, updated_at = NOW() WHERE id = ${postId}`;
+      await write`UPDATE posts SET tags = ${value.map(String)}, updated_at = NOW() WHERE id = ${postId}`;
       return { ok: true };
     case "jlpt_level": {
       const level = Array.isArray(value) ? value[0] : (value as Record<string, unknown>)?.recommendedLevel ?? value;
       if (typeof level !== "string" || !/^N[1-5]$/.test(level)) return { ok: false, error: "suggested_value for jlpt_level must resolve to N1-N5" };
-      await sql`UPDATE posts SET jlpt_level = ${[level]}, updated_at = NOW() WHERE id = ${postId}`;
+      await write`UPDATE posts SET jlpt_level = ${[level]}, updated_at = NOW() WHERE id = ${postId}`;
       return { ok: true };
     }
     default:
@@ -136,9 +146,11 @@ async function applySidecarField(
   postId: string,
   fieldName: string,
   value: unknown,
-  allowedFields: string[]
+  allowedFields: string[],
+  dryRun = false
 ): Promise<ApplyFixResult> {
   if (!sql) return { ok: false, error: "Database unavailable" };
+  const write: SqlTag = dryRun ? (async () => []) as unknown as SqlTag : sql;
   if (!allowedFields.includes(fieldName)) {
     return { ok: false, error: `Field "${fieldName}" is not auto-applicable for ${table} — edit it manually via the content editor` };
   }
@@ -162,84 +174,84 @@ async function applySidecarField(
   // unchecked user input) before being spliced into the query text below.
   switch (`${table}.${fieldName}`) {
     case "vocabulary.word":
-      await sql`UPDATE vocabulary SET word = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
+      await write`UPDATE vocabulary SET word = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
       return { ok: true };
     case "vocabulary.reading":
-      await sql`UPDATE vocabulary SET reading = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
+      await write`UPDATE vocabulary SET reading = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
       return { ok: true };
     case "vocabulary.meaning":
-      await sql`UPDATE vocabulary SET meaning = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
+      await write`UPDATE vocabulary SET meaning = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
       return { ok: true };
     case "vocabulary.romaji":
-      await sql`UPDATE vocabulary SET romaji = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
+      await write`UPDATE vocabulary SET romaji = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
       return { ok: true };
     case "vocabulary.part_of_speech":
-      await sql`UPDATE vocabulary SET part_of_speech = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
+      await write`UPDATE vocabulary SET part_of_speech = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
       return { ok: true };
     case "vocabulary.transitivity":
       if (!["transitive", "intransitive", "both"].includes(normalized as string)) return { ok: false, error: "transitivity must be transitive/intransitive/both" };
-      await sql`UPDATE vocabulary SET transitivity = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
+      await write`UPDATE vocabulary SET transitivity = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
       return { ok: true };
     case "vocabulary.notes":
-      await sql`UPDATE vocabulary SET notes = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
+      await write`UPDATE vocabulary SET notes = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
       return { ok: true };
     case "grammar.pattern":
-      await sql`UPDATE grammar SET pattern = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
+      await write`UPDATE grammar SET pattern = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
       return { ok: true };
     case "grammar.structure":
-      await sql`UPDATE grammar SET structure = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
+      await write`UPDATE grammar SET structure = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
       return { ok: true };
     case "grammar.level":
-      await sql`UPDATE grammar SET level = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
+      await write`UPDATE grammar SET level = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
       return { ok: true };
     case "grammar.notes":
-      await sql`UPDATE grammar SET notes = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
+      await write`UPDATE grammar SET notes = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
       return { ok: true };
     case "kanji.character":
-      await sql`UPDATE kanji SET character = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
+      await write`UPDATE kanji SET character = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
       return { ok: true };
     case "kanji.onyomi":
-      await sql`UPDATE kanji SET onyomi = ${normalized as string[]}, updated_at = NOW() WHERE post_id = ${postId}`;
+      await write`UPDATE kanji SET onyomi = ${normalized as string[]}, updated_at = NOW() WHERE post_id = ${postId}`;
       return { ok: true };
     case "kanji.kunyomi":
-      await sql`UPDATE kanji SET kunyomi = ${normalized as string[]}, updated_at = NOW() WHERE post_id = ${postId}`;
+      await write`UPDATE kanji SET kunyomi = ${normalized as string[]}, updated_at = NOW() WHERE post_id = ${postId}`;
       return { ok: true };
     case "kanji.meaning":
-      await sql`UPDATE kanji SET meaning = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
+      await write`UPDATE kanji SET meaning = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
       return { ok: true };
     case "kanji.meaning_extended":
-      await sql`UPDATE kanji SET meaning_extended = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
+      await write`UPDATE kanji SET meaning_extended = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
       return { ok: true };
     case "kanji.stroke_count":
-      await sql`UPDATE kanji SET stroke_count = ${normalized as number}, updated_at = NOW() WHERE post_id = ${postId}`;
+      await write`UPDATE kanji SET stroke_count = ${normalized as number}, updated_at = NOW() WHERE post_id = ${postId}`;
       return { ok: true };
     case "reading.title":
-      await sql`UPDATE reading SET title = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
+      await write`UPDATE reading SET title = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
       return { ok: true };
     case "reading.notes":
-      await sql`UPDATE reading SET notes = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
+      await write`UPDATE reading SET notes = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
       return { ok: true };
     case "listening.title":
-      await sql`UPDATE listening SET title = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
+      await write`UPDATE listening SET title = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
       return { ok: true };
     case "listening.notes":
-      await sql`UPDATE listening SET notes = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
+      await write`UPDATE listening SET notes = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
       return { ok: true };
     case "listening.audio_url":
       if (!isValidHttpUrl(normalized as string)) return { ok: false, error: "suggested_value for audio_url is not a valid absolute http(s) URL" };
-      await sql`UPDATE listening SET audio_url = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
+      await write`UPDATE listening SET audio_url = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
       return { ok: true };
     case "writing.title":
-      await sql`UPDATE writing SET title = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
+      await write`UPDATE writing SET title = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
       return { ok: true };
     case "writing.notes":
-      await sql`UPDATE writing SET notes = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
+      await write`UPDATE writing SET notes = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
       return { ok: true };
     case "sounds.title":
-      await sql`UPDATE sounds SET title = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
+      await write`UPDATE sounds SET title = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
       return { ok: true };
     case "sounds.notes":
-      await sql`UPDATE sounds SET notes = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
+      await write`UPDATE sounds SET notes = ${normalized as string}, updated_at = NOW() WHERE post_id = ${postId}`;
       return { ok: true };
     default:
       return { ok: false, error: `No apply-fix handler for ${table}.${fieldName}` };

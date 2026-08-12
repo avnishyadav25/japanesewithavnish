@@ -18,19 +18,9 @@
  * - Listening audio always uses per-QUESTION audio_url (never section-level).
  */
 import { sql } from "@/lib/db";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { isR2Configured, uploadToR2 } from "@/lib/r2";
 import { itemTypesForSection, type ItemTypeDef, type JlptLevel } from "@/lib/practiceTest/itemTypes";
 
-const r2 = new S3Client({
-  region: "auto",
-  endpoint: process.env.R2_ENDPOINT || "",
-  credentials: {
-    accessKeyId: process.env.R2_ACCESS_KEY_ID || "",
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || "",
-  },
-});
-const bucketName = process.env.R2_BUCKET_NAME || "";
-const bucketUrl = process.env.R2_BUCKET_URL || "";
 const geminiKey = process.env.GEMINI_API_KEY;
 
 // ---------- LLM helpers ----------
@@ -174,7 +164,7 @@ function splitIntoTTSChunks(text: string, maxLen = 200): string[] {
 }
 
 async function generateTTSAndUpload(text: string, keyPrefix: string): Promise<string | null> {
-  if (!bucketName || !bucketUrl) return null;
+  if (!isR2Configured()) return null;
   try {
     const chunks = splitIntoTTSChunks(text);
     const buffers: Buffer[] = [];
@@ -186,8 +176,8 @@ async function generateTTSAndUpload(text: string, keyPrefix: string): Promise<st
     }
     const combined = Buffer.concat(buffers);
     const fileKey = `practice-tests/audio-${keyPrefix}-${Date.now()}.mp3`;
-    await r2.send(new PutObjectCommand({ Bucket: bucketName, Key: fileKey, Body: combined, ContentType: "audio/mpeg" }));
-    return `${bucketUrl.replace(/\/$/, "")}/${fileKey}`;
+    // cacheControl: null preserves the pre-refactor behaviour of sending no Cache-Control.
+    return await uploadToR2(fileKey, combined, "audio/mpeg", { cacheControl: null });
   } catch {
     return null;
   }

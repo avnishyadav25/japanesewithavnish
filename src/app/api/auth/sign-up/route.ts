@@ -4,6 +4,7 @@ import { hashPassword } from "@/lib/auth/password";
 import { createEmailVerificationToken } from "@/lib/auth/session";
 import { sendEmailVerificationEmail } from "@/lib/email";
 import { logError } from "@/lib/error-log";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 const MIN_PASSWORD_LENGTH = 8;
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://japanesewithavnish.com";
@@ -14,6 +15,12 @@ function trimStr(v: unknown): string {
 
 export async function POST(req: Request) {
   try {
+    const ip = getClientIp(req);
+    const { allowed } = await checkRateLimit(`sign-up:${ip}`, { max: 3, windowMs: 60 * 60 * 1000 });
+    if (!allowed) {
+      return NextResponse.json({ error: "Too many sign-up attempts. Please try again later." }, { status: 429 });
+    }
+
     const body = await req.json().catch(() => ({}));
     const { email, password, first_name: fn, last_name: ln } = body as {
       email?: string;

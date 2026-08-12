@@ -12,7 +12,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ postId
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!sql) return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
   const { sectionId } = await params;
-  const body = await req.json();
+  const body = await req.json().catch(() => null);
+  if (!body) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
 
   const existingRows = await sql`SELECT * FROM practice_test_sections WHERE id = ${sectionId} LIMIT 1`;
   const existing = (existingRows as Record<string, unknown>[])[0];
