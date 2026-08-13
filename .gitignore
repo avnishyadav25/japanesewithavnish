@@ -57,3 +57,7 @@ japanesewithavnish.com-audit
 
 
 .avnish-files/*
+
+# Mascot pilot output and brand preview stills — regenerable, never committed.
+# public/mascots/*.png IS committed; this is the review scratch area.
+video-brand-preview/

@@ -33,7 +33,13 @@ const SIDECARS: Record<string, { table: string; columns: string[]; exampleFk?: s
   },
   grammar: {
     table: "grammar",
-    columns: ["pattern", "structure", "level", "meaning", "when_to_use", "notes"],
+    // pattern_spoken / pattern_romaji are the curated speakable forms from migration 139,
+    // populated by scripts/backfill-grammar-spoken.ts. They MUST be selected: 280 of 548
+    // patterns are mixed notation like "Verb volitional form + と思います", and without the
+    // curated column storyboard.ts silently falls back to crudely extracting Japanese runs —
+    // which turns "Vて-form + ください" into "て、ください" instead of "ください", and cannot
+    // express "this pattern should not be spoken at all" (an empty string).
+    columns: ["pattern", "pattern_spoken", "pattern_romaji", "structure", "level", "meaning", "when_to_use", "notes"],
     exampleFk: "grammar_id",
   },
   kanji: {

@@ -1,8 +1,14 @@
+import Link from "next/link";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminCard } from "@/components/admin/AdminCard";
 import { AdminTable } from "@/components/admin/AdminTable";
 import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
+import { StatusBadge } from "@/components/admin/StatusBadge";
 import { sql } from "@/lib/db";
+import { listBriefs } from "@/lib/social/briefs";
+import { ImportPackButton } from "./ImportPackButton";
+
+export const dynamic = "force-dynamic";
 
 type SocialPackRow = {
   id: string;
@@ -13,6 +19,53 @@ type SocialPackRow = {
   image_urls: Record<string, string> | null;
   created_at: string;
 };
+
+/**
+ * Briefs from the new per-surface engine, above the legacy packs.
+ *
+ * Both are listed during the transition: existing packs keep working and stay reachable, while
+ * everything new is a brief. Nothing is migrated implicitly — a pack becomes a brief only when
+ * someone deliberately imports it.
+ */
+async function BriefsSection() {
+  if (!sql) return null;
+  const briefs = await listBriefs(25);
+  if (briefs.length === 0) return null;
+
+  return (
+    <>
+      <h2 className="font-heading text-lg font-bold text-charcoal mb-3">Briefs</h2>
+      <AdminCard className="mb-8">
+        <AdminTable headers={["Created", "Title", "Source", "Surfaces", "Posted", "Status"]}>
+          {briefs.map((b) => (
+            <tr key={b.id}>
+              <td className="py-3 px-2 text-secondary whitespace-nowrap">
+                {new Date(b.createdAt).toLocaleDateString()}
+              </td>
+              <td className="py-3 px-2">
+                <Link href={`/admin/social/briefs/${b.id}`} className="text-primary hover:underline">
+                  {b.title}
+                </Link>
+              </td>
+              <td className="py-3 px-2 text-secondary">{b.sourceType.replace(/_/g, " ")}</td>
+              <td className="py-3 px-2 text-charcoal tabular-nums">{b.variantCount}</td>
+              <td className="py-3 px-2 tabular-nums">
+                {b.postedCount > 0 ? (
+                  <span className="text-charcoal">{b.postedCount}</span>
+                ) : (
+                  <span className="text-secondary">—</span>
+                )}
+              </td>
+              <td className="py-3 px-2">
+                <StatusBadge status={b.status} />
+              </td>
+            </tr>
+          ))}
+        </AdminTable>
+      </AdminCard>
+    </>
+  );
+}
 
 export default async function AdminSocialListPage() {
   let packs: SocialPackRow[] = [];
@@ -31,10 +84,11 @@ export default async function AdminSocialListPage() {
     return (
       <div>
         <AdminPageHeader
-          title="Social content packs"
+          title="Social"
           breadcrumb={[{ label: "Admin", href: "/admin" }]}
           actions={[{ label: "Prepare for social", href: "/admin/social/prepare" }]}
         />
+        <BriefsSection />
         <AdminEmptyState
           message="No social content packs yet."
           action={{ label: "Prepare first pack", href: "/admin/social/prepare" }}
@@ -46,12 +100,14 @@ export default async function AdminSocialListPage() {
   return (
     <div>
       <AdminPageHeader
-        title="Social content packs"
+        title="Social"
         breadcrumb={[{ label: "Admin", href: "/admin" }]}
         actions={[{ label: "Prepare for social", href: "/admin/social/prepare" }]}
       />
+      <BriefsSection />
+      <h2 className="font-heading text-lg font-bold text-charcoal mb-3">Content packs</h2>
       <p className="text-secondary text-sm mb-4">
-        Latest AI-generated packs for blogs, products, and newsletters. Click through to refine or regenerate.
+        Packs from the original single-call generator. Still editable; new work goes through briefs above.
       </p>
       <AdminCard>
         <AdminTable headers={["Created", "Type", "Title", "Slug", "Images", "Actions"]}>
@@ -74,8 +130,10 @@ export default async function AdminSocialListPage() {
                   <span className="line-clamp-1">{p.slug}</span>
                 </td>
                 <td className="py-2 px-2 text-secondary text-xs">{images || "—"}</td>
-                <td className="py-2 px-2">
-                  <a href={prepareHref} className="text-primary text-sm hover:underline">
+                <td className="py-2 px-2 whitespace-nowrap text-sm">
+                  <ImportPackButton packId={p.id} />
+                  <span className="mx-2 text-secondary opacity-40">·</span>
+                  <a href={prepareHref} className="text-secondary hover:underline">
                     Open in Prepare
                   </a>
                 </td>

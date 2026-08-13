@@ -3,9 +3,15 @@
 import { useState } from "react";
 import { AdminCard } from "@/components/admin/AdminCard";
 import { ChatbotContextCard } from "@/components/admin/ChatbotContextCard";
+import { BRAND, SOCIALS, type SocialAccount } from "@/lib/brand";
 import { HomepageSettingsForm } from "./HomepageSettingsForm";
 
 type Settings = Record<string, string | unknown>;
+
+/** Lets each social field show the brand default rather than a hand-typed hint that can drift. */
+const SOCIAL_BY_SETTINGS_KEY: Record<string, SocialAccount | undefined> = Object.fromEntries(
+  SOCIALS.map((account) => [account.settingsKey, account])
+);
 
 function SettingsSection({
   title,
@@ -134,13 +140,15 @@ export function CompanySettingsForm({
           <div key={key}>
             <label className="block text-sm font-medium text-charcoal mb-1">
               {key.replace("_url", "").replace(/_/g, " ")}
-              {key === "instagram_url" && " (@japanesewithavnish)"}
+              {SOCIAL_BY_SETTINGS_KEY[key] && ` (${BRAND.atHandle})`}
             </label>
             <input
               type="url"
               value={String(settings[key] ?? "")}
               onChange={(e) => update(key, e.target.value)}
-              placeholder={key === "instagram_url" ? "https://www.instagram.com/japanesewithavnish" : undefined}
+              // Placeholder is the brand default, so leaving a field blank and leaving it at the
+              // suggested value mean the same thing.
+              placeholder={SOCIAL_BY_SETTINGS_KEY[key]?.url}
               className="w-full px-4 py-2 border border-[var(--divider)] rounded-bento text-charcoal"
             />
           </div>

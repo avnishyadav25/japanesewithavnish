@@ -5,6 +5,7 @@ import { AdminCard } from "@/components/admin/AdminCard";
 import { AdminTable } from "@/components/admin/AdminTable";
 import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
 import { StatusBadge } from "@/components/admin/StatusBadge";
+import { DeleteProjectButton } from "./DeleteProjectButton";
 
 export const dynamic = "force-dynamic";
 
@@ -86,7 +87,7 @@ export default async function VideoProjectsPage({
         />
       ) : (
         <AdminCard>
-          <AdminTable headers={["Title", "Scope", "Formats", "Languages", "Videos", "Status", "Created"]}>
+          <AdminTable headers={["Title", "Scope", "Formats", "Languages", "Videos", "Status", "Created", ""]}>
             {projects.map((project) => (
               <tr key={project.id} className="border-b border-[var(--divider)] last:border-0">
                 <td className="py-3 px-2">
@@ -104,6 +105,13 @@ export default async function VideoProjectsPage({
                 </td>
                 <td className="py-3 px-2 text-secondary whitespace-nowrap">
                   {new Date(project.created_at).toLocaleDateString()}
+                </td>
+                <td className="py-3 px-2 text-right">
+                  <DeleteProjectButton
+                    projectId={project.id}
+                    title={project.title}
+                    renderCount={project.render_count}
+                  />
                 </td>
               </tr>
             ))}

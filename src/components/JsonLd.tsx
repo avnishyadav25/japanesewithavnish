@@ -1,13 +1,19 @@
 import { sql } from "@/lib/db";
+import { BRAND, SOCIAL_SETTINGS_KEYS, sameAsUrls } from "@/lib/brand";
 
-const SOCIAL_SETTING_KEYS = ["youtube_url", "instagram_url", "twitter_url"] as const;
-
-// Same site_settings keys + instagram fallback as Footer.tsx, so the Organization
-// entity's sameAs matches whatever social links are actually live in the footer.
+/**
+ * Profile URLs for the Organization entity.
+ *
+ * Previously this listed three accounts and carried its own Instagram fallback that disagreed
+ * with the database. It now resolves through `@/lib/brand`, which means all six live accounts —
+ * YouTube, Instagram, X, Facebook, Threads, Pinterest — are declared instead of three. Search
+ * engines use `sameAs` to connect the site to those profiles, so the three that were missing
+ * were a free signal being thrown away.
+ */
 async function getSocialUrls(): Promise<string[]> {
   const map: Record<string, string> = {};
   if (sql) {
-    const rows = (await sql`SELECT key, value FROM site_settings WHERE key = ANY(${SOCIAL_SETTING_KEYS})`) as {
+    const rows = (await sql`SELECT key, value FROM site_settings WHERE key = ANY(${SOCIAL_SETTINGS_KEYS})`) as {
       key: string;
       value: unknown;
     }[];
@@ -15,17 +21,16 @@ async function getSocialUrls(): Promise<string[]> {
       map[r.key] = typeof r.value === "string" ? r.value : "";
     });
   }
-  const instagram = map.instagram_url?.trim() || "https://www.instagram.com/japanesewithavnish";
-  return [map.youtube_url, instagram, map.twitter_url].filter((url): url is string => !!url?.trim());
+  return sameAsUrls(map);
 }
 
 export async function OrganizationSchema() {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://japanesewithavnish.com";
+  const siteUrl = BRAND.siteUrl;
   const sameAs = await getSocialUrls();
   const schema = {
     "@context": "https://schema.org",
     "@type": "Organization",
-    name: "Japanese with Avnish",
+    name: BRAND.name,
     url: siteUrl,
     logo: `${siteUrl}/logo.png`,
     description: "Premium Japanese learning resources. JLPT bundles, placement quiz, and lessons.",
@@ -146,8 +151,8 @@ export function CourseSchema({
     url,
     provider: {
       "@type": "Organization",
-      name: "Japanese with Avnish",
-      sameAs: process.env.NEXT_PUBLIC_SITE_URL || "https://japanesewithavnish.com",
+      name: BRAND.name,
+      sameAs: BRAND.siteUrl,
     },
     ...(numberOfLessons && {
       hasCourseInstance: {
@@ -182,7 +187,7 @@ export function ArticleSchema({
   dateModified?: string;
   authorName?: string;
 }) {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://japanesewithavnish.com";
+  const siteUrl = BRAND.siteUrl;
   const schema = {
     "@context": "https://schema.org",
     "@type": "Article",
@@ -194,11 +199,11 @@ export function ArticleSchema({
     ...(dateModified && { dateModified }),
     author: {
       "@type": "Person",
-      name: authorName || "Japanese with Avnish Editorial Team",
+      name: authorName || `${BRAND.name} Editorial Team`,
     },
     publisher: {
       "@type": "Organization",
-      name: "Japanese with Avnish",
+      name: BRAND.name,
       logo: {
         "@type": "ImageObject",
         url: `${siteUrl}/logo.png`,

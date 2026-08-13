@@ -49,6 +49,29 @@ export const ALLOWED_PROMPT_KEYS = [
   "video_narration_listening",
   "video_narration_lesson",
   "video_metadata_seo",
+  // Social engine — one key per surface (src/lib/social/platforms.ts). These carry voice and
+  // craft only; character limits and hashtag counts live in PLATFORM_RULES and are enforced in
+  // code after generation, so editing a prompt here cannot break a platform's limits.
+  // Seeded by supabase/migrations/144_social_prompt_keys.sql — /admin/prompts has no POST, so a
+  // key without a seeded row would be invisible and uneditable.
+  "social_shared_brand",
+  "social_youtube_long",
+  "social_youtube_short",
+  "social_instagram_reel",
+  "social_instagram_post",
+  "social_instagram_carousel",
+  "social_x_post",
+  "social_x_thread",
+  "social_facebook_post",
+  "social_threads_post",
+  "social_tiktok_video",
+  "social_pinterest_pin",
+  "social_linkedin_post",
+  "social_linkedin_article",
+  "social_reddit_post",
+  "social_blog_article",
+  "social_content_plan",
+  "social_plan_hint",
 ] as const;
 
 export type PromptKey = (typeof ALLOWED_PROMPT_KEYS)[number];
@@ -100,6 +123,12 @@ const POLICY_EXCLUDED_KEYS = new Set<string>([
   "video_narration_listening",
   "video_narration_lesson",
   "video_metadata_seo",
+  // Social CONTENT prompts are deliberately NOT excluded — a caption makes the same public
+  // claims about Japanese that a lesson page does, so the shared accuracy policy applies. Only
+  // the two scheduling prompts below are excluded: they contain no Japanese and produce no
+  // learner-facing prose, so the content policy is dead weight in their context window.
+  "social_content_plan",
+  "social_plan_hint",
 ]);
 
 async function getRawPromptContent(key: string): Promise<string | null> {

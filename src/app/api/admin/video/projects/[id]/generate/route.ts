@@ -4,6 +4,8 @@ import { sql } from "@/lib/db";
 import { insertAiLog } from "@/lib/ai-logs";
 import { resolveScope } from "@/lib/video/scopeResolver";
 import { generateStoryboard, outroSiteUrl } from "@/lib/video/storyboard";
+import { resolvePacing } from "@/lib/video/pacing";
+import { recordGenerationRun, snapshotStoryboardState } from "@/lib/video/audit";
 import {
   getProject,
   insertStoryboardVersion,
@@ -42,17 +44,30 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   try {
     const snapshot = await resolveScope(project.scopeKind, project.scopeRef);
-    const generated = await generateStoryboard(snapshot, {
-      projectId: id,
-      narrationLang: lang,
-      themeKey: project.themeKey,
-      tone: toneOverride ?? project.tone,
-      targetDurationSeconds: project.targetDurationSeconds,
-      bgm: project.bgmTrackId ? { trackId: project.bgmTrackId, gainDb: -18, duckDb: -12 } : undefined,
-      includeBroll: project.includeBroll,
-      siteName: "JapaneseWithAvnish",
-      siteUrl: outroSiteUrl(),
-    });
+    // Pacing is what makes the requested duration binding — see src/lib/video/pacing.ts.
+    const pacing = resolvePacing(
+      (body?.pacing as Record<string, number> | undefined) ?? project.pacing,
+      snapshot.items[0]?.kind
+    );
+    const generated = await generateStoryboard(
+      snapshot,
+      {
+        projectId: id,
+        narrationLang: lang,
+        themeKey: project.themeKey,
+        pacing,
+        voices: project.voices,
+        tone: toneOverride ?? project.tone,
+        bgm: project.bgmTrackId ? { trackId: project.bgmTrackId, gainDb: -18, duckDb: -12 } : undefined,
+        includeBroll: project.includeBroll,
+        siteName: "JapaneseWithAvnish",
+        siteUrl: outroSiteUrl(),
+      },
+      {
+        systemPrompt: typeof body?.systemPrompt === "string" ? body.systemPrompt : undefined,
+        slots: (body?.slotOverrides as Record<string, { hint?: string; maxWords?: number }>) ?? undefined,
+      }
+    );
 
     // The policy decides whether this can go straight to rendering or has to be read first.
     const mode = await resolveApprovalMode({
@@ -76,6 +91,37 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       completionTokens: generated.usage.completionTokens,
       estimatedCostUsd: generated.estimatedCostUsd,
       createdBy: admin.email,
+    });
+
+    // Verbatim record of what was sent and what came back, so a good run can be reproduced
+    // and a bad one diagnosed. Token counts alone cannot tell you why.
+    await recordGenerationRun({
+      projectId: id,
+      storyboardId: storyboard.id,
+      kind: "full_script",
+      narrationLang: lang,
+      model: generated.model,
+      promptKey: generated.promptKey,
+      systemPrompt: generated.request.systemPrompt,
+      userMessage: generated.request.userMessage,
+      rawResponse: generated.rawResponse,
+      slots: generated.request.slots,
+      pacing,
+      estimatedSeconds: generated.request.estimatedSeconds,
+      promptTokens: generated.usage.promptTokens,
+      completionTokens: generated.usage.completionTokens,
+      estimatedCostUsd: generated.estimatedCostUsd,
+      durationMs: generated.durationMs,
+      requestedBy: admin.email,
+    });
+
+    await snapshotStoryboardState({
+      storyboardId: storyboard.id,
+      projectId: id,
+      fromState: "draft",
+      toState: approvalStatus === "approved" ? "script_ready" : "script_pending_review",
+      doc: generated.storyboard,
+      actor: admin.email,
     });
 
     await setProjectStatus(id, approvalStatus === "approved" ? "script_ready" : "script_pending_review");
@@ -119,6 +165,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ storyboard, approvalMode: mode });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Script generation failed";
+    // A failed run is the one most worth keeping — record it before surfacing the error.
+    await recordGenerationRun({
+      projectId: id,
+      narrationLang: lang,
+      model: "deepseek-chat",
+      systemPrompt: "(generation failed before or during the call)",
+      userMessage: "(see error_message)",
+      status: "api_error",
+      errorMessage: message,
+      requestedBy: admin.email,
+    }).catch(() => {});
     await setProjectStatus(id, "failed", message);
     return NextResponse.json({ error: message }, { status: 500 });
   }

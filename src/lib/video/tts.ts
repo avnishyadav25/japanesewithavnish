@@ -19,6 +19,7 @@ import { SignJWT, importPKCS8 } from "jose";
 // under plain tsx, which resolves relative specifiers but not Next's "@/" tsconfig alias.
 // Same reason for "./types" below. Everything else in src/ keeps the house "@/" convention.
 import { uploadToR2 } from "../r2";
+import { languageCodeFromVoice, supportsSsml } from "./voices";
 import type { NarrationLang, NarrationSegment } from "./types";
 
 const TTS_SCOPE = "https://www.googleapis.com/auth/cloud-platform";
@@ -132,12 +133,6 @@ export function buildSsml(segment: Pick<NarrationSegment, "text" | "spokenAs" | 
     ? `<break time="${Math.round(segment.leadInSeconds * 1000)}ms"/>`
     : "";
   return `<speak>${lead}${spoken}</speak>`;
-}
-
-function languageCodeFromVoice(voiceName: string): string {
-  const match = /^([a-z]{2}-[A-Z]{2})/.exec(voiceName);
-  if (!match) throw new Error(`Cannot derive a language code from voice name "${voiceName}"`);
-  return match[1];
 }
 
 function priceTierFromVoice(voiceName: string): number {
@@ -300,11 +295,19 @@ export function ttsHash(req: SynthesisRequest): string {
 
 async function synthesizeChunk(ssml: string, req: SynthesisRequest): Promise<Buffer> {
   const token = await getAccessToken();
+
+  // Chirp 3: HD voices reject SSML — they take plain text only. Sending markup to one gets the
+  // angle brackets read out loud. Our pauses are timeline gaps rather than <break> tags, so
+  // stripping the wrapper loses nothing.
+  const input = supportsSsml(req.voiceName)
+    ? { ssml }
+    : { text: ssml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() };
+
   const res = await fetch(SYNTHESIZE_URL, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      input: { ssml },
+      input,
       voice: { languageCode: languageCodeFromVoice(req.voiceName), name: req.voiceName },
       audioConfig: {
         audioEncoding: "LINEAR16",

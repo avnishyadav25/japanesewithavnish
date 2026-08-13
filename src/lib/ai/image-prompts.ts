@@ -9,7 +9,37 @@ export type ImageContext = {
   entityType?: string;
 };
 
-export type ImageType = "product" | "blog" | "newsletter" | "page" | "learning" | "curriculum";
+export type ImageType = "product" | "blog" | "newsletter" | "page" | "learning" | "curriculum" | "mascot";
+
+/** The cast, matching the Learn Hub illustrations so the video and the site read as one product. */
+export const MASCOT_CHARACTERS = {
+  fox: "a friendly red fox (kitsune) sensei wearing a deep indigo kimono with a subtle pattern, small round glasses",
+  tanuki: "a cheerful tanuki (Japanese raccoon dog) student wearing a warm brown-and-cream yukata, a satchel over one shoulder",
+  owl: "a wise owl professor wearing a charcoal haori jacket and half-moon spectacles",
+  redPanda: "a bright-eyed red panda pupil wearing a soft rose-coloured kimono",
+} as const;
+
+export type MascotCharacter = keyof typeof MASCOT_CHARACTERS;
+
+export const MASCOT_POSES = {
+  wave: "standing, waving one paw in greeting, warm open smile, facing the viewer",
+  point: "standing side-on, pointing upward and to its right with one paw, eyebrows raised, explaining something",
+  think: "seated, one paw resting against its chin, eyes turned upward, thoughtful",
+  write: "seated at a low desk seen from the side, holding a calligraphy brush, concentrating",
+  celebrate: "both paws raised above its head in celebration, eyes closed happily, mid-hop",
+} as const;
+
+export type MascotPose = keyof typeof MASCOT_POSES;
+
+/**
+ * The chroma field mascots are generated on.
+ *
+ * Neither Gemini 2.5 Flash Image nor Z-Image reliably emits a real alpha channel from a text
+ * prompt, so transparency is produced afterwards by keying this colour out with sharp. Pure
+ * magenta is chosen because it appears nowhere in the brand palette or in any plausible fur,
+ * kimono or brush-ink colour — keying out white or green would eat parts of the character.
+ */
+export const MASCOT_CHROMA = { r: 255, g: 0, b: 255, hex: "#FF00FF" } as const;
 
 const BASE_STYLE = `
 Style: flat vector illustration, minimal Japanese aesthetic.
@@ -72,7 +102,44 @@ Show a minimal study desk with an open notebook, hiragana chart (あ い う え
 ${BASE_STYLE}
 At the bottom of the image, display the text japanesewithavnish.com in clean, readable typography (subtle but legible).`;
     }
+    case "mascot":
+      // Handled by getMascotPrompt(), which needs a character and pose rather than an
+      // ImageContext. Routed here only so the ImageType union stays exhaustive.
+      return getMascotPrompt("fox", "wave");
     default:
       return `A clean flat-vector educational image about "${topic}" for Japanese learners. Minimal study desk with hiragana, katakana, kanji elements.${BASE_STYLE}`;
   }
+}
+
+/**
+ * Prompt for one mascot cutout.
+ *
+ * Deliberately does NOT use BASE_STYLE, which is actively hostile to this job on three counts:
+ * it negative-prompts "no anime, no people faces" (these are stylised characters), it forces a
+ * #FAF8F5 background (we need a keyable chroma field), and it bakes "japanesewithavnish.com" into
+ * the image (a watermark inside a mascot cutout would float in mid-air over the video).
+ *
+ * The style brief matches public/images/hub/*.jpg — ukiyo-e-influenced storybook line art with
+ * flat colour — so a mascot standing on a video frame looks like it came from the same hand as
+ * the Learn Hub artwork.
+ */
+export function getMascotPrompt(character: MascotCharacter, pose: MascotPose): string {
+  return `A single full-body character illustration: ${MASCOT_CHARACTERS[character]}, ${MASCOT_POSES[pose]}.
+
+Style: Japanese storybook illustration with ukiyo-e influence — confident dark ink linework, flat
+colour fill, subtle cel shading, no gradients or photographic texture. Warm, friendly, suitable for
+a language-learning audience of all ages.
+
+CRITICAL COMPOSITION REQUIREMENTS:
+- Solid, perfectly uniform ${MASCOT_CHROMA.hex} magenta background. Absolutely flat — no gradient,
+  no vignette, no shadow cast onto the background, no texture, no border or frame.
+- The character must not touch the edges of the image. Leave clear magenta margin on all four sides.
+- Exactly ONE character. No scenery, no furniture, no props beyond what the pose names, no ground
+  plane, no cast shadow, no decorative elements.
+- No text, no lettering, no logos, no watermark, no signature anywhere in the image.
+- Crisp, clean edges on the character silhouette so it can be cut out cleanly.
+
+Aspect ratio 1:1.
+Negative prompt: background scenery, gradient background, drop shadow, text, watermark, frame,
+border, multiple characters, photorealism, 3D render, blurry edges, cropped limbs.`;
 }

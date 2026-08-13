@@ -39,6 +39,7 @@ import {
   type ClaimedJob,
 } from "./db";
 import { makeTempDir, renderStoryboard } from "./render";
+import { generateSocialForRender } from "../social/autoGenerate";
 
 export interface PipelineOptions {
   runnerLabel: string;
@@ -82,7 +83,10 @@ export async function runJob(job: ClaimedJob, options: PipelineOptions): Promise
     const scenes = [];
     for (const scene of loaded.doc.scenes) {
       const narration: NarrationSegment[] = await resolveNarrationAudio(scene.narration, {
-        voices: loaded.themeVoices ?? undefined,
+        // Project overrides the theme. The theme row also carries jaRate/narrationRate keys
+        // that are not voice names, so spreading it under the project's picks is safe — only
+        // recognised language keys are ever read by voiceForSegment().
+        voices: { ...(loaded.themeVoices ?? {}), ...(loaded.projectVoices ?? {}) },
         cache: options.dryRun ? undefined : (await import("./db")).ttsCache,
         onSynthesized: ({ charCount, costUsd }) => {
           synthesized += 1;
@@ -250,6 +254,19 @@ export async function runJob(job: ClaimedJob, options: PipelineOptions): Promise
       },
     });
     await log(`Uploaded — ${videoUrl}`);
+
+    // ---- 7. Social copy ----------------------------------------------------
+    // Captions for the obvious surfaces, written the moment the video exists, so a finished
+    // render is never sitting there un-promotable. Deliberately non-fatal and last: the video is
+    // already uploaded and recorded by this point, and a DeepSeek outage must not turn a
+    // successful render into a failed job.
+    if (!options.dryRun) {
+      try {
+        await generateSocialForRender({ renderId, actor: `worker:${options.runnerLabel}`, log });
+      } catch (err) {
+        await log(`Social copy skipped: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
   } finally {
     // Renders are hundreds of MB; a worker that leaks temp dirs fills a CI runner's disk
     // within a handful of jobs. Preserved on a dry run, which is the whole point of one.

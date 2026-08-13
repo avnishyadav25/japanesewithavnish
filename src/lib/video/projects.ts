@@ -10,6 +10,8 @@ import { sql } from "@/lib/db";
 import type {
   ApprovalMode,
   NarrationLang,
+  PacingConfig,
+  VoiceConfig,
   ProjectStatus,
   ScopeKind,
   ScopeRef,
@@ -84,6 +86,8 @@ function toProjectRow(row: Record<string, unknown>): VideoProjectRow {
     targetDurationSeconds: (row.target_duration_seconds as number | null) ?? null,
     tone: (row.tone as string | null) ?? null,
     includeBroll: Boolean(row.include_broll),
+    pacing: (row.pacing as PacingConfig | null) ?? null,
+    voices: (row.voices as VoiceConfig | null) ?? null,
     status: row.status as ProjectStatus,
     currentStoryboardId: (row.current_storyboard_id as string | null) ?? null,
     errorMessage: (row.error_message as string | null) ?? null,
@@ -94,8 +98,8 @@ function toProjectRow(row: Record<string, unknown>): VideoProjectRow {
 }
 
 const PROJECT_COLUMNS = `id, title, scope_kind, scope_ref, grouping, theme_key, bgm_track_id,
-  narration_langs, formats, target_duration_seconds, tone, include_broll, status,
-  current_storyboard_id, error_message, created_by, created_at::text, updated_at::text`;
+  narration_langs, formats, target_duration_seconds, tone, include_broll, pacing, voices,
+  status, current_storyboard_id, error_message, created_by, created_at::text, updated_at::text`;
 
 export interface CreateProjectInput {
   title: string;
@@ -109,6 +113,8 @@ export interface CreateProjectInput {
   targetDurationSeconds?: number | null;
   tone?: string | null;
   includeBroll?: boolean;
+  pacing?: PacingConfig | null;
+  voices?: VoiceConfig | null;
   createdBy: string;
 }
 
@@ -119,8 +125,8 @@ export async function createProject(input: CreateProjectInput): Promise<VideoPro
   const rows = (await db.query(
     `INSERT INTO video_projects
        (title, scope_kind, scope_ref, grouping, theme_key, bgm_track_id, narration_langs, formats,
-        target_duration_seconds, tone, include_broll, created_by)
-     VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7::text[], $8::text[], $9, $10, $11, $12)
+        target_duration_seconds, tone, include_broll, pacing, voices, created_by)
+     VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7::text[], $8::text[], $9, $10, $11, $12::jsonb, $13::jsonb, $14)
      RETURNING ${PROJECT_COLUMNS}`,
     [
       input.title,
@@ -134,6 +140,8 @@ export async function createProject(input: CreateProjectInput): Promise<VideoPro
       input.targetDurationSeconds ?? null,
       input.tone ?? null,
       input.includeBroll ?? false,
+      input.pacing ? JSON.stringify(input.pacing) : null,
+      input.voices ? JSON.stringify(input.voices) : null,
       input.createdBy,
     ]
   )) as Record<string, unknown>[];
@@ -451,6 +459,15 @@ export interface RenderRow {
   approvalStatus: string;
   isCurrent: boolean;
   createdAt: string;
+  /**
+   * Where this render has been distributed, one entry per platform.
+   *
+   * Filled in by the project page, not by listRenders() — the render list on /admin/video/renders
+   * shows 60 rows and does not need 60 extra lookups. Absent means "not loaded", which the UI
+   * renders the same as "not posted"; both are honest for a card that is only ever shown for a
+   * current render.
+   */
+  publications?: { platform: string; status: string; url: string | null }[];
 }
 
 export async function listRenders(filters: { projectId?: string; limit?: number } = {}): Promise<RenderRow[]> {

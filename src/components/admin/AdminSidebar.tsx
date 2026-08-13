@@ -132,6 +132,7 @@ const navGroups = [
       { href: "/admin/grammar-drills", label: "Practice Drills Panel" },
       { href: "/admin/chatbot", label: "Chatbot Console" },
       { href: "/admin/reading-glossary", label: "Reading Glossary" },
+      { href: "/admin/social/channels", label: "Social Channels" },
       { href: "/admin/social", label: "Social Content" },
       { href: "/admin/ai-logs", label: "AI Logs" }
     ]
@@ -140,12 +141,14 @@ const navGroups = [
     label: "Video Studio",
     items: [
       { href: "/admin/video", label: "Dashboard" },
+      { href: "/admin/video/content-plan", label: "Content Plan" },
       { href: "/admin/video/new", label: "New Video" },
       { href: "/admin/video/projects", label: "Projects" },
       { href: "/admin/video/projects?status=script_pending_review", label: "Scripts to Review" },
       { href: "/admin/video/jobs", label: "Render Queue" },
       { href: "/admin/video/renders", label: "Finished Videos" },
-      { href: "/admin/video/assets", label: "Music & Assets" }
+      { href: "/admin/video/assets", label: "Music & Assets" },
+      { href: "/admin/video/brand-check", label: "Brand Check" }
     ]
   },
   {
