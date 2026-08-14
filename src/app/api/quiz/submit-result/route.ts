@@ -1,0 +1,57 @@
+import { NextResponse } from "next/server";
+import { sql } from "@/lib/db";
+import { sendQuizResults } from "@/lib/email";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+
+const THRESHOLDS = [
+  { level: "N5", minScore: 0 },
+  { level: "N4", minScore: 3 },
+  { level: "N3", minScore: 5 },
+  { level: "N2", minScore: 7 },
+  { level: "N1", minScore: 9 },
+];
+
+export async function POST(req: Request) {
+  try {
+    const { email, score, total, newsletterOptIn } = await req.json();
+    if (!email || typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      return NextResponse.json({ error: "A valid email is required" }, { status: 400 });
+    }
+
+    const ip = getClientIp(req);
+    const { allowed } = await checkRateLimit(`quiz:${ip}`, { max: 10, windowMs: 15 * 60 * 1000 });
+    if (!allowed) {
+      return NextResponse.json({ error: "Too many attempts. Please try again later." }, { status: 429 });
+    }
+
+    const rec = [...THRESHOLDS].reverse().find((t) => (score || 0) >= t.minScore) || THRESHOLDS[0];
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+
+    if (sql) {
+      if (newsletterOptIn !== false) {
+        await sql`INSERT INTO subscribers (email, source) VALUES (${email}, 'quiz') ON CONFLICT (email) DO UPDATE SET source = 'quiz'`;
+      }
+      await sql`INSERT INTO quiz_attempts (email, score, total_questions, recommended_level) VALUES (${email}, ${score || 0}, ${total || 10}, ${rec.level})`;
+      try {
+        await sql`
+          INSERT INTO profiles (email, recommended_level, updated_at)
+          VALUES (${email}, ${rec.level}, NOW())
+          ON CONFLICT (email) DO UPDATE SET recommended_level = ${rec.level}, updated_at = NOW()
+        `;
+      } catch (profileErr) {
+        console.warn("Profiles upsert (table may not exist yet):", profileErr);
+      }
+    }
+
+    try {
+      await sendQuizResults(email, rec.level, `${siteUrl}/pricing`);
+    } catch (e) {
+      console.error("Quiz email error:", e);
+    }
+
+    return NextResponse.json({ success: true, level: rec.level });
+  } catch (e) {
+    console.error("Submit result:", e);
+    return NextResponse.json({ error: "Failed" }, { status: 500 });
+  }
+}

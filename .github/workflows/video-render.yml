@@ -1,0 +1,86 @@
+# Video Studio render worker.
+#
+# Rendering needs a headless Chrome and ffmpeg, neither of which exists in a Netlify function,
+# and a 1080p render runs for minutes against a ~10 second execution limit. So the app only
+# enqueues rows in video_render_jobs, and this workflow (or `npm run video:worker` on a Mac)
+# claims and renders them. The two are interchangeable: whichever is up does the work, and the
+# FOR UPDATE SKIP LOCKED claim means running both at once is safe.
+name: video-render
+
+on:
+  # Fired by the admin panel immediately after a render is queued, so a job starts in seconds
+  # rather than waiting for the schedule. See src/lib/video/dispatch.ts.
+  repository_dispatch:
+    types: [video-render]
+  workflow_dispatch:
+    inputs:
+      max_jobs:
+        description: "How many jobs to drain in this run"
+        required: false
+        default: "2"
+  # Safety net for anything queued while nothing was listening (a failed dispatch, a retry, a
+  # job requeued by the stale-claim sweep).
+  schedule:
+    - cron: "*/15 * * * *"
+
+# Never run two workers from this repo at once. The queue claim is safe under concurrency, but
+# serialising keeps Actions-minute usage predictable and avoids two runners both paying to
+# bundle Remotion.
+concurrency:
+  group: video-render
+  cancel-in-progress: false
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    # Generous, because a long-form 1080p render legitimately takes tens of minutes. The worker
+    # heartbeats throughout; if the runner is killed anyway, the job is reclaimed after five
+    # quiet minutes rather than being lost.
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # Chromium is ~150MB and Remotion downloads its own headless shell on first use; caching
+      # both turns a 2-3 minute cold start into a few seconds.
+      - name: Cache browsers
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/.cache/remotion
+          key: browsers-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: browsers-${{ runner.os }}-
+
+      # Playwright is only needed once B-roll capture lands (Phase 4), but installing it here
+      # keeps the cache warm and the workflow unchanged when that ships.
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      # ffmpeg is preinstalled on ubuntu-latest. fonts-noto-cjk is the fallback face if the
+      # Google Fonts fetch in src/remotion/fonts.ts fails — without a system CJK font, a failed
+      # fetch renders Japanese as tofu boxes rather than degrading gracefully.
+      - name: Install CJK fonts
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+
+      - name: Drain the render queue
+        run: npm run video:worker -- --once --max-jobs=${{ github.event.inputs.max_jobs || 2 }} --runner=github-actions
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+          R2_BUCKET_URL: ${{ secrets.R2_BUCKET_URL }}
+          GOOGLE_TTS_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GOOGLE_TTS_SERVICE_ACCOUNT_EMAIL }}
+          GOOGLE_TTS_SERVICE_ACCOUNT_PRIVATE_KEY: ${{ secrets.GOOGLE_TTS_SERVICE_ACCOUNT_PRIVATE_KEY }}
+          # Only needed once B-roll capture lands; harmless before then.
+          VIDEO_CAPTURE_BASE_URL: ${{ secrets.VIDEO_CAPTURE_BASE_URL }}
+          VIDEO_CAPTURE_ADMIN_COOKIE: ${{ secrets.VIDEO_CAPTURE_ADMIN_COOKIE }}

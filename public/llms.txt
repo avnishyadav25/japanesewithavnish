@@ -1,0 +1,62 @@
+# Japanese with Avnish
+
+> Japanese with Avnish is a structured, JLPT-aligned Japanese learning platform. It teaches Japanese from complete-beginner (N5) through advanced (N1) using a placement quiz, daily lessons, and premium digital bundles (grammar, vocabulary, kanji, reading, writing, and listening practice), delivered instantly via secure download.
+
+## Start here
+
+- [Start Here](https://japanesewithavnish.com/start-here): Orientation guide for new learners — how to pick a JLPT level and begin.
+- [Placement Quiz](https://japanesewithavnish.com/quiz): Free quiz that recommends a starting JLPT level (N5–N1).
+- [Free N5 Starter Pack](https://japanesewithavnish.com/free-n5-pack): No-cost sample of the N5 curriculum.
+- [Pricing / Bundles](https://japanesewithavnish.com/pricing): JLPT N5–N1 digital bundle pricing and what's included.
+
+## JLPT levels
+
+- [JLPT Overview](https://japanesewithavnish.com/jlpt): Explanation of the five JLPT levels (N5–N1) and what each certifies.
+- [JLPT N5](https://japanesewithavnish.com/jlpt?level=n5): Beginner level — fundamentals.
+- [JLPT N4](https://japanesewithavnish.com/jlpt?level=n4): Elementary level — everyday vocabulary and grammar.
+- [JLPT N3](https://japanesewithavnish.com/jlpt?level=n3): Intermediate level — practical reading and listening.
+- [JLPT N2](https://japanesewithavnish.com/jlpt?level=n2): Upper-intermediate — business and academic Japanese.
+- [JLPT N1](https://japanesewithavnish.com/jlpt?level=n1): Advanced — near-native mastery.
+
+## Learn (free structured content)
+
+- [Learn Hub](https://japanesewithavnish.com/learn): Entry point to all free structured learning content.
+- [Curriculum](https://japanesewithavnish.com/learn/curriculum): Full structured lesson path from N5 to N1.
+- [Grammar](https://japanesewithavnish.com/learn/grammar): JLPT grammar points by level, with meanings and examples.
+- [Vocabulary](https://japanesewithavnish.com/learn/vocabulary): JLPT vocabulary lists with readings and example sentences.
+- [Kanji](https://japanesewithavnish.com/learn/kanji): Kanji by JLPT level with readings, meanings, and stroke order.
+- [Reading Practice](https://japanesewithavnish.com/learn/reading): Japanese reading passages with comprehension questions.
+- [Writing Practice](https://japanesewithavnish.com/learn/writing): Guided hiragana, katakana, and kanji stroke-order practice.
+- [Listening Practice](https://japanesewithavnish.com/learn/listening): Audio comprehension scenarios by JLPT level.
+
+## Blog (guides and study plans)
+
+- [Blog](https://japanesewithavnish.com/blog): Study guides, roadmaps, and tips for learning Japanese.
+- [JLPT N5 Roadmap](https://japanesewithavnish.com/blog/reasons-to-learn-japanese-jlpt-n5): Why and how to start with N5.
+- [JLPT N4 Roadmap](https://japanesewithavnish.com/blog/jlpt-n4-roadmap-your-structured-guide-to-success): Structured guide to N4 success.
+- [JLPT N3 Roadmap](https://japanesewithavnish.com/blog/jlpt-n3-roadmap-structured-guide-success): Structured guide to N3 success.
+- [JLPT N3 60-Day Study Plan](https://japanesewithavnish.com/blog/jlpt-n3-60-day-study-plan-day-by-day-guide): Day-by-day N3 study plan.
+- [JLPT N2 Roadmap](https://japanesewithavnish.com/blog/jlpt-n2-roadmap-structured-guide-success): Structured guide to N2 success.
+- [JLPT N2 75-Day Study Plan](https://japanesewithavnish.com/blog/jlpt-n2-75-day-study-plan): Day-by-day N2 study plan.
+- [JLPT N1 Roadmap](https://japanesewithavnish.com/blog/jlpt-n1-roadmap-structured-guide-success): Structured guide to N1 success.
+- [JLPT N1 90-Day Study Plan](https://japanesewithavnish.com/blog/jlpt-n1-90-day-study-plan): Day-by-day N1 study plan.
+- [Best Books for JLPT N5](https://japanesewithavnish.com/blog/best-books-for-jlpt-n5-structured-guide): Recommended N5 study materials.
+- [Best Books for JLPT N4](https://japanesewithavnish.com/blog/best-books-for-jlpt-n4-structured-guide-foundation): Recommended N4 study materials.
+- [How I Study Kanji Every Day](https://japanesewithavnish.com/blog/how-i-study-kanji-every-day): Practical daily kanji study method.
+- [Mistakes Made While Learning Japanese](https://japanesewithavnish.com/blog/mistakes-i-made-while-learning-japanese): Common beginner pitfalls to avoid.
+
+## Guides
+
+- [Platform Guide](https://japanesewithavnish.com/guide): How the platform, curriculum, and bundles fit together.
+
+## Policies
+
+- [Privacy Policy](https://japanesewithavnish.com/policies/privacy)
+- [Terms of Service](https://japanesewithavnish.com/policies/terms)
+- [Refund Policy](https://japanesewithavnish.com/policies/refunds)
+
+## Notes for AI agents
+
+- Paid bundle content (PDFs, audio) is delivered via signed, time-limited download links after purchase and is not publicly crawlable — don't expect to retrieve it directly.
+- The `/learn/*` and `/blog/*` sections above are free, publicly accessible study content and are the best source for citing this site's teaching material.
+- See `/sitemap.xml` for the full, machine-generated list of URLs (blog posts and learn-content pages are added continuously).

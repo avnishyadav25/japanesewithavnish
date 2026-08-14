@@ -1,0 +1,12 @@
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "20"
+  
+[[redirects]]
+    from = "https://cosmic-blini-bc94d7.netlify.app/*"
+    to = "https://japanesewithavnish.com/:splat"
+    status = 301
+    force = true

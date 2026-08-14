@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 140" fill="none" aria-hidden="true">
+  <title>Learning path mascot placeholder</title>
+  <!-- Simple anime-style character: head, body, book, pen -->
+  <ellipse cx="60" cy="52" rx="32" ry="36" fill="#fdd" stroke="#c99" stroke-width="2"/>
+  <circle cx="52" cy="48" r="4" fill="#333"/>
+  <circle cx="68" cy="48" r="4" fill="#333"/>
+  <path d="M 48 58 Q 60 68 72 58" stroke="#c66" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <ellipse cx="60" cy="105" rx="28" ry="32" fill="#7dd" stroke="#5aa" stroke-width="2"/>
+  <rect x="30" y="85" width="28" height="36" rx="4" fill="#e8d4b8" stroke="#c4a574" stroke-width="1.5"/>
+  <line x1="38" y1="95" x2="50" y2="95" stroke="#8b7355" stroke-width="1"/>
+  <line x1="38" y1="102" x2="50" y2="102" stroke="#8b7355" stroke-width="1"/>
+  <path d="M 58 75 L 58 125 L 62 125 L 62 75" fill="#c4a574" stroke="#8b7355" stroke-width="1"/>
+  <circle cx="60" cy="72" r="6" fill="#fdd" stroke="#c99" stroke-width="1"/>
+</svg>

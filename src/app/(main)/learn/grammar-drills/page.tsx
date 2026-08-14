@@ -1,0 +1,59 @@
+import Link from "next/link";
+import { getSession } from "@/lib/auth/session";
+import { GrammarDrillsClient } from "./GrammarDrillsClient";
+import { GrammarDrillsPreview } from "./GrammarDrillsPreview";
+import { clampTitle, clampDescription, canonicalUrl } from "@/lib/seo";
+
+const TITLE = clampTitle("Grammar Drills | Japanese with Avnish");
+const DESCRIPTION = clampDescription(
+  "Practice Japanese grammar with interactive drills — choose the correct particle or conjugation, linked to your lessons and grammar points."
+);
+
+export const metadata = {
+  title: TITLE,
+  description: DESCRIPTION,
+  alternates: { canonical: "/learn/grammar-drills" },
+  openGraph: {
+    title: TITLE,
+    description: DESCRIPTION,
+    url: canonicalUrl("/learn/grammar-drills"),
+    images: ["/og-default.png"],
+  },
+};
+
+export default async function GrammarDrillsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ lessonId?: string; grammarId?: string }>;
+}) {
+  const session = await getSession();
+  const params = await searchParams;
+  return (
+    <div className="min-h-screen bg-[var(--base)]">
+      <div className="max-w-[1200px] mx-auto px-4 py-8">
+        <nav className="text-sm text-secondary mb-4">
+          <Link href="/learn/dashboard" className="hover:text-primary">Dashboard</Link>
+          <span className="mx-2">/</span>
+          <span className="text-charcoal">Grammar drills</span>
+        </nav>
+        <h1 className="font-heading text-3xl font-bold text-charcoal mb-2">Grammar drills</h1>
+        <p className="text-secondary mb-6">
+          Choose the correct particle or conjugation. Drills are linked to lessons or grammar points.
+        </p>
+        {session?.email ? (
+          <GrammarDrillsClient lessonId={params.lessonId} grammarId={params.grammarId} />
+        ) : (
+          <div className="space-y-6">
+            <GrammarDrillsPreview />
+            <p className="text-secondary text-sm">
+              <Link href={`/login?redirect=/learn/grammar-drills`} className="text-primary hover:underline">Sign in</Link> to practice full lessons.
+            </p>
+          </div>
+        )}
+        <div className="mt-8 pt-6 border-t border-[var(--divider)] flex flex-wrap gap-4">
+          <Link href="/learn/dashboard" className="text-primary text-sm font-medium hover:underline">← Dashboard</Link>
+        </div>
+      </div>
+    </div>
+  );
+}

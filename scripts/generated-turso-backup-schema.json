@@ -1,0 +1,278 @@
+[
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"achievement_definitions\" (\n  \"id\" TEXT,\n  \"code\" TEXT,\n  \"name\" TEXT,\n  \"description\" TEXT,\n  \"badge_icon_url\" TEXT,\n  \"points\" INTEGER,\n  \"meta\" TEXT,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"admin_chat_logs\" (\n  \"id\" TEXT,\n  \"session_id\" TEXT,\n  \"admin_email\" TEXT,\n  \"role\" TEXT,\n  \"content\" TEXT,\n  \"created_at\" TEXT,\n  \"flagged\" INTEGER,\n  \"rating\" INTEGER,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"ai_generation_logs\" (\n  \"id\" TEXT,\n  \"created_at\" TEXT,\n  \"log_type\" TEXT,\n  \"content_type\" TEXT,\n  \"entity_type\" TEXT,\n  \"entity_id\" TEXT,\n  \"model_used\" TEXT,\n  \"prompt_sent\" TEXT,\n  \"result_preview\" TEXT,\n  \"result_metadata\" TEXT,\n  \"admin_email\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"ai_prompts\" (\n  \"key\" TEXT,\n  \"content\" TEXT,\n  \"updated_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"badges\" (\n  \"id\" TEXT,\n  \"name\" TEXT,\n  \"slug\" TEXT,\n  \"description\" TEXT,\n  \"emoji\" TEXT,\n  \"color\" TEXT,\n  \"icon_type\" TEXT,\n  \"icon_url\" TEXT,\n  \"category\" TEXT,\n  \"trigger_type\" TEXT,\n  \"condition\" TEXT,\n  \"is_active\" INTEGER,\n  \"created_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"contact_submissions\" (\n  \"id\" TEXT,\n  \"name\" TEXT,\n  \"email\" TEXT,\n  \"message\" TEXT,\n  \"status\" TEXT,\n  \"created_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"content_events\" (\n  \"id\" TEXT,\n  \"content_type\" TEXT,\n  \"content_id\" TEXT,\n  \"event_type\" TEXT,\n  \"duration_seconds\" INTEGER,\n  \"session_id\" TEXT,\n  \"path\" TEXT,\n  \"referrer\" TEXT,\n  \"created_at\" TEXT,\n  \"utm_source\" TEXT,\n  \"utm_medium\" TEXT,\n  \"utm_campaign\" TEXT,\n  \"country\" TEXT,\n  \"region\" TEXT,\n  \"city\" TEXT,\n  \"device_type\" TEXT,\n  \"browser\" TEXT,\n  \"os\" TEXT,\n  \"ip_hash\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"coupon_redemptions\" (\n  \"id\" TEXT,\n  \"coupon_id\" TEXT,\n  \"user_email\" TEXT,\n  \"order_id\" TEXT,\n  \"redeemed_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"coupons\" (\n  \"id\" TEXT,\n  \"code\" TEXT,\n  \"discount_type\" TEXT,\n  \"discount_value\" INTEGER,\n  \"product_ids\" TEXT,\n  \"max_uses\" INTEGER,\n  \"used_count\" INTEGER,\n  \"expires_at\" TEXT,\n  \"created_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"curriculum_lesson_content\" (\n  \"id\" TEXT,\n  \"lesson_id\" TEXT,\n  \"content_slug\" TEXT,\n  \"post_id\" TEXT,\n  \"content_role\" TEXT,\n  \"sort_order\" INTEGER,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"title\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"curriculum_lesson_grammar\" (\n  \"id\" TEXT,\n  \"lesson_id\" TEXT,\n  \"grammar_id\" TEXT,\n  \"sort_order\" INTEGER,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"curriculum_lesson_kana\" (\n  \"id\" TEXT,\n  \"lesson_id\" TEXT,\n  \"kana_id\" TEXT,\n  \"sort_order\" INTEGER,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"curriculum_lesson_kanji\" (\n  \"id\" TEXT,\n  \"lesson_id\" TEXT,\n  \"kanji_id\" TEXT,\n  \"sort_order\" INTEGER,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"curriculum_lesson_prerequisites\" (\n  \"id\" TEXT,\n  \"lesson_id\" TEXT,\n  \"prerequisite_lesson_id\" TEXT,\n  \"created_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"curriculum_lesson_vocabulary\" (\n  \"id\" TEXT,\n  \"lesson_id\" TEXT,\n  \"vocabulary_id\" TEXT,\n  \"sort_order\" INTEGER,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"curriculum_lessons\" (\n  \"id\" TEXT,\n  \"submodule_id\" TEXT,\n  \"code\" TEXT,\n  \"title\" TEXT,\n  \"goal\" TEXT,\n  \"introduction\" TEXT,\n  \"sort_order\" INTEGER,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"estimated_minutes\" INTEGER,\n  \"summary\" TEXT,\n  \"feature_image_url\" TEXT,\n  \"description\" TEXT,\n  \"access_type\" TEXT,\n  \"content_type\" TEXT,\n  \"slug\" TEXT,\n  \"access_policy\" TEXT,\n  \"daily_sequence_position\" INTEGER,\n  \"premium_bypass\" INTEGER,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"curriculum_level_exams\" (\n  \"id\" TEXT,\n  \"level_id\" TEXT,\n  \"exam_type\" TEXT,\n  \"title\" TEXT,\n  \"meta\" TEXT,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"curriculum_levels\" (\n  \"id\" TEXT,\n  \"code\" TEXT,\n  \"name\" TEXT,\n  \"sort_order\" INTEGER,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"summary\" TEXT,\n  \"description\" TEXT,\n  \"feature_image_url\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"curriculum_module_reviews\" (\n  \"id\" TEXT,\n  \"module_id\" TEXT,\n  \"content_slug\" TEXT,\n  \"post_id\" TEXT,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"curriculum_modules\" (\n  \"id\" TEXT,\n  \"level_id\" TEXT,\n  \"code\" TEXT,\n  \"title\" TEXT,\n  \"sort_order\" INTEGER,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"summary\" TEXT,\n  \"description\" TEXT,\n  \"feature_image_url\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"curriculum_practices\" (\n  \"id\" TEXT,\n  \"lesson_id\" TEXT,\n  \"title\" TEXT,\n  \"description\" TEXT,\n  \"practice_type\" TEXT,\n  \"content_data\" TEXT,\n  \"sort_order\" INTEGER,\n  \"estimated_minutes\" INTEGER,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"curriculum_submodules\" (\n  \"id\" TEXT,\n  \"module_id\" TEXT,\n  \"code\" TEXT,\n  \"title\" TEXT,\n  \"sort_order\" INTEGER,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"summary\" TEXT,\n  \"description\" TEXT,\n  \"feature_image_url\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"daily_lesson_access\" (\n  \"id\" TEXT,\n  \"user_email\" TEXT,\n  \"date_key\" TEXT,\n  \"lessons_allowed\" INTEGER,\n  \"lessons_consumed\" INTEGER,\n  \"reset_at\" TEXT,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"daily_routine_baseline\" (\n  \"level_code\" TEXT,\n  \"min_kanji\" INTEGER,\n  \"min_reading\" INTEGER,\n  \"min_grammar\" INTEGER,\n  \"min_vocab\" INTEGER,\n  \"min_review\" INTEGER,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"download_logs\" (\n  \"id\" TEXT,\n  \"user_email\" TEXT,\n  \"asset_id\" TEXT,\n  \"order_id\" TEXT,\n  \"created_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"email_templates\" (\n  \"key\" TEXT,\n  \"subject\" TEXT,\n  \"body_html\" TEXT,\n  \"updated_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"entitlements\" (\n  \"id\" TEXT,\n  \"user_email\" TEXT,\n  \"product_id\" TEXT,\n  \"order_id\" TEXT,\n  \"active\" INTEGER,\n  \"created_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"error_log\" (\n  \"id\" TEXT,\n  \"source\" TEXT,\n  \"message\" TEXT,\n  \"details\" TEXT,\n  \"created_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"exam_attempts\" (\n  \"id\" TEXT,\n  \"user_email\" TEXT,\n  \"exam_type\" TEXT,\n  \"level_id\" TEXT,\n  \"module_id\" TEXT,\n  \"score\" INTEGER,\n  \"section_scores\" TEXT,\n  \"passed\" INTEGER,\n  \"started_at\" TEXT,\n  \"completed_at\" TEXT,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"examples\" (\n  \"id\" TEXT,\n  \"lesson_id\" TEXT,\n  \"vocabulary_id\" TEXT,\n  \"grammar_id\" TEXT,\n  \"sentence_ja\" TEXT,\n  \"sentence_romaji\" TEXT,\n  \"sentence_en\" TEXT,\n  \"notes\" TEXT,\n  \"sort_order\" INTEGER,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"feedback\" (\n  \"id\" TEXT,\n  \"name\" TEXT,\n  \"email\" TEXT,\n  \"message\" TEXT,\n  \"created_at\" TEXT,\n  \"status\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"grammar\" (\n  \"id\" TEXT,\n  \"post_id\" TEXT,\n  \"pattern\" TEXT,\n  \"structure\" TEXT,\n  \"level\" TEXT,\n  \"notes\" TEXT,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"grammar_drill_items\" (\n  \"id\" TEXT,\n  \"lesson_id\" TEXT,\n  \"grammar_id\" TEXT,\n  \"sentence_ja\" TEXT,\n  \"correct_answers\" TEXT,\n  \"distractors\" TEXT,\n  \"hint\" TEXT,\n  \"sort_order\" INTEGER,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"grammar_drill_responses\" (\n  \"id\" TEXT,\n  \"user_email\" TEXT,\n  \"drill_id\" TEXT,\n  \"correct\" INTEGER,\n  \"response_time_ms\" INTEGER,\n  \"created_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"kana\" (\n  \"id\" TEXT,\n  \"character\" TEXT,\n  \"type\" TEXT,\n  \"romaji\" TEXT,\n  \"row_label\" TEXT,\n  \"sort_order\" INTEGER,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"stroke_count\" INTEGER,\n  \"stroke_data\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"kanji\" (\n  \"id\" TEXT,\n  \"post_id\" TEXT,\n  \"character\" TEXT,\n  \"onyomi\" TEXT,\n  \"kunyomi\" TEXT,\n  \"stroke_count\" INTEGER,\n  \"meaning\" TEXT,\n  \"notes\" TEXT,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"stroke_data\" TEXT,\n  \"jlpt_level\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"leaderboard_reward_cycles\" (\n  \"id\" TEXT,\n  \"period_start\" TEXT,\n  \"period_end\" TEXT,\n  \"rank\" INTEGER,\n  \"user_email\" TEXT,\n  \"xp_total\" INTEGER,\n  \"reward_mode\" TEXT,\n  \"reward_status\" TEXT,\n  \"granted_at\" TEXT,\n  \"created_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"learning_content_archive\" (\n  \"id\" TEXT,\n  \"content_type\" TEXT,\n  \"slug\" TEXT,\n  \"title\" TEXT,\n  \"content\" TEXT,\n  \"jlpt_level\" TEXT,\n  \"tags\" TEXT,\n  \"meta\" TEXT,\n  \"status\" TEXT,\n  \"sort_order\" INTEGER,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"learning_content_comments_archive\" (\n  \"id\" TEXT,\n  \"learning_content_id\" TEXT,\n  \"author_name\" TEXT,\n  \"author_email\" TEXT,\n  \"content\" TEXT,\n  \"status\" TEXT,\n  \"created_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"learning_content_migration_map\" (\n  \"old_id\" TEXT,\n  \"old_slug\" TEXT,\n  \"content_type\" TEXT,\n  \"new_post_id\" TEXT,\n  \"new_slug\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"learning_objectives\" (\n  \"id\" TEXT,\n  \"lesson_id\" TEXT,\n  \"objective_text\" TEXT,\n  \"sort_order\" INTEGER,\n  \"created_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"lesson_access_logs\" (\n  \"id\" TEXT,\n  \"user_email\" TEXT,\n  \"lesson_id\" TEXT,\n  \"access_type\" TEXT,\n  \"access_granted\" INTEGER,\n  \"blocked_reason\" TEXT,\n  \"accessed_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"lesson_blocks\" (\n  \"id\" TEXT,\n  \"lesson_id\" TEXT,\n  \"block_type\" TEXT,\n  \"block_data\" TEXT,\n  \"sort_order\" INTEGER,\n  \"status\" TEXT,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"review_status\" TEXT,\n  \"generated_by_model\" TEXT,\n  \"reviewed_by\" TEXT,\n  \"reviewed_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"listening\" (\n  \"id\" TEXT,\n  \"post_id\" TEXT,\n  \"title\" TEXT,\n  \"level\" TEXT,\n  \"audio_url\" TEXT,\n  \"notes\" TEXT,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"listening_attempts\" (\n  \"id\" TEXT,\n  \"user_email\" TEXT,\n  \"scenario_id\" TEXT,\n  \"score\" INTEGER,\n  \"total_questions\" INTEGER,\n  \"response_time_ms\" INTEGER,\n  \"answers\" TEXT,\n  \"created_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"listening_questions\" (\n  \"id\" TEXT,\n  \"scenario_id\" TEXT,\n  \"question_text\" TEXT,\n  \"options\" TEXT,\n  \"correct_index\" INTEGER,\n  \"sort_order\" INTEGER,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"listening_scenarios\" (\n  \"id\" TEXT,\n  \"listening_id\" TEXT,\n  \"title\" TEXT,\n  \"audio_url\" TEXT,\n  \"transcript\" TEXT,\n  \"sort_order\" INTEGER,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"media\" (\n  \"id\" TEXT,\n  \"storage_path\" TEXT,\n  \"filename\" TEXT,\n  \"mime_type\" TEXT,\n  \"size_bytes\" INTEGER,\n  \"created_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"newsletter_send_logs\" (\n  \"id\" TEXT,\n  \"newsletter_id\" TEXT,\n  \"email\" TEXT,\n  \"status\" TEXT,\n  \"error\" TEXT,\n  \"sent_at\" TEXT,\n  \"created_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"newsletters\" (\n  \"id\" TEXT,\n  \"slug\" TEXT,\n  \"title\" TEXT,\n  \"subject\" TEXT,\n  \"body_html\" TEXT,\n  \"status\" TEXT,\n  \"sent_at\" TEXT,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"send_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"offer_banners\" (\n  \"id\" TEXT,\n  \"title\" TEXT,\n  \"message\" TEXT,\n  \"link_url\" TEXT,\n  \"image_url\" TEXT,\n  \"active\" INTEGER,\n  \"start_at\" TEXT,\n  \"end_at\" TEXT,\n  \"priority\" INTEGER,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"order_items\" (\n  \"id\" TEXT,\n  \"order_id\" TEXT,\n  \"product_id\" TEXT,\n  \"quantity\" INTEGER,\n  \"price_paise\" INTEGER,\n  \"created_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"orders\" (\n  \"id\" TEXT,\n  \"user_email\" TEXT,\n  \"user_name\" TEXT,\n  \"user_phone\" TEXT,\n  \"status\" TEXT,\n  \"provider\" TEXT,\n  \"total_amount_paise\" INTEGER,\n  \"coupon_code\" TEXT,\n  \"discount_paise\" INTEGER,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"last_confirmation_email_at\" TEXT,\n  \"payment_reference\" TEXT,\n  \"payment_note\" TEXT,\n  \"plan_id\" TEXT,\n  \"currency\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"pages\" (\n  \"id\" TEXT,\n  \"slug\" TEXT,\n  \"title\" TEXT,\n  \"content\" TEXT,\n  \"jlpt_level\" TEXT,\n  \"seo_title\" TEXT,\n  \"seo_description\" TEXT,\n  \"og_image_url\" TEXT,\n  \"status\" TEXT,\n  \"published_at\" TEXT,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"payments\" (\n  \"id\" TEXT,\n  \"order_id\" TEXT,\n  \"provider_payment_id\" TEXT,\n  \"status\" TEXT,\n  \"raw_event_ref\" TEXT,\n  \"created_at\" TEXT,\n  \"provider_order_id\" TEXT,\n  \"provider_signature\" TEXT,\n  \"captured_at\" TEXT,\n  \"provider_invoice_id\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"platform_guide_sections\" (\n  \"id\" TEXT,\n  \"title\" TEXT,\n  \"short_description\" TEXT,\n  \"body\" TEXT,\n  \"icon\" TEXT,\n  \"link_href\" TEXT,\n  \"link_label\" TEXT,\n  \"sort_order\" INTEGER,\n  \"published\" INTEGER,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"points_transactions\" (\n  \"id\" TEXT,\n  \"user_email\" TEXT,\n  \"type\" TEXT,\n  \"points\" INTEGER,\n  \"reason\" TEXT,\n  \"related_entity_type\" TEXT,\n  \"related_entity_id\" TEXT,\n  \"created_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"post_comments\" (\n  \"id\" TEXT,\n  \"post_id\" TEXT,\n  \"author_name\" TEXT,\n  \"author_email\" TEXT,\n  \"content\" TEXT,\n  \"status\" TEXT,\n  \"created_at\" TEXT,\n  \"is_read\" INTEGER,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"posts\" (\n  \"id\" TEXT,\n  \"slug\" TEXT,\n  \"title\" TEXT,\n  \"summary\" TEXT,\n  \"content\" TEXT,\n  \"jlpt_level\" TEXT,\n  \"tags\" TEXT,\n  \"seo_title\" TEXT,\n  \"seo_description\" TEXT,\n  \"og_image_url\" TEXT,\n  \"canonical_url\" TEXT,\n  \"status\" TEXT,\n  \"published_at\" TEXT,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"image_prompt\" TEXT,\n  \"topic\" TEXT,\n  \"content_type\" TEXT,\n  \"sort_order\" INTEGER,\n  \"meta\" TEXT,\n  \"author_name\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"product_assets\" (\n  \"id\" TEXT,\n  \"product_id\" TEXT,\n  \"storage_path\" TEXT,\n  \"type\" TEXT,\n  \"display_name\" TEXT,\n  \"sort_order\" INTEGER,\n  \"created_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"products\" (\n  \"id\" TEXT,\n  \"slug\" TEXT,\n  \"name\" TEXT,\n  \"description\" TEXT,\n  \"price_paise\" INTEGER,\n  \"compare_price_paise\" INTEGER,\n  \"jlpt_level\" TEXT,\n  \"badge\" TEXT,\n  \"who_its_for\" TEXT,\n  \"whats_included\" TEXT,\n  \"outcome\" TEXT,\n  \"faq\" TEXT,\n  \"no_refunds_note\" TEXT,\n  \"sort_order\" INTEGER,\n  \"is_mega\" INTEGER,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"preview_url\" TEXT,\n  \"image_url\" TEXT,\n  \"gallery_images\" TEXT,\n  \"image_prompt\" TEXT,\n  \"is_active\" INTEGER,\n  \"is_featured\" INTEGER,\n  \"is_digital_download\" INTEGER,\n  \"content_path\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"profiles\" (\n  \"email\" TEXT,\n  \"recommended_level\" TEXT,\n  \"display_name\" TEXT,\n  \"streak_reminder_email_opt_out\" INTEGER,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"last_activity_date\" TEXT,\n  \"current_streak\" INTEGER,\n  \"longest_streak\" INTEGER,\n  \"last_streak_reminder_sent_at\" TEXT,\n  \"show_on_scoreboard\" INTEGER,\n  \"first_name\" TEXT,\n  \"last_name\" TEXT,\n  \"is_active\" INTEGER,\n  \"last_login_at\" TEXT,\n  \"avatar_url\" TEXT,\n  \"address\" TEXT,\n  \"phone\" TEXT,\n  \"linkedin_url\" TEXT,\n  \"instagram_url\" TEXT,\n  \"facebook_url\" TEXT,\n  \"twitter_url\" TEXT,\n  \"website\" TEXT,\n  \"current_level\" TEXT,\n  \"target_level\" TEXT,\n  \"target_date\" TEXT,\n  \"user_auth_id\" TEXT,\n  \"role\" TEXT,\n  \"status\" TEXT,\n  \"timezone\" TEXT,\n  \"language_preference\" TEXT,\n  \"onboarding_completed\" INTEGER,\n  \"placement_quiz_completed\" INTEGER,\n  \"quiz_recommended_level\" TEXT,\n  \"xp\" INTEGER,\n  \"points\" INTEGER,\n  \"premium_until\" TEXT,\n  \"is_lifetime\" INTEGER,\n  \"current_plan\" TEXT,\n  \"subscription_status\" TEXT,\n  \"streak_freezes\" INTEGER,\n  \"stripe_customer_id\" TEXT,\n  \"last_nudge_sent_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"quiz_attempts\" (\n  \"id\" TEXT,\n  \"email\" TEXT,\n  \"score\" INTEGER,\n  \"total_questions\" INTEGER,\n  \"recommended_level\" TEXT,\n  \"recommended_product_id\" TEXT,\n  \"created_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"quiz_questions\" (\n  \"id\" TEXT,\n  \"question_text\" TEXT,\n  \"options\" TEXT,\n  \"correct_index\" INTEGER,\n  \"jlpt_level\" TEXT,\n  \"sort_order\" INTEGER,\n  \"created_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"quiz_thresholds\" (\n  \"id\" TEXT,\n  \"level\" TEXT,\n  \"min_score\" INTEGER,\n  \"recommended_product_id\" TEXT,\n  \"created_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"reading\" (\n  \"id\" TEXT,\n  \"post_id\" TEXT,\n  \"title\" TEXT,\n  \"level\" TEXT,\n  \"notes\" TEXT,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"reading_glossary\" (\n  \"id\" TEXT,\n  \"post_id\" TEXT,\n  \"segment_text\" TEXT,\n  \"segment_start\" INTEGER,\n  \"segment_end\" INTEGER,\n  \"definition_text\" TEXT,\n  \"vocabulary_id\" TEXT,\n  \"grammar_id\" TEXT,\n  \"sort_order\" INTEGER,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"review_schedule\" (\n  \"id\" TEXT,\n  \"user_email\" TEXT,\n  \"item_type\" TEXT,\n  \"item_id\" TEXT,\n  \"next_review_at\" TEXT,\n  \"interval_days\" INTEGER,\n  \"ease_factor\" REAL,\n  \"repetitions\" INTEGER,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"reward_events\" (\n  \"id\" TEXT,\n  \"user_email\" TEXT,\n  \"reward_type\" TEXT,\n  \"points\" INTEGER,\n  \"created_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"site_settings\" (\n  \"id\" TEXT,\n  \"key\" TEXT,\n  \"value\" TEXT,\n  \"updated_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"social_content_packs\" (\n  \"id\" TEXT,\n  \"entity_type\" TEXT,\n  \"entity_id\" TEXT,\n  \"slug\" TEXT,\n  \"title\" TEXT,\n  \"payload\" TEXT,\n  \"image_urls\" TEXT,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"description\" TEXT,\n  \"summary\" TEXT,\n  \"link\" TEXT,\n  \"reference_image_url\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"sounds\" (\n  \"id\" TEXT,\n  \"post_id\" TEXT,\n  \"title\" TEXT,\n  \"level\" TEXT,\n  \"notes\" TEXT,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"subscribers\" (\n  \"id\" TEXT,\n  \"email\" TEXT,\n  \"source\" TEXT,\n  \"created_at\" TEXT,\n  \"name\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"subscription_payments\" (\n  \"id\" TEXT,\n  \"user_email\" TEXT,\n  \"subscription_id\" TEXT,\n  \"plan_id\" TEXT,\n  \"provider\" TEXT,\n  \"provider_payment_id\" TEXT,\n  \"provider_order_id\" TEXT,\n  \"provider_invoice_id\" TEXT,\n  \"amount\" INTEGER,\n  \"currency\" TEXT,\n  \"status\" TEXT,\n  \"coupon_code\" TEXT,\n  \"discount_amount\" INTEGER,\n  \"paid_at\" TEXT,\n  \"failed_reason\" TEXT,\n  \"raw_webhook_event_id\" TEXT,\n  \"created_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"subscription_plans\" (\n  \"id\" TEXT,\n  \"name\" TEXT,\n  \"slug\" TEXT,\n  \"billing_type\" TEXT,\n  \"price_inr\" INTEGER,\n  \"price_usd\" INTEGER,\n  \"currency_mode\" TEXT,\n  \"trial_days\" INTEGER,\n  \"is_active\" INTEGER,\n  \"is_popular\" INTEGER,\n  \"sort_order\" INTEGER,\n  \"features\" TEXT,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"stripe_product_id\" TEXT,\n  \"stripe_price_id\" TEXT,\n  \"razorpay_plan_id_inr\" TEXT,\n  \"razorpay_plan_id_usd\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"trial_code_redemptions\" (\n  \"id\" TEXT,\n  \"trial_code_id\" TEXT,\n  \"user_email\" TEXT,\n  \"redeemed_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"trial_codes\" (\n  \"id\" TEXT,\n  \"code\" TEXT,\n  \"trial_days\" INTEGER,\n  \"max_uses\" INTEGER,\n  \"uses_count\" INTEGER,\n  \"expires_at\" TEXT,\n  \"active\" INTEGER,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"tutor_logs\" (\n  \"id\" TEXT,\n  \"user_email\" TEXT,\n  \"question\" TEXT,\n  \"normalized_question\" TEXT,\n  \"answer\" TEXT,\n  \"ask_count\" INTEGER,\n  \"last_asked_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"user_achievements\" (\n  \"id\" TEXT,\n  \"user_email\" TEXT,\n  \"achievement_id\" TEXT,\n  \"earned_at\" TEXT,\n  \"created_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"user_auth\" (\n  \"email\" TEXT,\n  \"password_hash\" TEXT,\n  \"salt\" TEXT,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"email_verified_at\" TEXT,\n  \"verification_sent_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"user_badges\" (\n  \"id\" TEXT,\n  \"user_email\" TEXT,\n  \"badge_id\" TEXT,\n  \"awarded_at\" TEXT,\n  \"awarded_by_admin_email\" TEXT,\n  \"reason\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"user_learning_progress\" (\n  \"id\" TEXT,\n  \"user_email\" TEXT,\n  \"content_slug\" TEXT,\n  \"status\" TEXT,\n  \"last_reviewed_at\" TEXT,\n  \"next_review_at\" TEXT,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"user_lesson_progress\" (\n  \"id\" TEXT,\n  \"user_email\" TEXT,\n  \"lesson_id\" TEXT,\n  \"status\" TEXT,\n  \"completed_at\" TEXT,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"user_level_progress\" (\n  \"id\" TEXT,\n  \"user_email\" TEXT,\n  \"level_id\" TEXT,\n  \"mock_passed\" INTEGER,\n  \"mock_passed_at\" TEXT,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"user_mistakes\" (\n  \"id\" TEXT,\n  \"user_email\" TEXT,\n  \"original_text\" TEXT,\n  \"corrected_text\" TEXT,\n  \"explanation\" TEXT,\n  \"source\" TEXT,\n  \"created_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"user_module_progress\" (\n  \"id\" TEXT,\n  \"user_email\" TEXT,\n  \"module_id\" TEXT,\n  \"review_passed\" INTEGER,\n  \"review_passed_at\" TEXT,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"user_response_log\" (\n  \"id\" TEXT,\n  \"user_email\" TEXT,\n  \"item_type\" TEXT,\n  \"item_id\" TEXT,\n  \"correct\" INTEGER,\n  \"response_time_ms\" INTEGER,\n  \"module_id\" TEXT,\n  \"submodule_id\" TEXT,\n  \"created_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"user_subscriptions\" (\n  \"id\" TEXT,\n  \"user_email\" TEXT,\n  \"plan_id\" TEXT,\n  \"status\" TEXT,\n  \"provider\" TEXT,\n  \"provider_customer_id\" TEXT,\n  \"provider_subscription_id\" TEXT,\n  \"started_at\" TEXT,\n  \"trial_ends_at\" TEXT,\n  \"current_period_start\" TEXT,\n  \"current_period_end\" TEXT,\n  \"grace_ends_at\" TEXT,\n  \"cancel_at_period_end\" INTEGER,\n  \"cancelled_at\" TEXT,\n  \"manual_reason\" TEXT,\n  \"granted_by_admin_email\" TEXT,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"users\" (\n  \"id\" TEXT,\n  \"email\" TEXT,\n  \"name\" TEXT,\n  \"phone\" TEXT,\n  \"is_admin\" INTEGER,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"vocabulary\" (\n  \"id\" TEXT,\n  \"post_id\" TEXT,\n  \"word\" TEXT,\n  \"reading\" TEXT,\n  \"meaning\" TEXT,\n  \"notes\" TEXT,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"jlpt_level\" TEXT,\n  \"part_of_speech\" TEXT,\n  \"romaji\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"writing\" (\n  \"id\" TEXT,\n  \"post_id\" TEXT,\n  \"title\" TEXT,\n  \"level\" TEXT,\n  \"notes\" TEXT,\n  \"created_at\" TEXT,\n  \"updated_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  },
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS \"xp_transactions\" (\n  \"id\" TEXT,\n  \"user_email\" TEXT,\n  \"event_type\" TEXT,\n  \"xp_amount\" INTEGER,\n  \"related_entity_type\" TEXT,\n  \"related_entity_id\" TEXT,\n  \"created_at\" TEXT,\n  \"_synced_at\" TEXT\n)"
+  }
+]

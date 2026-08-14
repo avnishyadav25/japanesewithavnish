@@ -1,0 +1,482 @@
+"use client";
+
+import React, { useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkBreaks from "remark-breaks";
+import remarkGfm from "remark-gfm";
+import { slugify } from "@/lib/slugify";
+import { TTSPlayButton, SoundsTableCellWithTTS } from "@/components/learn/LessonMetaContent";
+import { WritingPracticeModal } from "./WritingPracticeModal";
+import type { CharacterType } from "./WritingCanvas";
+
+type SectionAudio = Record<string, string>;
+type Meta = Record<string, unknown> | null | undefined;
+
+function metaStr(meta: Meta, key: string): string {
+  const v = meta?.[key];
+  return v != null ? String(v) : "";
+}
+
+function hasAudio(meta: Meta): boolean {
+  if (meta?.audio_url != null && String(meta.audio_url)) return true;
+  const urls = meta?.audio_urls;
+  return Array.isArray(urls) && urls.some((u) => u != null && String(u));
+}
+
+export function LearnMarkdown({
+  content,
+  meta,
+  contentType,
+}: {
+  content: string;
+  meta?: Meta;
+  contentType?: string;
+}) {
+  const sectionAudio = (meta?.section_audio as SectionAudio | undefined) ?? {};
+  const m = meta ?? {};
+  const audio = hasAudio(meta);
+
+  // Writing Modal State
+  const [writingChar, setWritingChar] = useState("");
+  const [writingType, setWritingType] = useState<"kanji" | "hiragana" | "katakana">("kanji");
+  const [writingStrokes, setWritingStrokes] = useState<number | null>(null);
+  const [writingReading, setWritingReading] = useState<string | null>(null);
+  const [writingMeaning, setWritingMeaning] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const handleOpenWritingModal = (
+    char: string,
+    type: "kanji" | "hiragana" | "katakana",
+    strokes: number | null | undefined,
+    reading: string | null | undefined,
+    meaning: string | null | undefined
+  ) => {
+    setWritingChar(char);
+    setWritingType(type);
+    setWritingStrokes(strokes ?? null);
+    setWritingReading(reading ?? null);
+    setWritingMeaning(meaning ?? null);
+    setIsModalOpen(true);
+  };
+
+  function SectionWithAudio({
+    level,
+    children,
+    className,
+    ...props
+  }: { level: 2 | 3; children?: React.ReactNode } & React.HTMLAttributes<HTMLHeadingElement>) {
+    const text = typeof children === "string" ? children : flattenText(children);
+    const id = text ? (slugify(text) || `h-${level}`) : undefined;
+    const url = text ? sectionAudio[text] ?? sectionAudio[text.trim()] : "";
+    const Tag = level === 2 ? "h2" : "h3";
+    const headingClass =
+      level === 2
+        ? "scroll-mt-24 mt-9 mb-4 font-heading text-xl font-black text-charcoal first:mt-0"
+        : "scroll-mt-24 mt-7 mb-3 font-heading text-lg font-bold text-charcoal";
+    return (
+      <>
+        <Tag id={id} className={[headingClass, className].filter(Boolean).join(" ")} {...props}>
+          {children}
+        </Tag>
+        {url && (
+          <div className="mt-1 mb-3 flex items-center gap-2">
+            <audio controls className="h-8 max-w-[240px]" src={url} preload="metadata">
+              Your browser does not support the audio element.
+            </audio>
+            <span className="text-xs text-secondary">Listen</span>
+          </div>
+        )}
+      </>
+    );
+  }
+
+  return (
+    <>
+      {/* Vocabulary: japanese, reading, type, meaning — before markdown */}
+      {contentType === "vocabulary" && (metaStr(meta, "japanese") || metaStr(meta, "meaning")) && (
+        <div className="mb-6 p-4 rounded-bento bg-[var(--divider)]/20 text-center overflow-hidden bg-white">
+          <div className="flex flex-wrap items-center justify-center gap-3 mb-2">
+            {metaStr(meta, "japanese") && (
+              <div className="flex items-center gap-2">
+                <span className="text-3xl font-bold text-charcoal">{metaStr(meta, "japanese")}</span>
+                {!audio && <TTSPlayButton text={metaStr(meta, "japanese")} />}
+                <button
+                  type="button"
+                  onClick={() => handleOpenWritingModal(metaStr(meta, "japanese"), "kanji", null, metaStr(meta, "reading"), metaStr(meta, "meaning"))}
+                  className="text-xs py-1 px-2.5 border border-primary/40 text-primary font-bold rounded hover:bg-primary/5 transition"
+                >
+                  Practice Drawing
+                </button>
+              </div>
+            )}
+            {metaStr(meta, "reading") && (
+              <span className="text-secondary text-lg">({metaStr(meta, "reading")})</span>
+            )}
+            {metaStr(meta, "romaji") && (
+              <span className="text-primary text-sm font-bold">romaji: {metaStr(meta, "romaji")}</span>
+            )}
+            {metaStr(meta, "type") && (
+              <span className="text-xs text-secondary border border-[var(--divider)] px-2 py-0.5 rounded">
+                {metaStr(meta, "type")}
+              </span>
+            )}
+            {metaStr(meta, "transitivity") && (
+              <span className="text-xs text-secondary border border-[var(--divider)] px-2 py-0.5 rounded">
+                {metaStr(meta, "transitivity")}
+              </span>
+            )}
+          </div>
+          {metaStr(meta, "meaning") && <p className="text-charcoal mb-2 font-medium">{metaStr(meta, "meaning")}</p>}
+        </div>
+      )}
+
+      {/* Grammar: grammar_form, reading, meaning, structure — before markdown */}
+      {contentType === "grammar" && (metaStr(meta, "grammar_form") || metaStr(meta, "meaning")) && (
+        <div className="mb-6 p-4 rounded-bento bg-[var(--divider)]/20 text-center overflow-hidden bg-white">
+          <div className="flex flex-wrap items-baseline justify-center gap-2 mb-2">
+            {metaStr(meta, "grammar_form") && (
+              <>
+                <span className="text-2xl font-medium text-charcoal">{metaStr(meta, "grammar_form")}</span>
+                {!audio && <TTSPlayButton text={metaStr(meta, "grammar_form")} />}
+              </>
+            )}
+            {metaStr(meta, "reading") && (
+              <span className="text-secondary text-lg">({metaStr(meta, "reading")})</span>
+            )}
+          </div>
+          {metaStr(meta, "meaning") && <p className="text-charcoal mb-2">{metaStr(meta, "meaning")}</p>}
+          {metaStr(meta, "structure") && (
+            <p className="text-[1rem] text-secondary font-mono mb-3">{metaStr(meta, "structure")}</p>
+          )}
+        </div>
+      )}
+
+      {/* Kanji: character, meaning, stroke_count, onyomi, kunyomi — before markdown */}
+      {contentType === "kanji" && (metaStr(meta, "character") || metaStr(meta, "meaning")) && (
+        <div className="mb-6 p-6 rounded-bento bg-[var(--divider)]/20 text-center overflow-hidden bg-white border border-[var(--divider)] shadow-sm">
+          <div className="flex flex-wrap items-center justify-center gap-4 mb-3">
+            {metaStr(meta, "character") && (
+              <div className="flex items-center gap-2">
+                <span className="text-5xl font-bold text-charcoal">{metaStr(meta, "character")}</span>
+                {!audio && <TTSPlayButton text={metaStr(meta, "character")} />}
+                <button
+                  type="button"
+                  onClick={() => handleOpenWritingModal(metaStr(meta, "character"), "kanji", meta?.stroke_count ? Number(meta.stroke_count) : null, null, metaStr(meta, "meaning"))}
+                  className="text-xs py-1 px-2.5 border border-primary/40 text-primary font-bold rounded hover:bg-primary/5 transition"
+                >
+                  Practice Drawing
+                </button>
+              </div>
+            )}
+            {metaStr(meta, "meaning") && <span className="text-charcoal text-lg font-bold">({metaStr(meta, "meaning")})</span>}
+            {meta?.stroke_count != null && (
+              <span className="text-xs font-semibold px-2 py-0.5 rounded bg-base border border-[var(--divider)]">{Number(meta.stroke_count)} strokes</span>
+            )}
+          </div>
+          <div className="flex flex-wrap justify-center gap-6 text-sm text-secondary">
+            {Array.isArray(m.onyomi) && (m.onyomi as string[]).length > 0 && (
+              <span>
+                <strong className="text-charcoal font-semibold">On-yomi: </strong>
+                {(m.onyomi as string[]).join(", ")}
+              </span>
+            )}
+            {Array.isArray(m.kunyomi) && (m.kunyomi as string[]).length > 0 && (
+              <span>
+                <strong className="text-charcoal font-semibold">Kun-yomi: </strong>
+                {(m.kunyomi as string[]).join(", ")}
+              </span>
+            )}
+          </div>
+          {metaStr(meta, "meaning_extended") && (
+            <details className="mt-3 text-xs text-secondary text-left max-w-md mx-auto">
+              <summary className="cursor-pointer hover:text-primary text-center">Advanced dictionary information</summary>
+              <p className="mt-1.5 leading-relaxed">{metaStr(meta, "meaning_extended")}</p>
+            </details>
+          )}
+        </div>
+      )}
+
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm, remarkBreaks]}
+        components={{
+          p: ({ children, ...props }) => (
+            <p className="my-4 leading-8 text-[0.95rem]" {...props}>
+              {children}
+              <JapaneseControls node={children} />
+            </p>
+          ),
+          img: ({ alt, src, ...props }) => (
+            <span className="block my-7 text-center">
+              <img
+                {...props}
+                alt={alt || ""}
+                src={src || ""}
+                className="max-w-md w-full mx-auto rounded-[10px] object-cover object-center border border-[var(--divider)] bg-[var(--divider)]/10"
+              />
+            </span>
+          ),
+          // The page template already renders the item title as the page's single H1;
+          // demote any H1 inside DB markdown content to H2 to avoid a duplicate H1.
+          h1: ({ children, ...props }) => (
+            <SectionWithAudio level={2} {...props}>
+              {children}
+            </SectionWithAudio>
+          ),
+          h2: ({ children, ...props }) => (
+            <SectionWithAudio level={2} {...props}>
+              {children}
+            </SectionWithAudio>
+          ),
+          h3: ({ children, ...props }) => (
+            <SectionWithAudio level={3} {...props}>
+              {children}
+            </SectionWithAudio>
+          ),
+          h4: ({ children, ...props }) => (
+            <h4 className="mt-7 mb-3 font-heading text-base font-bold text-charcoal" {...props}>
+              {children}
+            </h4>
+          ),
+          hr: ({ ...props }) => (
+            <hr className="my-8 border-[var(--divider)]" {...props} />
+          ),
+          table: ({ children, ...props }) => (
+            <div className="my-8 overflow-x-auto rounded-xl border border-[var(--divider)]">
+              <table className="w-full border-collapse border border-[var(--divider)]" {...props}>
+                {children}
+              </table>
+            </div>
+          ),
+          thead: ({ children, ...props }) => (
+            <thead className="bg-[var(--divider)]/20" {...props}>
+              {children}
+            </thead>
+          ),
+          tbody: ({ children, ...props }) => (
+            <tbody {...props}>{children}</tbody>
+          ),
+          tr: ({ children, ...props }) => (
+            <tr className="border-b border-[var(--divider)] last:border-b-0" {...props}>
+              {children}
+            </tr>
+          ),
+          th: ({ children, ...props }) => (
+            <th className="border border-[var(--divider)] px-3 py-2 text-left font-bold text-charcoal" {...props}>
+              {children}
+            </th>
+          ),
+          td: ({ children, ...props }) =>
+            contentType === "sounds" ? (
+              <SoundsTableCellWithTTS className="border border-[var(--divider)] px-3 py-2 align-top" {...props}>
+                {children}
+              </SoundsTableCellWithTTS>
+            ) : (
+              <td className="border border-[var(--divider)] px-3 py-2 align-top" {...props}>
+                {children}
+                <JapaneseControls node={children} />
+              </td>
+            ),
+          ul: ({ children, ...props }) =>
+            contentType === "sounds" ? (
+              <ol className="list-decimal list-inside mb-6 space-y-3 [&_p]:inline [&_p]:my-0">
+                {children}
+              </ol>
+            ) : (
+              <ul className="list-disc list-outside pl-6 my-5 space-y-3" {...props}>
+                {children}
+              </ul>
+            ),
+          ol: ({ children, ...props }) => (
+            <ol className="list-decimal list-outside pl-6 my-5 space-y-3" {...props}>
+              {children}
+            </ol>
+          ),
+          li: ({ children, ...props }) => {
+            if (contentType !== "sounds") {
+              return (
+                <li {...props}>
+                  {children}
+                  <JapaneseControls node={children} />
+                </li>
+              );
+            }
+            const nodes = Array.isArray(children) ? children : [children];
+            const first = nodes[0];
+            const rest = nodes.slice(1);
+            const japanese = first != null ? extractJapaneseFromNode(first) : null;
+            return (
+              <li className="leading-[1.7] text-[1rem]" {...props}>
+                {first != null && (
+                  <span className="inline-flex items-center gap-2 flex-wrap">
+                    <>{first}</>
+                    {japanese && <TTSPlayButton text={japanese} />}
+                  </span>
+                )}
+                {rest.length > 0 && rest}
+              </li>
+            );
+          },
+          blockquote: ({ children, ...props }) => {
+            const rawText = flattenText(children).trim();
+            
+            let type: "info" | "example" | "warning" | "practice" | "summary" | null = null;
+            let title = "";
+
+            if (rawText.startsWith("[!NOTE]") || rawText.startsWith("[!INFO]")) {
+              type = "info";
+              title = "Info Box";
+            } else if (rawText.startsWith("[!TIP]") || rawText.startsWith("[!EXAMPLE]")) {
+              type = "example";
+              title = "Example Box";
+            } else if (rawText.startsWith("[!WARNING]") || rawText.startsWith("[!MISTAKE]") || rawText.startsWith("[!CAUTION]")) {
+              type = "warning";
+              title = "Common Mistake";
+            } else if (rawText.startsWith("[!PRACTICE]") || rawText.startsWith("[!DRILL]")) {
+              type = "practice";
+              title = "Practice Box";
+            } else if (rawText.startsWith("[!SUMMARY]")) {
+              type = "summary";
+              title = "Summary Box";
+            }
+
+            if (type) {
+              const configs = {
+                info: {
+                  bg: "bg-blue-50/70 border-blue-500 text-blue-900",
+                  titleColor: "text-blue-800",
+                  emoji: "ℹ️"
+                },
+                example: {
+                  bg: "bg-green-50/70 border-green-600 text-green-900",
+                  titleColor: "text-green-800",
+                  emoji: "💡"
+                },
+                warning: {
+                  bg: "bg-[#FFF7F7] border-[#D0021B] text-[#80010E]",
+                  titleColor: "text-[#D0021B]",
+                  emoji: "⚠️"
+                },
+                practice: {
+                  bg: "bg-purple-50/70 border-purple-600 text-purple-900",
+                  titleColor: "text-purple-800",
+                  emoji: "📝"
+                },
+                summary: {
+                  bg: "bg-gray-50/70 border-gray-600 text-gray-900",
+                  titleColor: "text-gray-800",
+                  emoji: "📋"
+                }
+              }[type];
+
+              // Strip the alert tag from the children nodes
+              const stripAlertTag = (node: React.ReactNode): React.ReactNode => {
+                if (typeof node === "string") {
+                  return node.replace(/^\[!(NOTE|INFO|TIP|EXAMPLE|WARNING|MISTAKE|CAUTION|PRACTICE|DRILL|SUMMARY)\]\s*/i, "");
+                }
+                if (Array.isArray(node)) {
+                  return node.map((child, idx) => (idx === 0 ? stripAlertTag(child) : child));
+                }
+                if (node && typeof node === "object" && "props" in node) {
+                  const el = node as React.ReactElement;
+                  if (el.props?.children) {
+                    return React.cloneElement(el, {}, stripAlertTag(el.props.children));
+                  }
+                }
+                return node;
+              };
+
+              return (
+                <div className={`my-7 p-5 rounded-r-xl border-l-4 border-y border-r border-black/5 ${configs.bg}`}>
+                  <div className={`flex items-center gap-1.5 font-bold text-xs uppercase tracking-wider mb-2 ${configs.titleColor}`}>
+                    <span>{configs.emoji}</span>
+                    <span>{title}</span>
+                  </div>
+                  <div className="prose-sm leading-relaxed [&_p]:my-2">
+                    {stripAlertTag(children)}
+                  </div>
+                </div>
+              );
+            }
+
+            return (
+              <blockquote className="border-l-4 border-primary pl-5 italic my-7 text-secondary" {...props}>
+                {children}
+              </blockquote>
+            );
+          },
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+
+      <WritingPracticeModal
+        character={writingChar}
+        characterType={writingType}
+        expectedStrokeCount={writingStrokes}
+        reading={writingReading}
+        meaning={writingMeaning}
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+      />
+    </>
+  );
+}
+
+function flattenText(node: React.ReactNode): string {
+  if (typeof node === "string") return node;
+  if (Array.isArray(node)) return node.map(flattenText).join("");
+  if (node && typeof node === "object" && "props" in node) return flattenText((node as { props: { children?: React.ReactNode } }).props?.children);
+  return "";
+}
+
+const JAPANESE_CHAR = /[\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf\u3000-\u303f\uff00-\uffef]/;
+function extractJapaneseFromNode(node: React.ReactNode): string | null {
+  const s = flattenText(node).replace(/\*\*/g, "").trim();
+  // JAPANESE_CHAR.source already includes its own [...] brackets \u2014 do not re-wrap in another [...].
+  const match = s.match(new RegExp(JAPANESE_CHAR.source + "+"));
+  return match ? match[0] : null;
+}
+
+/** All Japanese-script characters in a node, concatenated (drops interspersed romaji/punctuation). */
+function extractAllJapanese(node: React.ReactNode): string {
+  const s = flattenText(node).replace(/\*\*/g, "");
+  const matches = s.match(new RegExp(JAPANESE_CHAR.source + "+", "g"));
+  return matches ? matches.join("") : "";
+}
+
+const KANJI_CHAR = /[\u4e00-\u9faf]/;
+
+/** Appended after paragraphs/table cells/list items that contain Japanese text: a play button
+ * plus one practice chip per distinct kanji found, reusing the same WritingPracticeModal used
+ * in the Lesson Materials sidebar and structured blocks. */
+function JapaneseControls({ node }: { node: React.ReactNode }) {
+  const [openChar, setOpenChar] = useState<{ char: string; type: CharacterType } | null>(null);
+  const japanese = extractAllJapanese(node);
+  if (!japanese) return null;
+  const kanjiChars = Array.from(new Set(japanese.match(new RegExp(KANJI_CHAR.source, "g")) ?? [])).slice(0, 6);
+
+  return (
+    <span className="inline-flex items-center gap-1 ml-1.5 align-middle flex-wrap">
+      <TTSPlayButton text={japanese} />
+      {kanjiChars.map((c) => (
+        <button
+          key={c}
+          type="button"
+          onClick={() => setOpenChar({ char: c, type: "kanji" })}
+          title={`Practice ${c}`}
+          className="text-[11px] leading-none px-1.5 py-1 rounded border border-primary/30 text-primary font-semibold hover:bg-primary/5 transition"
+        >
+          {c}
+        </button>
+      ))}
+      {openChar && (
+        <WritingPracticeModal
+          character={openChar.char}
+          characterType={openChar.type}
+          isOpen={!!openChar}
+          onClose={() => setOpenChar(null)}
+        />
+      )}
+    </span>
+  );
+}

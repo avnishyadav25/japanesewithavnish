@@ -1,0 +1,112 @@
+import Link from "next/link";
+import Image from "next/image";
+import { isLearnContent } from "@/lib/blog-filters";
+
+type Post = {
+  id: string;
+  slug: string;
+  title: string;
+  summary?: string | null;
+  seo_description?: string | null;
+  jlpt_level?: string[] | unknown;
+  tags?: string[] | null;
+  published_at?: string | null;
+  og_image_url?: string | null;
+  content_type?: string | null;
+  author_name?: string | null;
+};
+
+interface BlogPostCardProps {
+  post: Post;
+  size?: "featured" | "medium" | "small";
+}
+
+const levels = (l: unknown): string[] =>
+  Array.isArray(l) ? l.map((x) => String(x)) : l ? [String(l)] : [];
+
+export function BlogPostCard({ post, size = "small" }: BlogPostCardProps) {
+  const jlptTags = levels(post.jlpt_level);
+  const topicTags = (post.tags || []).slice(0, 2);
+  const primaryLevel = jlptTags[0];
+  const displayTags = primaryLevel ? [primaryLevel, ...topicTags.filter((t) => t !== primaryLevel)] : topicTags;
+  const href = isLearnContent(post.content_type)
+    ? `/blog/${post.content_type}/${post.slug}`
+    : `/blog/${post.slug}`;
+
+  const isFeatured = size === "featured";
+  const isMedium = size === "medium";
+
+  const imageUrl = post.og_image_url || null;
+  const placeholderText = post.content_type
+    ? post.content_type.charAt(0).toUpperCase() + post.content_type.slice(1)
+    : jlptTags[0]
+    ? `${jlptTags[0]} Notes`
+    : "JLPT Study Notes";
+
+  return (
+    <Link
+      href={href}
+      className={`card block h-full hover:no-underline group overflow-hidden rounded-2xl hover:border-primary transition-all duration-300 ${
+        isFeatured ? "bento-span-4 bento-row-2" : isMedium ? "bento-span-2 bento-row-2" : ""
+      }`}
+    >
+      <div
+        className={`relative overflow-hidden rounded-t-[10px] -mx-6 -mt-6 ${
+          isFeatured || isMedium ? "aspect-video mb-4" : "aspect-video mb-3"
+        }`}
+      >
+        {imageUrl ? (
+          <Image
+            src={imageUrl}
+            alt=""
+            fill
+            sizes={
+              isFeatured
+                ? "(max-width: 768px) 100vw, 66vw"
+                : isMedium
+                ? "(max-width: 768px) 100vw, 33vw"
+                : "(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            }
+            className="object-cover object-top group-hover:scale-[1.02] transition-transform duration-300"
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-[#D0021B] to-[#ff6b6b] flex flex-col items-center justify-center p-4 text-center group-hover:opacity-95 transition-opacity min-h-[140px]">
+            <span className="text-white/45 text-[9px] font-black uppercase tracking-widest">Japanese with Avnish</span>
+            <span className="text-white font-heading text-sm font-bold mt-1 tracking-tight drop-shadow-sm">{placeholderText}</span>
+          </div>
+        )}
+      </div>
+      <h2
+        className={`font-heading font-bold text-charcoal mb-2 group-hover:text-primary transition-colors ${
+          isFeatured ? "text-xl sm:text-2xl" : isMedium ? "text-lg" : "text-base"
+        }`}
+      >
+        <span className={isFeatured || isMedium ? "" : "line-clamp-2"}>
+          {post.title}
+        </span>
+      </h2>
+      {(post.seo_description || post.summary) && (
+        <p className="text-secondary text-sm mb-2 line-clamp-2">
+          {post.seo_description || post.summary}
+        </p>
+      )}
+      <div className="flex flex-wrap gap-2 mb-2">
+        {displayTags.slice(0, 3).map((tag) => (
+          <span
+            key={tag}
+            className="px-2 py-0.5 rounded text-xs bg-base border border-[var(--divider)] text-secondary"
+          >
+            {tag}
+          </span>
+        ))}
+      </div>
+      {(post.published_at || post.author_name) && (
+        <p className="text-xs text-secondary mb-2">
+          {post.author_name?.trim() || "Japanese with Avnish Editorial Team"}
+          {post.published_at && <> · {new Date(post.published_at).toLocaleDateString()}</>}
+        </p>
+      )}
+      <span className="text-primary text-sm font-medium">Read →</span>
+    </Link>
+  );
+}
