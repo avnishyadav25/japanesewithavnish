@@ -39,13 +39,20 @@ const NEVER_REPLICATE = new Set([
   "backup_sync_state",
   "backup_sync_log",
   "sheets_export_state",
+  // Each provider records which migrations IT has run. Copying the primary's ledger over
+  // the standby's would assert the standby had applied things it may not have — the exact
+  // blindness the ledger exists to remove.
+  "schema_migrations",
 ]);
 
 // Rows read from the primary per table per pass. 500 suits steady-state polling, where a
 // pass should be short. A first backfill after rebuilding a standby has every cursor at
-// null and must re-walk whole tables, so raise it (REPLICATION_BATCH_SIZE=5000) to converge
-// in a couple of passes instead of ~18. Statement-level chunking keeps any batch size under
-// Postgres's parameter limit regardless.
+// null and must re-walk whole tables, so raising it converges in fewer passes.
+//
+// Don't raise it far: statement-level chunking keeps any size under Postgres's parameter
+// limit, but a single very large INSERT still has to cross the wire, and at cross-region
+// latency 10000 reliably died with ETIMEDOUT mid-statement. 2000 is a safe backfill value;
+// past that the wins are small and the failure mode is a stalled connection.
 const BATCH_SIZE = Number(process.env.REPLICATION_BATCH_SIZE ?? 500);
 
 interface TablePlan {
