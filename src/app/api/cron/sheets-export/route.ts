@@ -3,7 +3,7 @@ import { runSheetsExport, sheetsExportConfigured } from "@/lib/google-sheets-exp
 
 const CRON_SECRET = process.env.CRON_SECRET;
 
-/** Called every 30 minutes by Vercel Cron (see vercel.json). Incremental — only exports
+/** Called every 30 minutes by .github/workflows/crons.yml. Incremental — only exports
  * orders/leaderboard changes since the last run (src/lib/google-sheets-export.ts). Not
  * part of the live-replication path; Sheets is a reporting export only. */
 export async function GET(req: Request) {

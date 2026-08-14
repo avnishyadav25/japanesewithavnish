@@ -7,7 +7,7 @@ const JOBS_PER_TICK = 3; // smaller than backup-sync's batch: each job here is s
 // sequential LLM calls, not one DB copy.
 
 /**
- * Called on a schedule by Vercel Cron (see vercel.json), same CRON_SECRET auth pattern as
+ * Called every 10 minutes by .github/workflows/crons.yml, same CRON_SECRET auth pattern as
  * src/app/api/cron/backup-sync/route.ts. Drains the content_review_jobs queue in small
  * batches — the only path that processes bulk-sweep jobs (single-item reviews are already
  * processed inline by POST /api/admin/review/jobs); also recovers any job left stale-claimed
