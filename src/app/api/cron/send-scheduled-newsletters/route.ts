@@ -5,7 +5,7 @@ import { sendNewsletterById } from "@/lib/newsletter";
 const CRON_SECRET = process.env.CRON_SECRET;
 
 /**
- * Call from a cron job (e.g. Vercel cron or external scheduler) with ?key=CRON_SECRET.
+ * Call from a cron job (.github/workflows/crons.yml, or n8n on the VPS) with ?key=CRON_SECRET.
  * Sends any draft newsletter whose send_at has passed.
  */
 export async function GET(req: Request) {
