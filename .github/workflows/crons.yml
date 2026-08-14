@@ -58,7 +58,7 @@ jobs:
             "*/5 * * * *")  eps="replication-poll" ;;
             "*/10 * * * *") eps="content-review-worker" ;;
             "*/30 * * * *") eps="sheets-export" ;;
-            "0 * * * *")    eps="send-scheduled-newsletters backup-sync" ;;
+            "0 * * * *")    eps="send-scheduled-newsletters backup-sync replication-full" ;;
             "0 9 * * *")    eps="reengagement-nudge" ;;
             "0 6 1 * *")    eps="leaderboard-monthly-reward" ;;
             *)              eps="${{ inputs.endpoint }}" ;;
@@ -81,11 +81,12 @@ jobs:
           BODY=/tmp/cron-body.json
 
           # Returns 0 on 2xx, 2 on 401 (fatal — no point trying the rest), 1 otherwise.
+          # $2, if given, is a query string appended to the endpoint.
           call() {
-            local ep="$1" code
+            local ep="$1" qs="${2:-}" code
             code=$(curl -sS -o "$BODY" -w '%{http_code}' --max-time 120 \
                      -H "Authorization: Bearer ${CRON_SECRET}" \
-                     "${SITE_URL}/api/cron/${ep}") || code="000"
+                     "${SITE_URL}/api/cron/${ep}${qs}") || code="000"
             echo "  [$ep] HTTP $code -- $(head -c 400 "$BODY" 2>/dev/null)"
             case "$code" in
               2*)  return 0 ;;
@@ -112,6 +113,23 @@ jobs:
                   [ $rc -eq 2 ] && exit 1
                   [ $rc -ne 0 ] && fail=1
                   [ "$i" -lt 4 ] && sleep 20
+                done
+                ;;
+
+              replication-full)
+                # Tier 2: every replicable table, drained in slices. Planning a table costs
+                # several round trips before any row moves, so all ~137 cannot fit in one
+                # Netlify invocation (~10s limit). Loop on nextOffset until done.
+                off=0
+                for i in $(seq 1 40); do
+                  call "replication-poll" "?tier=full&offset=${off}"; rc=$?
+                  [ $rc -eq 2 ] && exit 1
+                  if [ $rc -ne 0 ]; then fail=1; break; fi
+                  off=$(jq -r '.nextOffset // 0' "$BODY" 2>/dev/null || echo 0)
+                  dn=$(jq -r '.done // false' "$BODY" 2>/dev/null || echo false)
+                  echo "    offset=$off done=$dn"
+                  if [ "$dn" = "true" ]; then break; fi
+                  sleep 1
                 done
                 ;;
 

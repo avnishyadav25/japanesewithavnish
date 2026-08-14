@@ -44,16 +44,15 @@ function pgTypeToSqlite(dataType: string, udtName: string): string {
   }
 }
 
-/** Postgres CREATE TABLE for Supabase is a near-direct copy of Neon's schema, just
- * dropping constraints/FKs (this is a backup target, not a live replica needing
- * referential integrity to other tables it doesn't have). */
-function pgTypeToSupabase(dataType: string, udtName: string): string {
-  if (dataType === "ARRAY") {
-    const elementType = udtName.startsWith("_") ? udtName.slice(1) : "text";
-    return `${elementType}[]`;
-  }
-  return dataType === "USER-DEFINED" ? "text" : dataType;
-}
+// Supabase DDL generation was removed on 2026-08-14. Supabase is no longer an archival
+// backup target -- it is a live hot standby, schema-identical to the primary and kept
+// current by the PK-matched upsert path in src/lib/db/replication-poll.ts.
+//
+// The generated file was actively dangerous once that changed: it emitted
+// "DROP TABLE IF EXISTS" followed by a CREATE with no primary keys, so running it against
+// today's Supabase would destroy the standby and recreate it in the exact PK-less shape
+// that made failover impossible in the first place. Rebuild the standby from a primary
+// pg_dump instead. Turso stays PK-less by design -- correct for an archive.
 
 async function main() {
   const tableRows = (await sql`
@@ -81,22 +80,12 @@ async function main() {
     columnsByTable.get(col.table_name)!.push(col);
   }
 
-  const supabaseStatements: string[] = [];
   const tursoStatements: { sql: string }[] = [];
 
   for (const tableName of tableNames) {
     const cols = columnsByTable.get(tableName) ?? [];
     if (cols.length === 0) continue;
 
-    // Supabase (Postgres)
-    const pgCols = cols
-      .map((c) => `  "${c.column_name}" ${pgTypeToSupabase(c.data_type, c.udt_name)}`)
-      .join(",\n");
-    supabaseStatements.push(
-      `DROP TABLE IF EXISTS "${tableName}";\nCREATE TABLE "${tableName}" (\n${pgCols},\n  "_synced_at" timestamptz DEFAULT now()\n);`
-    );
-
-    // Turso (SQLite)
     const sqliteCols = cols
       .map((c) => `  "${c.column_name}" ${pgTypeToSqlite(c.data_type, c.udt_name)}`)
       .join(",\n");
@@ -105,11 +94,9 @@ async function main() {
     });
   }
 
-  writeFileSync("scripts/generated-supabase-backup-schema.sql", supabaseStatements.join("\n\n") + "\n");
   writeFileSync("scripts/generated-turso-backup-schema.json", JSON.stringify(tursoStatements, null, 2));
 
-  console.log(`Generated schema for ${tableNames.length} tables.`);
-  console.log("Supabase DDL -> scripts/generated-supabase-backup-schema.sql");
+  console.log(`Generated Turso archive schema for ${tableNames.length} tables.`);
   console.log("Turso DDL (as JSON statements) -> scripts/generated-turso-backup-schema.json");
 }
 

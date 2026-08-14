@@ -55,7 +55,7 @@ export async function POST(req: Request) {
   if (resetCursor) {
     const driver = getDriverFor(provider);
     await driver.query(
-      `UPDATE replication_poll_state SET last_cursor_value = NULL, last_row_id = NULL WHERE table_name = ANY($1)`,
+      `UPDATE replication_poll_state SET last_cursor_value = NULL, last_pk_value = NULL WHERE table_name = ANY($1)`,
       [TIGHT_REPLICATION_TABLES as unknown as string[]]
     );
   }

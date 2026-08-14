@@ -35,7 +35,9 @@
     "video:studio": "remotion studio remotion/index.ts",
     "video:capture": "tsx scripts/video-capture.ts",
     "video:doctor": "tsx scripts/video-doctor.ts",
-    "grammar:spoken": "tsx scripts/backfill-grammar-spoken.ts"
+    "grammar:spoken": "tsx scripts/backfill-grammar-spoken.ts",
+    "db:replicate": "tsx scripts/replication-poll-once.ts",
+    "db:migrate": "tsx scripts/migrate.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1000.0",
