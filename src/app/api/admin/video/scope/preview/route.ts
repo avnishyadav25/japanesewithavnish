@@ -103,7 +103,7 @@ export async function POST(req: Request) {
           pauseSeconds: Math.round(detail.pauseSeconds),
         },
       },
-      warnings: buildWarnings(snapshot.items, kind, pacing, achievedPerItem),
+      warnings: buildWarnings(snapshot.items, kind, pacing, achievedPerItem, grouping, perVideoSeconds),
       items: snapshot.items.slice(0, 25).map((item) => ({
         title: item.title,
         kind: item.kind,
@@ -118,13 +118,29 @@ export async function POST(req: Request) {
   }
 }
 
+/** Longest single video worth making. Beyond this nothing we publish to will take it, and a
+ *  viewer will not either. A whole JLPT level at single_video grouping lands far past it. */
+const MAX_SINGLE_VIDEO_SECONDS = 20 * 60;
+
 function buildWarnings(
-  items: { examples: unknown[]; data: Record<string, unknown> }[],
+  items: { examples: unknown[]; data: Record<string, unknown>; kind?: string; children?: unknown[] }[],
   kind: string | undefined,
   pacing: PacingConfig,
-  achievedPerItem: number
+  achievedPerItem: number,
+  grouping: "single_video" | "video_per_item",
+  perVideoSeconds: number
 ): string[] {
   const warnings: string[] = [];
+
+  // The render-count warning covers "too many videos"; this covers the opposite mistake, which
+  // a whole-level scope walks straight into — one video of every lesson in N5.
+  if (grouping === "single_video" && perVideoSeconds > MAX_SINGLE_VIDEO_SECONDS) {
+    warnings.push(
+      `That is one continuous ${formatDuration(perVideoSeconds)} video from ${items.length} items. ` +
+        `Nothing you publish to accepts that, and it is not watchable — switch grouping to ` +
+        `"a separate video per item", or narrow the scope to a module or a single lesson.`
+    );
+  }
 
   // Only complain when the gap is big enough to matter. A few percent over is the intro and
   // outro, which are real content, not a mis-set budget.
@@ -134,6 +150,21 @@ function buildWarnings(
         `${pacing.repeatJapanese} repeat${pacing.repeatJapanese === 1 ? "" : "s"} and the ${pacing.pauseAfterJapaneseSeconds}s pause ` +
         `already fill most of the budget. Raise seconds per item, or cut a repeat or the pause.`
     );
+  }
+
+  // A lesson's own blocks are only headings and prose. Everything filmable comes from the
+  // curriculum's join tables, and only about half the lessons have anything linked — so a video
+  // for one of the others is a narrated slideshow of its section titles. Worth knowing before
+  // rendering rather than after watching.
+  if (kind === "lesson") {
+    const bare = items.filter((i) => (i.children?.length ?? 0) === 0).length;
+    if (bare > 0) {
+      warnings.push(
+        `${bare} of ${items.length} lesson${items.length === 1 ? " has" : "s have"} no vocabulary, kanji or grammar ` +
+          `linked in the curriculum, so ${items.length === 1 ? "this video" : "those videos"} will be section titles with ` +
+          `narration and nothing else on screen. Link content to the lesson first, or pick a lesson that has some.`
+      );
+    }
   }
 
   const noExamples = items.filter((i) => i.examples.length === 0).length;

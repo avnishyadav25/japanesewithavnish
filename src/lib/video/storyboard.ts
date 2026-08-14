@@ -24,6 +24,7 @@ import { BRAND } from "../brand";
 import { MASCOT_INTRO_SECONDS, OUTRO_MIN_SECONDS, resolveBranding } from "./branding";
 import { MASCOT_GREETING } from "./mascots";
 import {
+  defaultPacingFor,
   distributeSlotBudget,
   estimateStoryboardDuration,
   narrationSecondsForItem,
@@ -719,11 +720,165 @@ function withIntroOutro(
   };
 }
 
+/**
+ * Scene ids that `withIntroOutro` adds. Stripped when one skeleton is embedded inside another,
+ * so a lesson does not get three intros and three outros.
+ */
+const CHROME_SCENE_IDS: ReadonlySet<string> = new Set(["sc-mascot", "sc-intro", "sc-outro", "sc-broll"]);
+const CHROME_SLOT_IDS: ReadonlySet<string> = new Set(["sc-intro-nar", "sc-outro-nar", "sc-broll-nar"]);
+
+/**
+ * Builds the body of a per-kind skeleton, without its intro/outro chrome, and with every id
+ * prefixed so two embedded groups cannot collide.
+ *
+ * Scene ids must be unique across a storyboard: the TTS cache and the timeline editor's
+ * selection both key off them, and every per-kind builder numbers its scenes from `sc-i1`.
+ * A lesson embedding both vocabulary and kanji would otherwise produce two `sc-i1`.
+ */
+function embeddedBody(
+  snapshot: ContentSnapshot,
+  config: GenerateStoryboardConfig,
+  prefix: string
+): { scenes: Scene[]; blanks: BlankSlot[] } {
+  const built = buildSkeleton(snapshot, config);
+
+  const scenes = built.scenes
+    .filter((scene) => !CHROME_SCENE_IDS.has(scene.id))
+    .map((scene) => ({
+      ...scene,
+      id: `${prefix}-${scene.id}`,
+      narration: scene.narration.map((segment) => ({ ...segment, id: `${prefix}-${segment.id}` })),
+    }));
+
+  const blanks = built.blanks
+    .filter((slot) => !CHROME_SLOT_IDS.has(slot.id))
+    .map((slot) => ({ ...slot, id: `${prefix}-${slot.id}` }));
+
+  return { scenes, blanks };
+}
+
+/**
+ * A curriculum lesson.
+ *
+ * Two halves, because a lesson is two things. Its own blocks are only section headings and
+ * prose, which become the walkthrough — a title card per heading, narrated from the prose
+ * underneath it. Then the vocabulary, kanji and grammar the lesson explicitly declares
+ * (`ContentItem.children`, from the curriculum's join tables) get the same real scenes they
+ * would get in a batch video: word cards, stroke order, pattern breakdowns.
+ *
+ * Without the second half a lesson video is a slideshow of headings — which is what the generic
+ * skeleton produced, because it ignores `blocks` and lessons carry no `examples`.
+ */
+function lessonSkeleton(snapshot: ContentSnapshot, config: GenerateStoryboardConfig): Skeleton {
+  const lang = config.narrationLang;
+  const pacing = config.pacing;
+  const scenes: Scene[] = [];
+  const blanks: BlankSlot[] = [];
+
+  snapshot.items.forEach((item, i) => {
+    const base = `sc-l${i + 1}`;
+
+    // -- the lesson's own walkthrough ---------------------------------------
+    // Pair each heading with the prose that follows it; the prose is the source material for
+    // that section's narration, never shown on screen (it is markdown, and long).
+    const sections: { title: string; prose: string }[] = [];
+    for (const block of item.blocks) {
+      const data = block.data as Record<string, unknown>;
+      if (block.blockType === "section_heading") {
+        const title = str(data.title);
+        if (title) sections.push({ title, prose: "" });
+      } else if (block.blockType === "rich_text" && sections.length > 0) {
+        const markdown = str(data.markdown);
+        if (markdown) {
+          const current = sections[sections.length - 1];
+          current.prose = `${current.prose} ${markdown}`.trim();
+        }
+      }
+    }
+
+    sections.forEach((section, si) => {
+      const slotId = `${base}-s${si + 1}`;
+      scenes.push({
+        id: `${base}-sec${si + 1}`,
+        sceneType: "title_card",
+        sourceRef: item.postId ? { kind: "post", id: item.postId, url: item.url } : undefined,
+        durationMode: "auto",
+        durationSeconds: pacing.secondsPerItem,
+        transitionIn: { kind: "fade", durationSeconds: 0.4 },
+        narration: [blankSegment(slotId, lang, pacing)],
+        visual: {
+          sceneType: "title_card",
+          eyebrow: si === 0 && item.jlptLevel ? `JLPT ${item.jlptLevel}` : undefined,
+          title: section.title,
+          subtitle: sections.length > 1 ? `${si + 1} of ${sections.length}` : undefined,
+        },
+      });
+      blanks.push({
+        id: slotId,
+        // The prose is the source, and the model is told to teach from it rather than read it:
+        // lesson prose is written to be read on a page, and reads badly aloud verbatim.
+        hint:
+          `Section "${section.title}" of the lesson "${item.title}". Teach this section in your own ` +
+          `words, spoken aloud. Source material: ${section.prose.slice(0, 700) || "(no prose — use the heading)"}`,
+        maxWords: 0,
+        weight: 1,
+      });
+    });
+
+    // -- what the lesson actually teaches ------------------------------------
+    // Grouped by kind so each group goes through its own real builder.
+    const children = item.children ?? [];
+    const byKind = new Map<string, ContentItem[]>();
+    for (const child of children) {
+      byKind.set(child.kind, [...(byKind.get(child.kind) ?? []), child]);
+    }
+
+    for (const [kind, group] of byKind) {
+      // Pace each group as its OWN kind, not as the lesson.
+      //
+      // A lesson is 45s per item; a vocabulary word is 16. Passing the lesson's pacing down gave
+      // all 65 embedded words a 45-second budget, which estimated one lesson at 53 minutes while
+      // the model — correctly — wrote about 16 seconds' worth per word and produced 20. The
+      // budget has to match the thing being budgeted, or the forecast is fiction. Everything
+      // else (repeats, pause, rates) stays as the project configured it.
+      const childConfig: GenerateStoryboardConfig = {
+        ...config,
+        pacing: { ...config.pacing, secondsPerItem: defaultPacingFor(kind).secondsPerItem },
+      };
+      const embedded = embeddedBody(
+        { ...snapshot, items: group, title: item.title },
+        childConfig,
+        `${base}-${kind}`
+      );
+      scenes.push(...embedded.scenes);
+      blanks.push(...embedded.blanks);
+    }
+  });
+
+  // Slots created above with maxWords 0 get their real budget here, alongside the embedded ones
+  // which already have theirs.
+  const sectionSlots = blanks.filter((b) => b.maxWords === 0);
+  if (sectionSlots.length > 0) {
+    const budgeted = budgetItemSlots(
+      sectionSlots.map((b) => ({ id: b.id, hint: b.hint })),
+      [],
+      config
+    );
+    const budgetById = new Map(budgeted.map((b) => [b.id, b.maxWords]));
+    for (const slot of blanks) {
+      if (slot.maxWords === 0) slot.maxWords = budgetById.get(slot.id) ?? 40;
+    }
+  }
+
+  return withIntroOutro(scenes, blanks, snapshot, config, snapshot.title);
+}
+
 export function buildSkeleton(snapshot: ContentSnapshot, config: GenerateStoryboardConfig): Skeleton {
   const kind = snapshot.items[0]?.kind;
   if (kind === "vocabulary") return vocabularySkeleton(snapshot, config);
   if (kind === "kanji") return kanjiSkeleton(snapshot, config);
   if (kind === "grammar") return grammarSkeleton(snapshot, config);
+  if (kind === "lesson") return lessonSkeleton(snapshot, config);
   return genericSkeleton(snapshot, config);
 }
 

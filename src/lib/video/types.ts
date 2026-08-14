@@ -619,6 +619,15 @@ export interface ContentItem {
   examples: ExampleSentence[];
   /** Resolved blocks, when the item has any. Already FK-expanded. */
   blocks: { blockType: BlockType; data: Record<string, unknown> }[];
+  /**
+   * Content this item explicitly teaches, for a `lesson` item.
+   *
+   * Populated from the curriculum's own join tables (`curriculum_lesson_vocabulary`,
+   * `_kanji`, `_grammar`) — so these are the words and patterns the lesson declares, not a
+   * topic guess. Without them a lesson video is only its section headings: lessons themselves
+   * carry nothing but `section_heading` and `rich_text` blocks.
+   */
+  children?: ContentItem[];
 }
 
 // ---------------------------------------------------------------------------
