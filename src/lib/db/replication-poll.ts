@@ -139,9 +139,10 @@ async function syncTableOnce(primary: PgDriver, standby: PgDriver, plan: TablePl
 }
 
 /** Runs one pass across every tight-replication table, primary -> standby (direction
- * follows whichever provider is currently active). Intended to be called repeatedly
- * within a single cron invocation (Vercel Cron's floor is 1 minute; looping internally
- * gives effective ~10-15s coverage — see /api/cron/replication-poll). */
+ * follows whichever provider is currently active). Intended to be called repeatedly —
+ * but by the *scheduler*, not by looping inside one request: Netlify kills functions at
+ * ~10s, so /api/cron/replication-poll now does roughly one pass per invocation and
+ * .github/workflows/crons.yml (or n8n) calls it several times per run. */
 export async function runReplicationPollPass(): Promise<{ primary: DbProvider; standby: DbProvider; results: PollResult[] }> {
   const primaryProvider = await resolveActiveProvider();
   const standbyProvider = otherProvider(primaryProvider);

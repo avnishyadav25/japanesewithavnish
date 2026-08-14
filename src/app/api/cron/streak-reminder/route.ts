@@ -5,7 +5,7 @@ import { sendStreakReminder } from "@/lib/email";
 const CRON_SECRET = process.env.CRON_SECRET;
 
 /**
- * Call from a cron job (e.g. Vercel cron or external scheduler) with ?key=CRON_SECRET.
+ * Call from a cron job (.github/workflows/crons.yml, or n8n on the VPS) with ?key=CRON_SECRET.
  * Finds users who: haven't had activity today, have current_streak >= 1 (or opted in),
  * and haven't received a streak reminder today. Sends one email per user and records last_streak_reminder_sent_at.
  */

@@ -4,9 +4,8 @@ import { runBackupSyncBatch } from "@/lib/db-backup";
 const CRON_SECRET = process.env.CRON_SECRET;
 
 /**
- * Called hourly by Vercel Cron (see vercel.json), which sends the
- * Authorization: Bearer <CRON_SECRET> header automatically. Can also be pinged manually
- * with ?key=CRON_SECRET (e.g. from an external scheduler like n8n, if preferred instead).
+ * Called hourly by .github/workflows/crons.yml (and n8n on the VPS), which send
+ * Authorization: Bearer <CRON_SECRET>. Can also be pinged manually with ?key=CRON_SECRET.
  * Processes one batch of tables per call, resuming from backup_sync_state's cursor, until
  * the full database sync (Neon -> Supabase / Turso / R2) completes, then idles (20h
  * cooldown) until the next day's cycle starts naturally on a later hourly call.

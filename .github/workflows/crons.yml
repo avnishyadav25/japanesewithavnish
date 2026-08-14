@@ -1,0 +1,142 @@
+# Scheduled jobs.
+#
+# These schedules used to live in vercel.json — but the site is served by Netlify
+# (`curl -I` returns `server: Netlify`), and Netlify never reads vercel.json. So nothing
+# had been running since mid-July 2026: database backups, replication sync, newsletters,
+# the content-review worker and the re-engagement nudge were all silently dead while
+# looking configured.
+#
+# This workflow is the FALLBACK runner. n8n on the VPS is the primary one — GitHub's
+# scheduler drifts 5-15 minutes under load and disables workflows after 60 days of repo
+# inactivity, so it must not be the only thing keeping backups alive. Running both at
+# once is safe: every endpoint is idempotent, and backup-sync/replication-poll are
+# cursor-resumable by design.
+name: crons
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"    # replication-poll        (was "* * * * *"; Actions' floor is 5m)
+    - cron: "*/10 * * * *"   # content-review-worker
+    - cron: "*/30 * * * *"   # sheets-export
+    - cron: "0 * * * *"      # send-scheduled-newsletters + backup-sync
+    - cron: "0 9 * * *"      # reengagement-nudge
+    - cron: "0 6 1 * *"      # leaderboard-monthly-reward
+  workflow_dispatch:
+    inputs:
+      endpoint:
+        description: "Run a single cron endpoint right now"
+        required: true
+        type: choice
+        options:
+          - replication-poll
+          - backup-sync
+          - content-review-worker
+          - sheets-export
+          - send-scheduled-newsletters
+          - reengagement-nudge
+          - leaderboard-monthly-reward
+          - streak-reminder
+
+# Don't stack runs of the same schedule on top of each other; do let different schedules
+# overlap (a monthly leaderboard run shouldn't wait behind a replication poll).
+concurrency:
+  group: crons-${{ github.event.schedule || inputs.endpoint }}
+  cancel-in-progress: false
+
+env:
+  SITE_URL: https://japanesewithavnish.com
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Resolve endpoints for this trigger
+        id: resolve
+        run: |
+          case "${{ github.event.schedule }}" in
+            "*/5 * * * *")  eps="replication-poll" ;;
+            "*/10 * * * *") eps="content-review-worker" ;;
+            "*/30 * * * *") eps="sheets-export" ;;
+            "0 * * * *")    eps="send-scheduled-newsletters backup-sync" ;;
+            "0 9 * * *")    eps="reengagement-nudge" ;;
+            "0 6 1 * *")    eps="leaderboard-monthly-reward" ;;
+            *)              eps="${{ inputs.endpoint }}" ;;
+          esac
+          echo "endpoints=$eps" >> "$GITHUB_OUTPUT"
+          echo "Will run: $eps"
+
+      - name: Call cron endpoints
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          ENDPOINTS: ${{ steps.resolve.outputs.endpoints }}
+        run: |
+          set -uo pipefail
+
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::CRON_SECRET repo secret is not set. Every /api/cron/* route returns 401 without it."
+            exit 1
+          fi
+
+          BODY=/tmp/cron-body.json
+
+          # Returns 0 on 2xx, 2 on 401 (fatal — no point trying the rest), 1 otherwise.
+          call() {
+            local ep="$1" code
+            code=$(curl -sS -o "$BODY" -w '%{http_code}' --max-time 120 \
+                     -H "Authorization: Bearer ${CRON_SECRET}" \
+                     "${SITE_URL}/api/cron/${ep}") || code="000"
+            echo "  [$ep] HTTP $code -- $(head -c 400 "$BODY" 2>/dev/null)"
+            case "$code" in
+              2*)  return 0 ;;
+              401) echo "::error::$ep returned 401. CRON_SECRET is either unset in Netlify or does not match this repo's secret. This is the exact failure that looks green but does nothing."
+                   return 2 ;;
+              000) echo "::warning::$ep did not respond within 120s."
+                   return 1 ;;
+              *)   echo "::error::$ep returned HTTP $code"
+                   return 1 ;;
+            esac
+          }
+
+          fail=0
+          for ep in $ENDPOINTS; do
+            echo "== $ep =="
+            case "$ep" in
+
+              replication-poll)
+                # Netlify kills functions at ~10s, so the route now does roughly one pass
+                # per call (REPLICATION_POLL_BUDGET_MS). Repeat from out here, where there
+                # is no function timeout, instead of looping inside the request.
+                for i in 1 2 3 4; do
+                  call "$ep"; rc=$?
+                  [ $rc -eq 2 ] && exit 1
+                  [ $rc -ne 0 ] && fail=1
+                  [ "$i" -lt 4 ] && sleep 20
+                done
+                ;;
+
+              backup-sync)
+                # Resumable: 5 tables per call against 143 tables. One call an hour would
+                # need ~29 hours to finish a single full run, so drain it to completion here.
+                for i in $(seq 1 40); do
+                  call "$ep"; rc=$?
+                  [ $rc -eq 2 ] && exit 1
+                  if [ $rc -ne 0 ]; then fail=1; break; fi
+                  status=$(jq -r '.status // empty' "$BODY" 2>/dev/null || echo "")
+                  if [ "$status" = "completed" ] || [ "$status" = "idle" ]; then
+                    echo "  drained after $i call(s): status=$status"
+                    break
+                  fi
+                  sleep 2
+                done
+                ;;
+
+              *)
+                call "$ep"; rc=$?
+                [ $rc -eq 2 ] && exit 1
+                [ $rc -ne 0 ] && fail=1
+                ;;
+            esac
+          done
+
+          exit $fail

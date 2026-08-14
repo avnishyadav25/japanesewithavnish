@@ -4,8 +4,8 @@ import { runMonthlyLeaderboardReward } from "@/lib/leaderboard-rewards";
 const CRON_SECRET = process.env.CRON_SECRET;
 
 /**
- * Call from a cron job on the 1st of each month (e.g. Vercel cron) with ?key=CRON_SECRET
- * (or the Authorization: Bearer <CRON_SECRET> header Vercel injects automatically).
+ * Call from a cron job on the 1st of each month (.github/workflows/crons.yml) with ?key=CRON_SECRET
+ * (or the Authorization: Bearer <CRON_SECRET> header the workflow sends).
  * Ranks last month's XP leaderboard, records the top 3, and grants rewards per the
  * admin-configured mode. Idempotent — re-running for an already-processed month is a no-op.
  */
