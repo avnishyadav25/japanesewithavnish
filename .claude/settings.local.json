@@ -18,7 +18,9 @@
       "Bash(curl -s -I http://localhost:3000/store)",
       "Bash(claude-seo --help)",
       "Bash(claude-seo doctor *)",
-      "Bash(claude-seo setup *)"
+      "Bash(claude-seo setup *)",
+      "Bash(rm -f .git/index.lock)",
+      "Bash(ps -eo args)"
     ]
   }
 }

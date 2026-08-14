@@ -1,0 +1,86 @@
+"use client";
+
+/**
+ * Brand check — every branded frame, in every format, on one page.
+ *
+ * WHY THIS EXISTS RATHER THAN `scripts/video-brand-preview.ts`
+ * That script goes through `@remotion/bundler`, which stalls at 6% on at least one dev machine
+ * and takes the filesystem down with it (see the memory note). This page reaches the SAME
+ * VideoRoot tree through `@remotion/player`, which runs inside Next's own webpack — so it needs
+ * nothing but `npm run dev`, and what it shows is what renders.
+ *
+ * It exists because branding is the one part of the pipeline with no meaningful automated
+ * assertion. A logo that fails to load, a hashtag that vanishes against red, an icon row clipped
+ * off a 9:16 frame — all typecheck, lint and render without error. The first pass through this
+ * page caught `localhost:3000` printed into the outro's URL pill.
+ *
+ * Frames are picked 75% into each scene rather than as a percentage of the video: an earlier
+ * version landed one frame into a scene, where every entrance spring is still at zero, and the
+ * corner mascot looked missing when it was merely mid-animation.
+ */
+import dynamic from "next/dynamic";
+import { VideoRoot } from "@/remotion/VideoRoot";
+import { SAMPLE_STORYBOARD } from "@/remotion/sampleStoryboard";
+import { buildTimeline } from "@/lib/video/timeline";
+import { FORMAT_SPECS, type VideoFormat } from "@/lib/video/types";
+
+const Player = dynamic(() => import("@remotion/player").then((m) => m.Player), { ssr: false });
+
+function Frame({ label, format, at }: { label: string; format: VideoFormat; at: "mid" | "outro" | "intro" }) {
+  const spec = FORMAT_SPECS[format];
+  const layout = spec.layout;
+  const timeline = buildTimeline(SAMPLE_STORYBOARD, { format });
+  const total = timeline.totalFrames;
+  const spans = timeline.sceneFrameSpans;
+  // Land WELL INSIDE a scene. Picking a percentage of the whole video put the first shot one
+  // frame into its scene, where every entrance spring is still at zero — the corner mascot was
+  // rendering correctly and was simply invisible.
+  const pick = (i: number) => {
+    const [s0, e0] = spans[Math.min(i, spans.length - 1)] ?? [0, total];
+    return Math.min(e0 - 2, s0 + Math.round((e0 - s0) * 0.75));
+  };
+  const frame = at === "intro" ? pick(0) : at === "outro" ? pick(spans.length - 1) : pick(2);
+
+  return (
+    <div style={{ margin: 12 }}>
+      <div style={{ font: "600 12px system-ui", marginBottom: 6 }}>
+        {label} · frame {frame}/{total}
+      </div>
+      <div style={{ width: format === "landscape" ? 480 : 270 }} data-testid={`shot-${label}`}>
+        <Player
+          component={VideoRoot as never}
+          inputProps={{ storyboard: SAMPLE_STORYBOARD, layout, themeTokens: null, preview: true }}
+          durationInFrames={total}
+          fps={spec.fps}
+          compositionWidth={spec.width}
+          compositionHeight={spec.height}
+          initialFrame={frame}
+          style={{ width: "100%" }}
+          controls={false}
+          acknowledgeRemotionLicense
+        />
+      </div>
+    </div>
+  );
+}
+
+export default function BrandCheckPage() {
+  return (
+    <div>
+      <div style={{ marginBottom: 12 }}>
+        <h1 className="font-heading text-2xl font-bold text-charcoal">Brand check</h1>
+        <p className="text-sm text-secondary mt-1">
+          The same composition the worker renders, seeked to the frames most likely to be wrong. Vertical and
+          square carry the hashtag; landscape deliberately does not.
+        </p>
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", background: "#222", padding: 12, borderRadius: 12 }}>
+        <Frame label="vertical-intro" format="vertical" at="intro" />
+        <Frame label="vertical-mid" format="vertical" at="mid" />
+        <Frame label="vertical-outro" format="vertical" at="outro" />
+        <Frame label="landscape-mid" format="landscape" at="mid" />
+        <Frame label="square-outro" format="square" at="outro" />
+      </div>
+    </div>
+  );
+}

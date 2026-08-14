@@ -9,6 +9,7 @@
 import React from "react";
 import type { Scene, SceneType, VisualSpec } from "@/lib/video/types";
 import { CalloutScene, CtaOutroScene, SummaryRecapScene, TitleCardScene } from "./TextScenes";
+import { MascotIntroScene } from "./MascotScenes";
 import {
   ComparisonScene,
   ExampleSentenceScene,
@@ -31,6 +32,7 @@ import {
 type SceneComponent = React.FC<{ visual: never }>;
 
 const REGISTRY: Record<SceneType, SceneComponent> = {
+  mascot_intro: MascotIntroScene as SceneComponent,
   title_card: TitleCardScene as SceneComponent,
   vocab_card: VocabCardScene as SceneComponent,
   vocab_list: VocabListScene as SceneComponent,

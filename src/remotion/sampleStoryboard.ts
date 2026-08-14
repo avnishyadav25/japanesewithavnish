@@ -7,6 +7,8 @@
  * path in VideoRoot: durations fall back to each scene's authored hint.
  */
 import type { Storyboard } from "@/lib/video/types";
+import { BRAND } from "@/lib/brand";
+import { DEFAULT_BRANDING, MASCOT_INTRO_SECONDS, OUTRO_MIN_SECONDS } from "@/lib/video/branding";
 
 export const SAMPLE_STORYBOARD: Storyboard = {
   schemaVersion: 1,
@@ -16,6 +18,24 @@ export const SAMPLE_STORYBOARD: Storyboard = {
   themeKey: "washi-light",
   captions: { enabled: true, burnIn: true, style: "bold-center" },
   scenes: [
+    {
+      // The opening beat the storyboard builder now emits when branding.mascots is on. Present
+      // in the fixture so Studio and the preview exercise it like any other scene type.
+      id: "sc-mascot",
+      sceneType: "mascot_intro",
+      durationMode: "fixed",
+      durationSeconds: MASCOT_INTRO_SECONDS,
+      transitionIn: { kind: "fade", durationSeconds: 0.3 },
+      narration: [],
+      visual: {
+        sceneType: "mascot_intro",
+        mascot: "fox-wave",
+        greeting: "こんにちは",
+        greetingRomaji: "konnichiwa",
+        topic: "5 essential N5 words",
+        eyebrow: "JLPT N5",
+      },
+    },
     {
       id: "sc-intro",
       sceneType: "title_card",
@@ -79,16 +99,20 @@ export const SAMPLE_STORYBOARD: Storyboard = {
       id: "sc-outro",
       sceneType: "cta_outro",
       durationMode: "fixed",
-      durationSeconds: 3,
+      durationSeconds: OUTRO_MIN_SECONDS,
       transitionIn: { kind: "fade", durationSeconds: 0.4 },
       narration: [],
       visual: {
         sceneType: "cta_outro",
         headline: "Practise these on",
-        subline: "JapaneseWithAvnish",
-        url: "japanesewithavnish.com",
+        subline: BRAND.shortName,
+        url: BRAND.displayUrl,
         showLogo: true,
+        handle: DEFAULT_BRANDING.handle,
+        socials: DEFAULT_BRANDING.socials,
+        mascot: "fox-celebrate",
       },
     },
   ],
+  branding: DEFAULT_BRANDING,
 };

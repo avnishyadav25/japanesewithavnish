@@ -1,0 +1,353 @@
+/**
+ * Video Studio — the pacing engine.
+ *
+ * This exists because `targetDurationSeconds` never did anything. It was advisory prose in the
+ * LLM prompt ("Target total length: about 60 seconds") while the per-slot word limits were
+ * hardcoded constants in the skeleton builder. Nothing connected the two, so both real projects
+ * asked for 60 seconds: one produced 121s, the other would have produced 6-7 minutes.
+ *
+ * The fix is to make duration arithmetic. Everything here derives from speech rates MEASURED
+ * from our own synthesised clips rather than guessed — see SPEECH_RATES below. The same
+ * constants produce the word budget handed to the model and the estimate shown in the UI, so a
+ * miss is a calibration problem with one place to fix rather than two numbers that were never
+ * related.
+ *
+ * No `next/*` imports — the worker uses this too.
+ */
+import type { ContentSnapshot, NarrationLang, PacingConfig, Scene } from "./types";
+
+/**
+ * Characters per second of finished audio, measured from 49 real clips.
+ *
+ *   en-US-Neural2-F @1.0x : 19 clips, 767 chars, 53.3s -> 14.38 c/s
+ *   ja-JP-Neural2-B @0.9x : 30 clips, 169 chars, 44.3s ->  3.82 c/s
+ *
+ * Japanese is ~4x slower per character because each kana is a full mora, where a Latin character
+ * is a fraction of a phoneme. Estimating both at one rate — the obvious mistake — would put a
+ * Japanese-heavy video out by a factor of three.
+ *
+ * These are rates at the reference speaking rate; `charsPerSecond()` scales them linearly, which
+ * matches how Google's speakingRate behaves closely enough for planning.
+ */
+export const SPEECH_RATES = {
+  en: { charsPerSecond: 14.38, referenceRate: 1.0 },
+  hi: { charsPerSecond: 11.5, referenceRate: 1.0 }, // no measurements yet; Devanagari runs slower than Latin
+  ja: { charsPerSecond: 3.82, referenceRate: 0.9 },
+} as const;
+
+/** Average characters per English word, for turning a character budget into a word count the
+ * model can actually follow. Measured across the existing narration: 767 chars / ~139 words. */
+const CHARS_PER_WORD = 5.5;
+
+export function charsPerSecond(lang: NarrationLang, rate: number): number {
+  const spec = SPEECH_RATES[lang];
+  return spec.charsPerSecond * (rate / spec.referenceRate);
+}
+
+/** Seconds of audio a string of this language will take at this rate. */
+export function estimateSpeechSeconds(text: string, lang: NarrationLang, rate: number): number {
+  if (!text.trim()) return 0;
+  return text.trim().length / charsPerSecond(lang, rate);
+}
+
+// ---------------------------------------------------------------------------
+// Defaults
+// ---------------------------------------------------------------------------
+
+export const DEFAULT_PACING: PacingConfig = {
+  secondsPerItem: 12,
+  repeatJapanese: 2,
+  pauseAfterJapaneseSeconds: 1.2,
+  scenePaddingSeconds: 0.45,
+  japaneseRate: 0.85,
+  narrationRate: 1.0,
+};
+
+/**
+ * How long one item of each kind deserves.
+ *
+ * A vocabulary word is a word: say it, mean it, use it, move on. A grammar pattern needs the
+ * form, when to use it, and two or three worked examples — cramming that into the same 10
+ * seconds is what produced the unusable 60-second target. A curriculum lesson is a lesson.
+ */
+/**
+ * Chosen to be ACHIEVABLE, not aspirational.
+ *
+ * Each of these sits above `minimumSecondsPerItem` for its typical content, because a budget
+ * below the minimum is silently clamped and then over-runs — which is exactly the failure the
+ * pacing engine exists to prevent. A vocabulary word spoken twice with a shadowing pause after
+ * each, plus an example sentence, simply cannot fit in ten seconds; asking for ten and getting
+ * sixteen is worse than asking for sixteen.
+ */
+export const SECONDS_PER_ITEM_BY_KIND: Record<string, number> = {
+  vocabulary: 16,
+  kanji: 22,
+  grammar: 32,
+  sounds: 14,
+  writing: 30,
+  reading: 40,
+  listening: 35,
+  conversation: 30,
+  study_guide: 45,
+  practice_test: 30,
+  lesson: 45,
+};
+
+export function defaultPacingFor(kind: string | undefined): PacingConfig {
+  return {
+    ...DEFAULT_PACING,
+    secondsPerItem: SECONDS_PER_ITEM_BY_KIND[kind ?? ""] ?? DEFAULT_PACING.secondsPerItem,
+    // Repeating a whole sentence twice is tedious; repeating a single word twice is how it sticks.
+    repeatJapanese: kind === "vocabulary" || kind === "kanji" ? 2 : 1,
+  };
+}
+
+/** Fills gaps in a partial config from the per-kind defaults, so a project saved before a field
+ * existed still resolves. */
+export function resolvePacing(stored: Partial<PacingConfig> | null | undefined, kind?: string): PacingConfig {
+  return { ...defaultPacingFor(kind), ...(stored ?? {}) };
+}
+
+// ---------------------------------------------------------------------------
+// Budgets — what the model is allowed to write
+// ---------------------------------------------------------------------------
+
+/**
+ * How a per-item second budget is split across that item's narration slots.
+ *
+ * The Japanese audio, the repeats and the shadowing pauses are fixed costs we compute exactly.
+ * Whatever remains is the English explanation's budget — which is the only part the model
+ * controls, and therefore the only part worth expressing as a word limit.
+ */
+export interface SlotBudget {
+  id: string;
+  hint: string;
+  maxWords: number;
+  /** Seconds this slot is expected to occupy, for the estimate. */
+  seconds: number;
+}
+
+export interface ItemBudgetInput {
+  pacing: PacingConfig;
+  /** Japanese that will be spoken for this item, so its cost can be subtracted first. */
+  japaneseText: string[];
+  /** How many narration slots the model has to fill for this item. */
+  slotCount: number;
+}
+
+/**
+ * Seconds available to the narrator for one item, after the parts we control exactly.
+ *
+ * Returns at least a small floor: a slot budget of zero would make the model write nothing, and
+ * a silent card is worse than a slightly-over-budget one.
+ */
+export function narrationSecondsForItem(input: ItemBudgetInput): number {
+  return Math.max(MIN_NARRATION_SECONDS, input.pacing.secondsPerItem - fixedSecondsForItem(input));
+}
+
+/** Floor per item. A slot budget of zero would make the model write nothing, and a silent card
+ * is worse than a slightly-over-budget one. */
+const MIN_NARRATION_SECONDS = 2.5;
+
+/**
+ * The part of an item's time we control exactly: the Japanese audio, its repeats, the shadowing
+ * pauses and the scene padding. Whatever is left over is the narrator's.
+ */
+export function fixedSecondsForItem(input: ItemBudgetInput): number {
+  const { pacing, japaneseText } = input;
+  const japaneseSeconds = japaneseText.reduce(
+    (sum, text) => sum + estimateSpeechSeconds(text, "ja", pacing.japaneseRate),
+    0
+  );
+  // One pause per phrase, not one per repetition: the repeats play back to back and only the
+  // last is followed by the learner's turn to speak.
+  return (
+    japaneseSeconds * pacing.repeatJapanese +
+    japaneseText.length * pacing.pauseAfterJapaneseSeconds +
+    pacing.scenePaddingSeconds
+  );
+}
+
+/**
+ * The shortest an item can honestly be at this configuration.
+ *
+ * Asking for 6 seconds per vocabulary word when the word is spoken twice with a 1.2s pause after
+ * each and an example sentence follows is not a target, it is a wish. The wizard surfaces this
+ * so the number you type is either achievable or visibly corrected — silently clamping and then
+ * over-running is how "60 seconds" became 121 in the first place.
+ */
+export function minimumSecondsPerItem(input: ItemBudgetInput): number {
+  const narratorFloor = Math.max(MIN_NARRATION_SECONDS, input.slotCount * secondsForWords(6, "en", input.pacing.narrationRate));
+  return fixedSecondsForItem(input) + narratorFloor;
+}
+
+/** Turns a seconds budget into the word limit stated in the prompt. */
+export function wordsForSeconds(seconds: number, lang: NarrationLang, rate: number): number {
+  return Math.max(6, Math.round((seconds * charsPerSecond(lang, rate)) / CHARS_PER_WORD));
+}
+
+/** The inverse: how long a slot of this many words will take to speak. Used to estimate a
+ * storyboard before the model has written a single word into it. */
+export function secondsForWords(words: number, lang: NarrationLang, rate: number): number {
+  return (words * CHARS_PER_WORD) / charsPerSecond(lang, rate);
+}
+
+/**
+ * Splits an item's narration budget across its slots.
+ *
+ * Weighted, not equal: the slot that carries the actual explanation deserves more than the one
+ * that says "here's an example". Weights come from the caller because only the skeleton builder
+ * knows which slot is which.
+ */
+export function distributeSlotBudget(
+  slots: { id: string; hint: string; weight?: number }[],
+  totalSeconds: number,
+  lang: NarrationLang,
+  rate: number
+): SlotBudget[] {
+  const totalWeight = slots.reduce((sum, s) => sum + (s.weight ?? 1), 0) || 1;
+  return slots.map((slot) => {
+    const seconds = (totalSeconds * (slot.weight ?? 1)) / totalWeight;
+    return { id: slot.id, hint: slot.hint, seconds, maxWords: wordsForSeconds(seconds, lang, rate) };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Estimates
+// ---------------------------------------------------------------------------
+
+export interface DurationEstimate {
+  totalSeconds: number;
+  narrationSeconds: number;
+  japaneseSeconds: number;
+  pauseSeconds: number;
+  paddingSeconds: number;
+  /** True once every segment has real measured audio, i.e. this is no longer an estimate. */
+  measured: boolean;
+}
+
+/**
+ * Estimates a storyboard's length.
+ *
+ * Uses measured audio wherever the TTS stage has already run and falls back to the speech-rate
+ * constants everywhere else, so the same function serves the pre-generation preview, the
+ * post-generation review, and the post-render display. `measured` tells the UI which it is —
+ * showing an estimate as though it were fact is how "60 seconds" became 121 in the first place.
+ */
+export function estimateStoryboardDuration(
+  scenes: Scene[],
+  pacing: PacingConfig,
+  /**
+   * Seconds budgeted for narration that has not been written yet, keyed by segment id.
+   *
+   * Without this a pre-generation estimate reports only the Japanese audio and the pauses,
+   * because every English segment is still an empty string — which is exactly the wrong
+   * direction to be wrong in when the number exists to stop you queueing a video that is twice
+   * as long as you asked for.
+   */
+  plannedSeconds?: Map<string, number>
+): DurationEstimate {
+  let narrationSeconds = 0;
+  let japaneseSeconds = 0;
+  let pauseSeconds = 0;
+  // Seconds a scene sits on screen beyond what its audio needs, because of minDurationSeconds.
+  // Tracked separately so this stays in step with resolveSceneDuration() in timeline.ts — if the
+  // estimate ignored the floor, every branded video would render longer than it was forecast to,
+  // which is the precise failure this module exists to prevent.
+  let floorTopUpSeconds = 0;
+  let allMeasured = scenes.length > 0;
+
+  // Scenes whose length a human or the builder fixed outright, which the timeline honours
+  // verbatim and without padding (see resolveSceneDuration). Counted separately so the estimate
+  // matches the render: a 2.5s mascot intro carrying no narration would otherwise contribute
+  // only its padding, and every branded video would run two seconds longer than forecast.
+  let fixedSeconds = 0;
+  let autoSceneCount = 0;
+
+  for (const scene of scenes) {
+    if (scene.durationMode === "fixed") {
+      fixedSeconds += Math.max(scene.durationSeconds, 1 / 30);
+      continue;
+    }
+    autoSceneCount += 1;
+
+    let sceneSeconds = 0;
+
+    for (const segment of scene.narration) {
+      const measured = segment.audio?.durationSeconds;
+      if (measured === undefined) allMeasured = false;
+
+      const rate = segment.lang === "ja" ? pacing.japaneseRate : pacing.narrationRate;
+      const text = segment.spokenAs || segment.text;
+      const seconds =
+        measured ??
+        (text.trim() ? estimateSpeechSeconds(text, segment.lang, rate) : plannedSeconds?.get(segment.id) ?? 0);
+
+      if (segment.lang === "ja") japaneseSeconds += seconds;
+      else narrationSeconds += seconds;
+
+      const pause = (segment.leadInSeconds ?? 0) + (segment.pauseAfterSeconds ?? 0);
+      pauseSeconds += pause;
+      sceneSeconds += seconds + pause;
+    }
+
+    const floor = scene.minDurationSeconds ?? 0;
+    if (floor > 0) {
+      floorTopUpSeconds += Math.max(0, floor - (sceneSeconds + pacing.scenePaddingSeconds));
+    }
+  }
+
+  // Only auto scenes get padding — the timeline adds none to a fixed one.
+  const paddingSeconds = autoSceneCount * pacing.scenePaddingSeconds;
+  return {
+    totalSeconds:
+      narrationSeconds + japaneseSeconds + pauseSeconds + paddingSeconds + floorTopUpSeconds + fixedSeconds,
+    narrationSeconds,
+    japaneseSeconds,
+    pauseSeconds,
+    paddingSeconds,
+    measured: allMeasured,
+  };
+}
+
+/** Rough total before a script exists — used by the wizard's estimate panel. */
+export function estimateProjectDuration(snapshot: ContentSnapshot, pacing: PacingConfig): number {
+  // Intro and outro are roughly one item's worth between them.
+  const chrome = pacing.secondsPerItem * 0.8;
+  return snapshot.items.length * pacing.secondsPerItem + chrome;
+}
+
+// ---------------------------------------------------------------------------
+// Cost
+// ---------------------------------------------------------------------------
+
+/** Google Cloud TTS, USD per million characters. Both tiers include 1M chars/month free. */
+const TTS_PRICE_PER_MILLION: Record<string, number> = { Neural2: 16, Wavenet: 16, Chirp: 30, Standard: 4, Studio: 160 };
+
+export function ttsPricePerMillion(voiceName: string): number {
+  for (const [tier, price] of Object.entries(TTS_PRICE_PER_MILLION)) {
+    if (voiceName.includes(tier)) return price;
+  }
+  return TTS_PRICE_PER_MILLION.Neural2;
+}
+
+export function estimateTtsCost(scenes: Scene[], voices: Partial<Record<NarrationLang, string>>): number {
+  let cost = 0;
+  for (const scene of scenes) {
+    for (const segment of scene.narration) {
+      // A cached segment costs nothing to re-render, which is why editing visuals is free.
+      if (segment.audio) continue;
+      const voice = segment.voice ?? voices[segment.lang] ?? "Neural2";
+      const chars = (segment.spokenAs || segment.text).length;
+      cost += (chars / 1_000_000) * ttsPricePerMillion(voice);
+    }
+  }
+  return cost;
+}
+
+export function formatDuration(seconds: number): string {
+  const total = Math.max(0, Math.round(seconds));
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return m > 0 ? `${m}m ${String(s).padStart(2, "0")}s` : `${s}s`;
+}
