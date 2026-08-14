@@ -833,7 +833,9 @@ function lessonSkeleton(snapshot: ContentSnapshot, config: GenerateStoryboardCon
       byKind.set(child.kind, [...(byKind.get(child.kind) ?? []), child]);
     }
 
-    for (const [kind, group] of byKind) {
+    // Array.from rather than iterating the Map directly: this tsconfig's target predates
+    // downlevelIteration, so `for (… of map)` fails the production build.
+    for (const [kind, group] of Array.from(byKind)) {
       // Pace each group as its OWN kind, not as the lesson.
       //
       // A lesson is 45s per item; a vocabulary word is 16. Passing the lesson's pacing down gave
