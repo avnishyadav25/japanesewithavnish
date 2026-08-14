@@ -20,7 +20,8 @@ type LogRow = {
   run_started_at: string;
   table_name: string;
   row_count: number;
-  supabase_ok: boolean;
+  /** null = not applicable (Supabase is maintained by live replication, not this job). */
+  supabase_ok: boolean | null;
   turso_ok: boolean;
   r2_ok: boolean;
   error: string | null;
@@ -140,7 +141,12 @@ export default function AdminBackupPage() {
               <tr key={`${row.table_name}-${row.synced_at}-${i}`} className="border-b border-[var(--divider)]">
                 <td className="py-2 px-2 text-charcoal font-medium">{row.table_name}</td>
                 <td className="py-2 px-2 text-secondary">{row.row_count}</td>
-                <td className="py-2 px-2">{row.supabase_ok ? "✅" : "❌"}</td>
+                {/* null = not applicable: Supabase is kept current by live replication
+                    (src/lib/db/replication-poll.ts), not by this snapshot job. Rendering
+                    it as ❌ would read as a failure. */}
+                <td className="py-2 px-2" title={row.supabase_ok === null ? "Not applicable — Supabase is kept in sync by live replication, not this backup job" : undefined}>
+                  {row.supabase_ok === null ? "—" : row.supabase_ok ? "✅" : "❌"}
+                </td>
                 <td className="py-2 px-2">{row.turso_ok ? "✅" : "❌"}</td>
                 <td className="py-2 px-2">{row.r2_ok ? "✅" : "❌"}</td>
                 <td className="py-2 px-2 text-secondary text-xs">{new Date(row.synced_at).toLocaleString()}</td>

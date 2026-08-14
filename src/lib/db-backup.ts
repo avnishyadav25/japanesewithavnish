@@ -1,14 +1,18 @@
 import { sql } from "@/lib/db";
 import { isR2Configured, uploadToR2 } from "@/lib/r2";
-import { TIGHT_REPLICATION_TABLES } from "@/lib/db/replication-poll";
 
 const BATCH_SIZE = 5;
 
-// Tables under near-real-time polling sync (src/lib/db/replication-poll.ts) already
-// have an up-to-date, PK-matched live replica in Supabase — the old PK-less
-// insert-then-delete snapshot writer below would collide with those rows, so it's
-// skipped for this tier. Turso and R2 are unaffected (still get every table).
-const TIGHT_REPLICATION_TABLE_SET = new Set<string>(TIGHT_REPLICATION_TABLES);
+// Supabase is no longer written from here. It used to receive PK-less snapshots via
+// PostgREST using an insert-then-delete pattern, which only worked because the standby's
+// tables had no primary keys. Supabase is now a true schema replica of the primary
+// (143 tables, 143 primary keys), so that pattern would conflict on every row. It is kept
+// in sync by the PK-matched upsert path in src/lib/db/replication-poll.ts instead:
+// tier 1 every few seconds, tier 2 hourly across every table.
+//
+// Turso and R2 still get full snapshots here. That is correct for an archive: both are
+// intentionally PK-less, and the insert-then-delete pattern avoids any window where a
+// backup table is empty.
 
 async function getAllTableNames(): Promise<string[]> {
   if (!sql) return [];
@@ -26,45 +30,6 @@ async function getAllTableNames(): Promise<string[]> {
 }
 
 type WriteResult = { ok: boolean; error?: string };
-
-/** Writes an exact-schema replica of `rows` into `<tableName>` in Supabase (real
- * Postgres, generated schema in scripts/generated-supabase-backup-schema.sql). Inserts
- * the fresh snapshot first, then deletes anything older than this run — avoids any
- * window where the backup table is empty, without needing a primary key to upsert on
- * (the generated schema intentionally has none, to avoid cross-database PK conflicts). */
-async function writeToSupabase(tableName: string, rows: Record<string, unknown>[], runStartedAt: string): Promise<WriteResult> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) return { ok: false, error: "Supabase not configured" };
-
-  try {
-    const CHUNK = 500;
-    for (let i = 0; i < rows.length; i += CHUNK) {
-      const chunk = rows.slice(i, i + CHUNK).map((row) => ({ ...row, _synced_at: runStartedAt }));
-      const insertRes = await fetch(`${url}/rest/v1/${tableName}`, {
-        method: "POST",
-        headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify(chunk),
-      });
-      if (!insertRes.ok) {
-        const text = await insertRes.text();
-        return { ok: false, error: `insert ${insertRes.status}: ${text.slice(0, 300)}` };
-      }
-    }
-
-    const deleteRes = await fetch(
-      `${url}/rest/v1/${tableName}?_synced_at=lt.${encodeURIComponent(runStartedAt)}`,
-      { method: "DELETE", headers: { apikey: key, Authorization: `Bearer ${key}` } }
-    );
-    if (!deleteRes.ok) {
-      const text = await deleteRes.text();
-      return { ok: false, error: `cleanup delete ${deleteRes.status}: ${text.slice(0, 300)}` };
-    }
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Unknown Supabase error" };
-  }
-}
 
 type TursoArg = { type: "text" | "integer" | "null"; value?: string };
 
@@ -242,33 +207,31 @@ export async function runBackupSyncBatch(force = false): Promise<BackupSyncResul
         rows.push(...page);
         if (page.length < PAGE_SIZE) break;
       }
-      const [supabaseResult, tursoResult, r2Result] = await Promise.all([
-        TIGHT_REPLICATION_TABLE_SET.has(tableName)
-          ? Promise.resolve<WriteResult>({ ok: true })
-          : writeToSupabase(tableName, rows, runStartedAt),
+      const [tursoResult, r2Result] = await Promise.all([
         writeToTurso(tableName, rows, runStartedAt),
         writeToR2(tableName, rows, runStartedAt),
       ]);
-      const tableOk = supabaseResult.ok && tursoResult.ok && r2Result.ok;
+      const tableOk = tursoResult.ok && r2Result.ok;
       if (tableOk) okCount++;
       else failCount++;
 
       const errorParts = [
-        !supabaseResult.ok ? `supabase: ${supabaseResult.error}` : null,
         !tursoResult.ok ? `turso: ${tursoResult.error}` : null,
         !r2Result.ok ? `r2: ${r2Result.error}` : null,
       ].filter(Boolean);
 
+      // supabase_ok is NULL, not false: Supabase is no longer a target of this job, so
+      // "not applicable" is the honest value. The admin table renders null as "—".
       await sql`
         INSERT INTO backup_sync_log (run_started_at, table_name, row_count, supabase_ok, turso_ok, r2_ok, error)
-        VALUES (${runStartedAt}, ${tableName}, ${rows.length}, ${supabaseResult.ok}, ${tursoResult.ok}, ${r2Result.ok}, ${errorParts.length ? errorParts.join(" | ") : null})
+        VALUES (${runStartedAt}, ${tableName}, ${rows.length}, ${null}, ${tursoResult.ok}, ${r2Result.ok}, ${errorParts.length ? errorParts.join(" | ") : null})
       `;
     } catch (e) {
       failCount++;
       const errMsg = e instanceof Error ? e.message : "Unknown error";
       await sql`
         INSERT INTO backup_sync_log (run_started_at, table_name, row_count, supabase_ok, turso_ok, r2_ok, error)
-        VALUES (${runStartedAt}, ${tableName}, 0, false, false, false, ${errMsg})
+        VALUES (${runStartedAt}, ${tableName}, 0, ${null}, false, false, ${errMsg})
       `;
     }
   }
