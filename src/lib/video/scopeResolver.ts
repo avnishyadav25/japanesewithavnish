@@ -281,16 +281,44 @@ async function resolveLessonItems(lessonIds: string[]): Promise<ContentItem[]> {
     [lessonIds]
   )) as Record<string, string | number | null>[];
 
+  // One query for every lesson's objectives instead of one per lesson. A whole JLPT level is 50+
+  // lessons, and this loop used to make two sequential round trips each — 100+ against Neon over
+  // HTTP, which is enough to make the estimate feel broken.
+  const objectiveRows = (await sql.query(
+    `SELECT lesson_id, objective_text FROM learning_objectives
+     WHERE lesson_id = ANY($1::uuid[]) ORDER BY lesson_id, sort_order`,
+    [lessonIds]
+  )) as { lesson_id: string; objective_text: string }[];
+
+  const objectivesByLesson = new Map<string, string[]>();
+  for (const row of objectiveRows) {
+    const list = objectivesByLesson.get(row.lesson_id) ?? [];
+    list.push(row.objective_text);
+    objectivesByLesson.set(row.lesson_id, list);
+  }
+
+  // Blocks still cost one call per lesson — getResolvedLessonBlocks is shared with the public
+  // lesson pages and already batches its FK lookups within a lesson, so it is not worth
+  // restructuring for this. Running them a few at a time instead of strictly in series cuts the
+  // wall-clock without flooding the connection.
+  const CONCURRENCY = 6;
+  const blocksByLesson = new Map<string, Awaited<ReturnType<typeof getResolvedLessonBlocks>>>();
+  for (let i = 0; i < lessons.length; i += CONCURRENCY) {
+    const slice = lessons.slice(i, i + CONCURRENCY);
+    const resolved = await Promise.all(slice.map((l) => getResolvedLessonBlocks(String(l.id))));
+    slice.forEach((l, n) => blocksByLesson.set(String(l.id), resolved[n]));
+  }
+
+  const childrenByLesson = await resolveLessonChildren(lessonIds);
+
   const items: ContentItem[] = [];
   for (const lesson of lessons) {
     const lessonId = String(lesson.id);
-    const resolved = await getResolvedLessonBlocks(lessonId);
-    const objectives = (await sql.query(
-      `SELECT objective_text FROM learning_objectives WHERE lesson_id = $1::uuid ORDER BY sort_order`,
-      [lessonId]
-    )) as { objective_text: string }[];
+    const resolved = blocksByLesson.get(lessonId)!;
+    const objectives = (objectivesByLesson.get(lessonId) ?? []).map((objective_text) => ({ objective_text }));
 
     items.push({
+      children: childrenByLesson.get(lessonId) ?? [],
       kind: "lesson",
       slug: (lesson.slug as string) ?? undefined,
       url: `/learn/curriculum/lesson/${lesson.slug || lessonId}`,
@@ -313,6 +341,60 @@ async function resolveLessonItems(lessonIds: string[]): Promise<ContentItem[]> {
     });
   }
   return items;
+}
+
+/**
+ * The vocabulary, kanji and grammar a lesson explicitly teaches.
+ *
+ * A curriculum lesson's own blocks are only `section_heading` and `rich_text` — there is no
+ * filmable content inside the lesson itself. What it teaches lives in the join tables the
+ * curriculum already maintains, and those are populated: 3,993 vocabulary links across 208
+ * lessons, 2,185 kanji across 69, 375 grammar across 125.
+ *
+ * Using them keeps the video honest — these are the lesson's declared contents, not items
+ * guessed from a topic match, so the video still teaches what the lesson page teaches.
+ *
+ * `curriculum_lesson_kana` / `_listening` / `_reading` / `_writing` / `_practice_test` exist but
+ * are empty everywhere, so they are not queried.
+ */
+async function resolveLessonChildren(lessonIds: string[]): Promise<Map<string, ContentItem[]>> {
+  const byLesson = new Map<string, ContentItem[]>();
+  if (!sql || lessonIds.length === 0) return byLesson;
+
+  const sources = [
+    { join: "curriculum_lesson_vocabulary", fk: "vocabulary_id", sidecar: "vocabulary", kind: "vocabulary" },
+    { join: "curriculum_lesson_kanji", fk: "kanji_id", sidecar: "kanji", kind: "kanji" },
+    { join: "curriculum_lesson_grammar", fk: "grammar_id", sidecar: "grammar", kind: "grammar" },
+  ] as const;
+
+  for (const source of sources) {
+    // One query per content type across every lesson, rather than per lesson.
+    const links = (await sql.query(
+      `SELECT j.lesson_id, s.post_id
+       FROM ${source.join} j
+       JOIN ${source.sidecar} s ON s.id = j.${source.fk}
+       WHERE j.lesson_id = ANY($1::uuid[]) AND s.post_id IS NOT NULL
+       ORDER BY j.lesson_id, j.sort_order`,
+      [lessonIds]
+    )) as { lesson_id: string; post_id: string }[];
+    if (links.length === 0) continue;
+
+    // Reuse the normal post pipeline so a child item is shaped exactly like one from a
+    // content_batch scope — the scene builders then work on it unchanged.
+    const rows = await queryPosts({ contentType: source.kind, postIds: links.map((l) => l.post_id) });
+    const resolvedItems = await toContentItems(rows, source.kind, false);
+    const byPost = new Map(resolvedItems.map((item) => [item.postId, item]));
+
+    for (const link of links) {
+      const item = byPost.get(link.post_id);
+      if (!item) continue; // unpublished, or filtered out by queryPosts
+      const list = byLesson.get(link.lesson_id) ?? [];
+      list.push(item);
+      byLesson.set(link.lesson_id, list);
+    }
+  }
+
+  return byLesson;
 }
 
 /** Walks a curriculum node down to its lesson ids. */
@@ -349,16 +431,30 @@ async function lessonIdsUnder(scopeKind: ScopeKind, ref: ScopeRef): Promise<stri
 
 async function scopeTitle(scopeKind: ScopeKind, ref: ScopeRef): Promise<string> {
   if (!sql) return "Untitled";
-  const lookup: Partial<Record<ScopeKind, { table: string; id?: string }>> = {
-    curriculum_level: { table: "curriculum_levels", id: ref.levelId },
-    curriculum_module: { table: "curriculum_modules", id: ref.moduleId },
-    curriculum_submodule: { table: "curriculum_submodules", id: ref.submoduleId },
-    curriculum_lesson: { table: "curriculum_lessons", id: ref.lessonId },
+
+  /**
+   * The display column, per table.
+   *
+   * `curriculum_levels` calls it `name`; modules, submodules and lessons all call it `title`.
+   * This was previously `COALESCE(title, name, code)`, which reads as "whichever one exists" and
+   * is not that: Postgres resolves every column reference at PARSE time, before a value is
+   * looked at, so the query needed all three columns present and failed on all four tables —
+   * levels with `column "title" does not exist`, the rest with `column "name" does not exist`.
+   * That made every curriculum scope unusable, including project creation, not just the
+   * estimate. `code` exists everywhere and stays as the fallback.
+   */
+  const lookup: Partial<Record<ScopeKind, { table: string; titleColumn: string; id?: string }>> = {
+    curriculum_level: { table: "curriculum_levels", titleColumn: "name", id: ref.levelId },
+    curriculum_module: { table: "curriculum_modules", titleColumn: "title", id: ref.moduleId },
+    curriculum_submodule: { table: "curriculum_submodules", titleColumn: "title", id: ref.submoduleId },
+    curriculum_lesson: { table: "curriculum_lessons", titleColumn: "title", id: ref.lessonId },
   };
   const entry = lookup[scopeKind];
   if (entry?.id) {
+    // Table and column both come from the hardcoded map above — no caller input reaches the SQL.
     const rows = (await sql.query(
-      `SELECT COALESCE(title, name, code) AS title FROM ${entry.table} WHERE id = $1::uuid`, [entry.id]
+      `SELECT COALESCE(${entry.titleColumn}, code) AS title FROM ${entry.table} WHERE id = $1::uuid`,
+      [entry.id]
     )) as { title: string }[];
     if (rows[0]?.title) return rows[0].title;
   }
