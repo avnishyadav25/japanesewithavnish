@@ -18,6 +18,7 @@ import type {
 import type { RenderRow, StoryboardRow } from "@/lib/video/projects";
 import { StoryboardPlayer, type PlayerHandle } from "./StoryboardPlayer";
 import { Timeline, usePlayerTime } from "./Timeline";
+import { PromptPanel, type GenerateOverrides } from "./PromptPanel";
 
 interface Props {
   project: VideoProjectRow;
@@ -51,6 +52,8 @@ export function ProjectWorkspace({
   const [notice, setNotice] = useState<string | null>(null);
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
   const [previewBgm, setPreviewBgm] = useState(false);
+  const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
+  const [restoredDraft, setRestoredDraft] = useState(false);
   const playerRef = useRef<PlayerHandle | null>(null);
   const playheadSeconds = usePlayerTime(playerRef, FORMAT_SPECS[previewFormat].fps);
 
@@ -71,6 +74,21 @@ export function ProjectWorkspace({
     if (selected && draftFor.current !== selected.id) {
       draftFor.current = selected.id;
       setDraft(structuredClone(selected.doc));
+      setRestoredDraft(false);
+      setDraftSavedAt(null);
+
+      // An autosaved draft outranks the stored doc — it is strictly newer, and losing it is
+      // exactly the failure autosave exists to prevent. Restoring is silent but announced.
+      void (async () => {
+        const res = await fetch(`/api/admin/video/storyboards/${selected.id}/draft`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data.draft?.doc?.scenes) return;
+        if (draftFor.current !== selected.id) return; // switched away while fetching
+        setDraft(data.draft.doc);
+        setRestoredDraft(true);
+        setDraftSavedAt(data.draft.updatedAt);
+      })();
     }
     if (!selected) {
       draftFor.current = null;
@@ -82,6 +100,29 @@ export function ProjectWorkspace({
     if (!selected || !draft) return false;
     return JSON.stringify(draft.scenes) !== JSON.stringify(selected.doc.scenes);
   }, [draft, selected]);
+
+  /**
+   * Autosave.
+   *
+   * Debounced, and only while the draft actually differs from the stored version — so simply
+   * opening a script writes nothing. Saves to a draft slot rather than creating a version:
+   * an autosave every two seconds would leave dozens of numbered versions behind after one
+   * editing session.
+   */
+  useEffect(() => {
+    if (!selected || !draft || !dirty) return;
+    const timer = setTimeout(() => {
+      void fetch(`/api/admin/video/storyboards/${selected.id}/draft`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ doc: draft, baseVersion: selected.version }),
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => data && setDraftSavedAt(data.savedAt))
+        .catch(() => {});
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [draft, dirty, selected]);
 
   const hasActiveJob = jobs.some((j) => ACTIVE_JOB_STATUSES.has(j.status));
 
@@ -132,13 +173,15 @@ export function ProjectWorkspace({
     }
   }
 
-  async function generate(regenerate: boolean) {
+  async function generate(regenerate: boolean, overrides?: GenerateOverrides) {
     const tone = regenerate ? window.prompt("Any steer for this rewrite? (tone, length, audience)") : null;
     if (regenerate && tone === null) return;
     const data = await call(regenerate ? "regenerate" : "generate", `/api/admin/video/projects/${project.id}/generate`, {
       narrationLang: lang,
       regenerate,
       tone: tone || undefined,
+      systemPrompt: overrides?.systemPrompt,
+      slotOverrides: overrides?.slotOverrides,
     });
     if (data) {
       setNotice(
@@ -154,8 +197,12 @@ export function ProjectWorkspace({
     if (!selected || !draft) return;
     const data = await call("save", `/api/admin/video/storyboards/${selected.id}`, { doc: draft });
     if (data) {
+      // The draft has been promoted, so stop offering to restore work that is already saved.
+      await fetch(`/api/admin/video/storyboards/${selected.id}/draft`, { method: "DELETE" }).catch(() => {});
       setNotice(`Saved as version ${data.storyboard.version}. Narration you changed will be re-voiced on the next render.`);
       setSelectedVersionId(null);
+      setRestoredDraft(false);
+      setDraftSavedAt(null);
       draftFor.current = null;
       router.refresh();
     }
@@ -203,6 +250,40 @@ export function ProjectWorkspace({
       setNotice(data.message ?? (action === "approve" ? "Video approved." : "Done."));
       await refresh();
       router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Request failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  /**
+   * Re-renders the same storyboard at the aspect ratios it does not have yet.
+   *
+   * Free in TTS terms — narration is cached by content hash, so a 16:9 cut of a finished 9:16
+   * video costs render minutes and nothing else.
+   */
+  async function recut(renderId: string, currentFormat: VideoFormat) {
+    const others = (["vertical", "landscape", "square", "embed"] as VideoFormat[]).filter((f) => f !== currentFormat);
+    const picked = window.prompt(
+      `Which other sizes? Comma-separated from: ${others.join(", ")}`,
+      others.slice(0, 2).join(",")
+    );
+    if (!picked) return;
+
+    setBusy(`recut:${renderId}`);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/admin/video/renders/${renderId}/recut`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "formats", formats: picked.split(",").map((f) => f.trim()).filter(Boolean) }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Request failed");
+      setNotice(data.message);
+      await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Request failed");
     } finally {
@@ -315,6 +396,13 @@ export function ProjectWorkspace({
 
   return (
     <div className="space-y-6">
+      {restoredDraft && (
+        <div className="rounded-card px-4 py-3 text-sm border bg-amber-50 border-amber-200 text-amber-800">
+          Restored unsaved edits from your last session. Save them as a new version, or discard them
+          to go back to version {selected?.version}.
+        </div>
+      )}
+
       {(error || notice) && (
         <div
           className={`rounded-card px-4 py-3 text-sm border ${
@@ -346,15 +434,12 @@ export function ProjectWorkspace({
       )}
 
       {!selected ? (
-        <AdminCard>
-          <p className="text-secondary mb-4">
-            No script yet for {NARRATION_LANG_LABELS[lang]}. Generating one reads the source content out of the
-            database and writes narration for it — nothing renders until you approve it.
-          </p>
-          <button type="button" onClick={() => generate(false)} disabled={busy !== null} className="btn-primary disabled:opacity-50">
-            {busy === "generate" ? "Writing the script…" : "Generate script"}
-          </button>
-        </AdminCard>
+        <PromptPanel
+          projectId={project.id}
+          narrationLang={lang}
+          disabled={busy !== null}
+          onGenerate={(overrides) => generate(false, overrides)}
+        />
       ) : (
         <div className="grid lg:grid-cols-[minmax(0,380px)_1fr] gap-6 items-start">
           {/* -------- Preview -------- */}
@@ -467,8 +552,14 @@ export function ProjectWorkspace({
             </AdminCard>
           </div>
 
-          {/* -------- Scene editor -------- */}
-          <div className="space-y-4">
+          {/* -------- Scene editor --------
+              min-w-0 is load-bearing. A grid item defaults to min-width:auto, so this track
+              cannot shrink below its content's min-content width — and the Timeline's inner
+              strip is `total * pixelsPerSecond` wide, over 3000px for a two-minute video. Without
+              it the 1fr track expands to fit the strip, the minmax(0,380px) preview column
+              collapses to 0, and the whole page scrolls sideways. The strip is meant to scroll
+              inside its own overflow-x-auto wrapper instead. */}
+          <div className="space-y-4 min-w-0">
             {draft && (
               <Timeline
                 storyboard={draft}
@@ -487,9 +578,17 @@ export function ProjectWorkspace({
               </h2>
               {dirty && (
                 <div className="flex items-center gap-2">
+                  <span className="text-xs text-secondary">
+                    {draftSavedAt ? `Draft saved ${new Date(draftSavedAt).toLocaleTimeString()}` : "Saving draft…"}
+                  </span>
                   <button
                     type="button"
-                    onClick={() => setDraft(structuredClone(selected.doc))}
+                    onClick={async () => {
+                      setDraft(structuredClone(selected.doc));
+                      setRestoredDraft(false);
+                      setDraftSavedAt(null);
+                      await fetch(`/api/admin/video/storyboards/${selected.id}/draft`, { method: "DELETE" }).catch(() => {});
+                    }}
                     className="text-sm px-3 py-1.5 rounded-button border border-[var(--divider)] text-secondary"
                   >
                     Discard
@@ -640,17 +739,67 @@ export function ProjectWorkspace({
                       </>
                     )}
                     {render.isCurrent && render.approvalStatus !== "pending_review" && render.approvalStatus !== "rejected" && (
-                      <button
-                        type="button"
-                        onClick={() => renderAction(render.id, "link")}
-                        disabled={busy !== null}
-                        title="Embeds this video on the content page it was generated from, with VideoObject schema"
-                        className="text-primary hover:underline disabled:opacity-50"
-                      >
-                        Publish to site
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => renderAction(render.id, "link")}
+                          disabled={busy !== null}
+                          title="Embeds this video on the content page it was generated from, with VideoObject schema"
+                          className="text-primary hover:underline disabled:opacity-50"
+                        >
+                          Publish to site
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => recut(render.id, render.format)}
+                          disabled={busy !== null}
+                          title="Renders the same script at the other aspect ratios. The voiceover is cached, so this costs render time only."
+                          className="text-primary hover:underline disabled:opacity-50"
+                        >
+                          Other sizes
+                        </button>
+                        {/* Deliberately a plain link, not a panel: this file already carries the
+                            storyboard editor, the job list and the render list, and a social UI
+                            growing inside it would make every future video change riskier. */}
+                        <a
+                          href={`/admin/social/briefs/new?renderId=${render.id}`}
+                          title="Writes captions, titles and descriptions for every platform, in English and Hinglish, and tracks where each one gets posted"
+                          className="text-primary hover:underline"
+                        >
+                          Promote
+                        </a>
+                      </>
                     )}
                   </div>
+
+                  {/* Where this render has actually been distributed. The on-site embed is
+                      counted separately by "Publish to site" — conflating the two would hide
+                      exactly the gap this line exists to show. */}
+                  {render.isCurrent && (
+                    <p className="mt-2 text-xs text-secondary">
+                      {render.publications && render.publications.length > 0 ? (
+                        <>
+                          Posted:{" "}
+                          {render.publications.map((p, i) => (
+                            <span key={p.platform}>
+                              {i > 0 && " · "}
+                              {p.url ? (
+                                <a href={p.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                                  {p.platform}
+                                </a>
+                              ) : (
+                                <span title={p.status}>
+                                  {p.platform} ({p.status.replace(/_/g, " ")})
+                                </span>
+                              )}
+                            </span>
+                          ))}
+                        </>
+                      ) : (
+                        "Not posted anywhere yet"
+                      )}
+                    </p>
+                  )}
                 </div>
               </div>
             ))}

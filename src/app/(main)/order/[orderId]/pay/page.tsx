@@ -1,11 +1,13 @@
 import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
+import { BRAND, SOCIALS } from "@/lib/brand";
 import { CopyUpiButton } from "./CopyUpiButton";
 import { SubmitPaymentDetailsForm } from "./SubmitPaymentDetailsForm";
 
 const UPI_ID = process.env.NEXT_PUBLIC_UPI_ID || "japanesewithavnish@ybl";
 const WHATSAPP_NUMBER = "8960964978";
 const CONTACT_EMAIL = "support@japanesewithavnish.com";
+const INSTAGRAM = SOCIALS.find((s) => s.platform === "instagram")!;
 
 async function getOrderForPay(orderId: string) {
   if (!sql) return null;
@@ -102,8 +104,8 @@ export default async function OrderPayPage({
               </a>
             </li>
             <li>
-              <a href="https://www.instagram.com/japanesewithavnish" target="_blank" rel="noopener noreferrer" className="text-primary font-medium underline">
-                Instagram (@japanesewithavnish)
+              <a href={INSTAGRAM.url} target="_blank" rel="noopener noreferrer" className="text-primary font-medium underline">
+                Instagram ({BRAND.atHandle})
               </a>
             </li>
             <li>

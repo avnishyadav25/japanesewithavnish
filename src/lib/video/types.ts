@@ -11,6 +11,7 @@
 // Relative rather than "@/lib/blocks/blockTypes" so the render worker (plain tsx, no Next
 // resolver) can import this module by path. See the note in ./tts.ts.
 import type { BlockType } from "../blocks/blockTypes";
+import type { SocialPlatform } from "../brand";
 
 // ---------------------------------------------------------------------------
 // Output formats
@@ -76,6 +77,12 @@ export interface NarrationSegment {
   pitch?: number;
   /** Silence inserted before this segment, for pacing against an on-screen beat. */
   leadInSeconds?: number;
+  /**
+   * Silence AFTER this segment. On a Japanese segment this is the learner's turn to say it back —
+   * shadowing — which is the one way to lengthen a teaching video that adds value rather than
+   * dead air. Accounted for by sceneNarrationSeconds/segmentOffsets in ./timeline.ts.
+   */
+  pauseAfterSeconds?: number;
   /** Built by the TTS layer from text/spokenAs — never authored by the LLM or a human. */
   ssml?: string;
   /** Filled in by the worker's `tts` stage. Absent until then. */
@@ -86,11 +93,37 @@ export interface NarrationSegment {
   };
 }
 
+/**
+ * How long things take, and how often they repeat.
+ *
+ * Replaces the single `targetDurationSeconds` number, which was advisory prose in the LLM prompt
+ * while the per-slot word limits were hardcoded — so nothing enforced it. Every field here feeds
+ * a computation in src/lib/video/pacing.ts.
+ */
+export interface PacingConfig {
+  /** The one number that matters. Drives the model's per-slot word budget. */
+  secondsPerItem: number;
+  /** How many times a Japanese term is spoken. Two is right for single words, one for sentences. */
+  repeatJapanese: 1 | 2 | 3;
+  /** Silence after each Japanese phrase so the learner can repeat it. */
+  pauseAfterJapaneseSeconds: number;
+  /** Breathing room at the end of every scene, so a cut never clips the last syllable. */
+  scenePaddingSeconds: number;
+  /** 0.85 by default — slow enough to catch each mora without sounding artificial. */
+  japaneseRate: number;
+  /** 1.0 by default — the explanation should not drag. */
+  narrationRate: number;
+}
+
+/** Per-language Google TTS voice names. */
+export type VoiceConfig = Partial<Record<NarrationLang, string>>;
+
 // ---------------------------------------------------------------------------
 // Scenes
 // ---------------------------------------------------------------------------
 
 export type SceneType =
+  | "mascot_intro"
   | "title_card"
   | "vocab_card"
   | "vocab_list"
@@ -113,7 +146,7 @@ export type SceneType =
   | "cta_outro";
 
 export const SCENE_TYPES: SceneType[] = [
-  "title_card", "vocab_card", "vocab_list", "kanji_stroke", "kanji_detail", "kana_grid",
+  "mascot_intro", "title_card", "vocab_card", "vocab_list", "kanji_stroke", "kanji_detail", "kana_grid",
   "grammar_pattern", "grammar_formation", "example_sentence", "dialogue", "reading_passage",
   "listening_prompt", "comparison", "tip_callout", "common_mistake", "culture_note",
   "quiz_question", "summary_recap", "broll_page", "cta_outro",
@@ -189,9 +222,24 @@ export interface Scene {
   durationMode: "auto" | "fixed";
   /** Seconds. An authored hint in `auto` mode; authoritative in `fixed` mode. */
   durationSeconds: number;
+  /**
+   * Seconds a scene must stay on screen even when its narration is shorter.
+   *
+   * Distinct from `durationSeconds`, which `auto` mode ignores outright — a scene whose visuals
+   * take longer to read than to say needs a floor, not a hint. The outro is the motivating case:
+   * a logo, headline, URL pill, follow line and icon row cannot be taken in during the two
+   * seconds it takes to say "learn more at the site".
+   *
+   * Honoured by both `resolveSceneDuration()` and `estimateStoryboardDuration()`, so the forecast
+   * and the render agree.
+   */
+  minDurationSeconds?: number;
   transitionIn: Transition;
   narration: NarrationSegment[];
   visual: VisualSpec;
+  /** Overrides project pacing for this scene alone — one hard word may deserve three repeats
+   * when the easy ones do not. Unset fields inherit the project config. */
+  pacingOverride?: Partial<Pick<PacingConfig, "repeatJapanese" | "pauseAfterJapaneseSeconds" | "scenePaddingSeconds">>;
   /** Admin-only. Never rendered, never spoken. */
   notes?: string;
 }
@@ -200,10 +248,30 @@ export interface Scene {
 // Visual specs — discriminated on `sceneType`
 // ---------------------------------------------------------------------------
 
+/**
+ * The opening beat: a mascot waves, says hello, and the topic drops in.
+ *
+ * Its own scene type rather than a flag on the title card, because it is a different shape —
+ * the character is the subject and the text is secondary, which is the reverse of a title card.
+ */
+export interface MascotIntroVisual {
+  sceneType: "mascot_intro";
+  /** A MascotId from src/lib/video/mascots.ts. */
+  mascot: string;
+  /** Spoken and shown, e.g. こんにちは. */
+  greeting: string;
+  greetingRomaji?: string;
+  /** The topic, which lands after the greeting. */
+  topic: string;
+  eyebrow?: string;
+}
+
 export interface TitleCardVisual {
   sceneType: "title_card";
   title: string;
   subtitle?: string;
+  /** Optional character alongside the title. A MascotId from ./mascots.ts. */
+  mascot?: string;
   eyebrow?: string;
   jlptLevel?: string;
 }
@@ -391,9 +459,22 @@ export interface CtaOutroVisual {
   /** Shown as text; not a clickable link in a video file. */
   url?: string;
   showLogo: boolean;
+  /** "@japanesewithavnish", above the icon row. */
+  handle?: string;
+  /**
+   * Platforms shown as icons on the follow row.
+   *
+   * Stored on the scene rather than read from `@/lib/brand` at render time so that an old
+   * storyboard re-rendered a year from now still shows the icons it was authored with — the same
+   * reason `content_snapshot` exists.
+   */
+  socials?: SocialPlatform[];
+  /** Waving character above the follow row. A MascotId from ./mascots.ts. */
+  mascot?: string;
 }
 
 export type VisualSpec =
+  | MascotIntroVisual
   | TitleCardVisual
   | VocabCardVisual
   | VocabListVisual
@@ -446,6 +527,34 @@ export interface ResolvedTimeline {
   resolvedAt: string;
 }
 
+/**
+ * On-screen brand marks, applied across every scene rather than authored into any one of them.
+ *
+ * Stored on the storyboard so it is part of the document that gets versioned, diffed and
+ * re-rendered — a video re-rendered later shows the branding it was approved with, not whatever
+ * the constants say today.
+ */
+export interface BrandingSettings {
+  /**
+   * `badge`  the full circular logo (public/logo.png)
+   * `symbol` the ring and lettering stripped off (public/logo-dark.png)
+   * `none`   no watermark
+   */
+  logo: "badge" | "symbol" | "none";
+  /** 0-1. Low enough to sit behind content, high enough to survive a re-upload. */
+  logoOpacity: number;
+  /** Burned into the frame. Omit to suppress; suppressed on landscape regardless. */
+  hashtag?: string;
+  /** "@japanesewithavnish", shown on the outro. */
+  handle?: string;
+  /** Icon row on the outro, in order. */
+  socials?: SocialPlatform[];
+  /** Waving character on the outro. A MascotId from ./mascots.ts. */
+  mascot?: string;
+  /** Character art on the intro beat, the bookends and teaching-scene corners. */
+  mascots: boolean;
+}
+
 export interface Storyboard {
   schemaVersion: 1;
   projectId: string;
@@ -454,6 +563,9 @@ export interface Storyboard {
   themeKey: string;
   bgm?: BgmSettings;
   captions: CaptionSettings;
+  /** Optional so every storyboard authored before branding existed still parses. Consumers
+   * resolve it through `resolveBranding()`, which fills in the defaults. */
+  branding?: BrandingSettings;
   scenes: Scene[];
   resolved?: ResolvedTimeline;
 }
@@ -537,6 +649,8 @@ export interface VideoProjectRow {
   targetDurationSeconds: number | null;
   tone: string | null;
   includeBroll: boolean;
+  pacing: PacingConfig | null;
+  voices: VoiceConfig | null;
   status: ProjectStatus;
   currentStoryboardId: string | null;
   errorMessage: string | null;

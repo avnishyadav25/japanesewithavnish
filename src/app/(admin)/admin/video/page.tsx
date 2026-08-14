@@ -64,7 +64,10 @@ export default async function VideoStudioDashboard() {
       <AdminPageHeader
         title="Video Studio"
         breadcrumb={[{ label: "Admin", href: "/admin" }, { label: "Video Studio" }]}
-        action={{ label: "New video", href: "/admin/video/new" }}
+        actions={[
+          { label: "Content plan", href: "/admin/video/content-plan" },
+          { label: "New video", href: "/admin/video/new" },
+        ]}
       />
 
       {workerLooksDown && (

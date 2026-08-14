@@ -1,6 +1,8 @@
 import React from "react";
-import { interpolate, useCurrentFrame, useVideoConfig } from "remotion";
+import { Img, interpolate, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import type { CalloutVisual, CtaOutroVisual, SummaryRecapVisual, TitleCardVisual } from "@/lib/video/types";
+import { SocialIcon } from "@/components/icons/SocialIcons";
+import { mascotAsset, type MascotId } from "@/lib/video/mascots";
 import { useLayout } from "../LayoutContext";
 import { fontStackSans, fontStackSerif } from "../theme";
 import { Chip, Eyebrow, FadeUp, JapaneseText, SceneFrame, Surface } from "../components/primitives";
@@ -107,12 +109,43 @@ export const SummaryRecapScene: React.FC<{ visual: SummaryRecapVisual }> = ({ vi
   );
 };
 
+/**
+ * The closing card, and the only frame most viewers will act on.
+ *
+ * `showLogo` had been set to `true` by the storyboard builder since day one and was never read
+ * here — the prop existed, the logo did not. It renders now, above a follow row carrying the
+ * handle and the platform icons.
+ *
+ * Entrances are staggered rather than simultaneous so the eye lands on the URL before the icons.
+ * The scene carries `minDurationSeconds` (see OUTRO_MIN_SECONDS) because narration alone sizes it
+ * at roughly two seconds, which is not long enough to read a handle off a phone screen.
+ */
 export const CtaOutroScene: React.FC<{ visual: CtaOutroVisual }> = ({ visual }) => {
   const { theme, scale } = useLayout();
+  const socials = visual.socials ?? [];
+
   return (
     <SceneFrame background={theme.primary}>
-      <div style={{ textAlign: "center", display: "grid", gap: scale.gap * 0.7 }}>
-        <FadeUp>
+      <div style={{ textAlign: "center", display: "grid", gap: scale.gap * 0.55, justifyItems: "center" }}>
+        {visual.showLogo ? (
+          <FadeUp>
+            <Img
+              src={staticFile("logo.png")}
+              style={{
+                width: scale.headline * 1.5,
+                height: scale.headline * 1.5,
+                objectFit: "contain",
+                // The badge is navy-on-transparent and this card is deep red. A white disc behind
+                // it keeps the mark legible instead of muddying into the background.
+                background: "#fff",
+                borderRadius: 999,
+                padding: scale.gap * 0.22,
+              }}
+            />
+          </FadeUp>
+        ) : null}
+
+        <FadeUp delay={4}>
           <div
             style={{
               fontFamily: fontStackSans(theme),
@@ -125,11 +158,11 @@ export const CtaOutroScene: React.FC<{ visual: CtaOutroVisual }> = ({ visual }) 
             {visual.headline}
           </div>
         </FadeUp>
-        <FadeUp delay={6}>
+        <FadeUp delay={9}>
           <div
             style={{
               fontFamily: fontStackSerif(theme),
-              fontSize: scale.headline * 0.92,
+              fontSize: scale.headline * 0.82,
               fontWeight: 700,
               color: "#fff",
               lineHeight: 1.1,
@@ -139,7 +172,7 @@ export const CtaOutroScene: React.FC<{ visual: CtaOutroVisual }> = ({ visual }) 
           </div>
         </FadeUp>
         {visual.url ? (
-          <FadeUp delay={14}>
+          <FadeUp delay={15}>
             <div
               style={{
                 fontFamily: fontStackSans(theme),
@@ -152,6 +185,38 @@ export const CtaOutroScene: React.FC<{ visual: CtaOutroVisual }> = ({ visual }) 
               }}
             >
               {visual.url}
+            </div>
+          </FadeUp>
+        ) : null}
+
+        {visual.mascot ? (
+          <FadeUp delay={19}>
+            <Img
+              src={staticFile(mascotAsset(visual.mascot as MascotId))}
+              style={{ width: scale.displayJa * 0.85, height: scale.displayJa * 0.85, objectFit: "contain" }}
+            />
+          </FadeUp>
+        ) : null}
+
+        {visual.handle && socials.length > 0 ? (
+          <FadeUp delay={22}>
+            <div style={{ display: "grid", gap: scale.gap * 0.38, justifyItems: "center" }}>
+              <div
+                style={{
+                  fontFamily: fontStackSans(theme),
+                  fontSize: scale.caption * 0.78,
+                  fontWeight: 600,
+                  color: "rgba(255,255,255,0.78)",
+                  letterSpacing: "0.02em",
+                }}
+              >
+                Follow {visual.handle}
+              </div>
+              <div style={{ display: "flex", gap: scale.gap * 0.62, alignItems: "center" }}>
+                {socials.map((platform) => (
+                  <SocialIcon key={platform} platform={platform} size={scale.caption * 1.05} style={{ color: "#fff" }} />
+                ))}
+              </div>
             </div>
           </FadeUp>
         ) : null}

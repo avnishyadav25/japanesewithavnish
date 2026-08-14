@@ -30,7 +30,9 @@ export function sceneNarrationSeconds(scene: Scene): number {
     const lead = segment.leadInSeconds ?? 0;
     const duration = segment.audio?.durationSeconds ?? 0;
     const start = cursor + lead;
-    cursor = start + duration;
+    // The trailing pause is part of the scene's length even though no audio plays during it —
+    // it is the learner's turn to speak, and cutting it would defeat the point.
+    cursor = start + duration + (segment.pauseAfterSeconds ?? 0);
     end = Math.max(end, cursor);
   }
   return end;
@@ -44,7 +46,7 @@ export function segmentOffsets(scene: Scene): number[] {
   for (const segment of scene.narration) {
     const start = cursor + (segment.leadInSeconds ?? 0);
     offsets.push(start);
-    cursor = start + (segment.audio?.durationSeconds ?? 0);
+    cursor = start + (segment.audio?.durationSeconds ?? 0) + (segment.pauseAfterSeconds ?? 0);
   }
   return offsets;
 }
@@ -60,11 +62,12 @@ export function resolveSceneDuration(scene: Scene, tailPadding: number): number 
   if (scene.durationMode === "fixed") {
     return Math.max(scene.durationSeconds, 1 / 30);
   }
+  const floor = Math.max(scene.minDurationSeconds ?? 0, MIN_SCENE_SECONDS);
   const narration = sceneNarrationSeconds(scene);
   if (narration <= 0) {
-    return Math.max(scene.durationSeconds || MIN_SCENE_SECONDS, MIN_SCENE_SECONDS);
+    return Math.max(scene.durationSeconds || MIN_SCENE_SECONDS, floor);
   }
-  return narration + tailPadding;
+  return Math.max(narration + tailPadding, floor);
 }
 
 export function buildTimeline(storyboard: Storyboard, options: BuildTimelineOptions): ResolvedTimeline {

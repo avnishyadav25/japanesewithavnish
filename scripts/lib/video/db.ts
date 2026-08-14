@@ -146,6 +146,8 @@ export interface LoadedStoryboard {
   themeKey: string;
   themeTokens: Partial<VideoThemeTokens> | null;
   themeVoices: Partial<Record<NarrationLang, string>> | null;
+  /** Per-project overrides from the wizard's voice picker. Take precedence over the theme. */
+  projectVoices: Partial<Record<NarrationLang, string>> | null;
   bgmUrl: string | null;
   projectTitle: string;
 }
@@ -154,7 +156,7 @@ export async function loadStoryboard(storyboardId: string): Promise<LoadedStoryb
   const rows = (await sql`
     SELECT s.id, s.project_id, s.narration_lang, s.doc,
            p.title AS project_title, p.theme_key,
-           t.tokens AS theme_tokens, t.default_voices AS theme_voices,
+           t.tokens AS theme_tokens, t.default_voices AS theme_voices, p.voices AS project_voices,
            b.audio_url AS bgm_url
     FROM video_storyboards s
     JOIN video_projects p ON p.id = s.project_id
@@ -174,6 +176,7 @@ export async function loadStoryboard(storyboardId: string): Promise<LoadedStoryb
     themeKey: String(row.theme_key),
     themeTokens: (row.theme_tokens as Partial<VideoThemeTokens> | null) ?? null,
     themeVoices: (row.theme_voices as Partial<Record<NarrationLang, string>> | null) ?? null,
+    projectVoices: (row.project_voices as Partial<Record<NarrationLang, string>> | null) ?? null,
     bgmUrl: (row.bgm_url as string | null) ?? null,
     projectTitle: String(row.project_title),
   };

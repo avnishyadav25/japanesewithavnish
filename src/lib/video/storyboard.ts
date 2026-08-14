@@ -12,18 +12,36 @@
  * segment straight from `vocabulary.reading` / `kanji.onyomi` / `examples.sentence_ja`, and the
  * model is handed a list of blank segment ids to fill in with English/Hindi prose. It never
  * sees a slot where it could invent Japanese.
+ *
+ * Word budgets are COMPUTED from the project's PacingConfig via ./pacing.ts, not hardcoded.
+ * They used to be constants while a separate "target duration" was passed to the model as
+ * advisory prose, which meant nothing connected the request to the result — 60 seconds asked
+ * for, 121 and ~400 delivered.
  */
 import { randomUUID } from "crypto";
 import { getPromptContent } from "@/lib/ai/load-prompts";
+import { BRAND } from "../brand";
+import { MASCOT_INTRO_SECONDS, OUTRO_MIN_SECONDS, resolveBranding } from "./branding";
+import { MASCOT_GREETING } from "./mascots";
+import {
+  distributeSlotBudget,
+  estimateStoryboardDuration,
+  narrationSecondsForItem,
+  resolvePacing,
+  secondsForWords,
+} from "./pacing";
 import type {
+  BrandingSettings,
   ContentItem,
   ContentSnapshot,
   ExampleSentence,
   NarrationLang,
   NarrationSegment,
+  PacingConfig,
   Scene,
   Storyboard,
   VocabItem,
+  VoiceConfig,
 } from "./types";
 
 const DEEPSEEK_API = "https://api.deepseek.com/v1/chat/completions";
@@ -38,17 +56,19 @@ export interface GenerateStoryboardConfig {
   projectId: string;
   narrationLang: NarrationLang;
   themeKey: string;
+  pacing: PacingConfig;
+  voices?: VoiceConfig | null;
   tone?: string | null;
-  targetDurationSeconds?: number | null;
   bgm?: { trackId: string; gainDb: number; duckDb: number };
   burnInCaptions?: boolean;
   siteName?: string;
   siteUrl?: string;
+  /** Overrides on top of DEFAULT_BRANDING. Unset fields inherit. */
+  branding?: Partial<BrandingSettings> | null;
   /**
    * Insert a real-page B-roll beat before the outro, showing the live page the content came
    * from. Off by default: capture costs a browser launch per video, and a 60-second vocabulary
-   * short usually has no room for it. Worth it on longer formats and anything used as
-   * marketing, where "this is a real site you can go and use" is the point.
+   * short usually has no room for it.
    */
   includeBroll?: boolean;
 }
@@ -59,17 +79,86 @@ export interface GeneratedStoryboard {
   estimatedCostUsd: number;
   model: string;
   promptKey: string;
+  /** Everything that was sent, for the audit row. */
+  request: GenerationRequest;
+  rawResponse: string;
+  durationMs: number;
 }
 
 // ---------------------------------------------------------------------------
-// Skeleton: visuals + Japanese audio, straight from the DB
+// Japanese extraction — the mixed-pattern fix
 // ---------------------------------------------------------------------------
 
-/** A narration slot the LLM is asked to write. `hint` is what it's told the slot is for. */
+/** Hiragana, katakana, CJK ideographs, the iteration marks, and the long-vowel bar. */
+const JAPANESE_RUN = /[ぁ-ゟ゠-ヿ一-鿿々〆ー々〆ヶ]+/g;
+
+/**
+ * Keeps only the Japanese runs of a mixed string.
+ *
+ * 280 of 548 published grammar patterns look like `Verb volitional form + と思います`. That is the
+ * correct way to WRITE a grammar point and the screen keeps it verbatim — but handed to a ja-JP
+ * voice it is read with Japanese phonetics and comes out as gibberish, which would have made
+ * half of every grammar video unusable.
+ */
+export function japaneseOnly(text: string | null | undefined): string | undefined {
+  if (!text) return undefined;
+  const runs = text.match(JAPANESE_RUN);
+  if (!runs) return undefined;
+  // Runs separated by removed Latin text are joined by a short pause rather than jammed
+  // together, so 「Vて-form + ください」 does not become one run-on word.
+  const joined = runs.map((r) => r.trim()).filter(Boolean).join("、");
+  return joined || undefined;
+}
+
+/**
+ * What the voice should say for a grammar pattern.
+ *
+ * Prefers the curated `pattern_spoken` column (backfilled by scripts/backfill-grammar-spoken.ts),
+ * falls back to extracting the Japanese, and returns undefined when nothing survives — in which
+ * case the caller emits no Japanese segment at all and the English narrator carries the point.
+ * Degrading to English-only is correct; degrading to mispronounced Japanese is not.
+ */
+export function spokenGrammarPattern(data: Record<string, unknown>, pattern: string): string | undefined {
+  const curated = typeof data.pattern_spoken === "string" ? data.pattern_spoken.trim() : "";
+  if (curated) return curated;
+  return japaneseOnly(pattern);
+}
+
+// ---------------------------------------------------------------------------
+// Reading normalisation
+// ---------------------------------------------------------------------------
+
+/**
+ * Some `reading` values list alternatives — 良い is stored as "いい / よい", and a few use 、 or a
+ * comma. On screen that is useful information, but handed to a voice it is read aloud verbatim
+ * as "ii slash yoi". Only the first reading is spoken; the display keeps whatever the DB holds.
+ */
+export function primaryReading(reading?: string | null): string | undefined {
+  if (!reading) return undefined;
+  const first = reading.split(/[/／、,]/)[0].trim();
+  return first || undefined;
+}
+
+/** Strips kanji-dictionary notation from on/kun readings so they can be spoken: `す.き` is the
+ * word すき with the okurigana boundary marked, and `-がわ` marks a suffix reading. */
+export function speakableReadings(readings: string[]): string | undefined {
+  const cleaned = readings
+    .map((r) => r.replace(/[.．]/g, "").replace(/^[-−–—]+|[-−–—]+$/g, "").trim())
+    .filter(Boolean);
+  return cleaned.length > 0 ? cleaned.join("、") : undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Segment builders
+// ---------------------------------------------------------------------------
+
 interface BlankSlot {
   id: string;
   hint: string;
   maxWords: number;
+  /** Relative share of the item's narration budget. The slot carrying the real explanation
+   * deserves more than one saying "here's an example". */
+  weight?: number;
 }
 
 function str(value: unknown): string | undefined {
@@ -95,40 +184,59 @@ function toVocabItem(item: ContentItem): VocabItem {
 }
 
 /**
- * Some `reading` values list alternatives — 良い is stored as "いい / よい", and a few use 、 or a
- * comma. On screen that is useful information, but handed to a voice it is read aloud verbatim
- * as "ii slash yoi". Only the first reading is spoken; the display keeps whatever the DB holds.
+ * One Japanese narration segment.
+ *
+ * `pause` is opt-in rather than automatic. A shadowing pause belongs after something the learner
+ * should say back — a word, a sentence, a pattern. After a list of on'yomi readings it is just
+ * dead air, and applying it everywhere made a kanji video 91 seconds of silence out of 172.
  */
-export function primaryReading(reading?: string | null): string | undefined {
-  if (!reading) return undefined;
-  const first = reading.split(/[/／、,]/)[0].trim();
-  return first || undefined;
-}
-
-/** Strips kanji-dictionary notation from on/kun readings so they can be spoken: `す.き` is the
- * word すき with the okurigana boundary marked, and `-がわ` marks a suffix reading. */
-export function speakableReadings(readings: string[]): string | undefined {
-  const cleaned = readings
-    .map((r) => r.replace(/[.．]/g, "").replace(/^[-−–—]+|[-−–—]+$/g, "").trim())
-    .filter(Boolean);
-  return cleaned.length > 0 ? cleaned.join("、") : undefined;
-}
-
-/** Japanese narration segment. `spokenAs` carries the kana reading when we have one, which is
- * what keeps the ja-JP voice from guessing between readings of the same kanji. */
-function jaSegment(id: string, text: string, reading?: string, leadIn = 0.15): NarrationSegment {
+function jaSegment(
+  id: string,
+  text: string,
+  reading: string | undefined,
+  pacing: PacingConfig,
+  leadIn = 0.15,
+  pause = true
+): NarrationSegment {
   return {
     id,
     text,
     lang: "ja",
     spokenAs: primaryReading(reading),
     leadInSeconds: leadIn,
-    speakingRate: 0.9,
+    pauseAfterSeconds: pause ? pacing.pauseAfterJapaneseSeconds : undefined,
+    speakingRate: pacing.japaneseRate,
   };
 }
 
-function blankSegment(id: string, lang: NarrationLang, leadIn = 0): NarrationSegment {
-  return { id, text: "", lang, leadInSeconds: leadIn || undefined };
+/**
+ * Pushes a Japanese phrase `repeatJapanese` times.
+ *
+ * Repetition plus the pause between is what shadowing is: hear it, say it, hear it again. It is
+ * the only honest way to make a teaching video longer, as opposed to padding it.
+ */
+function pushJapanese(
+  narration: NarrationSegment[],
+  baseId: string,
+  text: string,
+  reading: string | undefined,
+  pacing: PacingConfig,
+  firstLeadIn = 0.25
+): void {
+  for (let i = 0; i < pacing.repeatJapanese; i++) {
+    const isLast = i === pacing.repeatJapanese - 1;
+    narration.push(jaSegment(`${baseId}-${i + 1}`, text, reading, pacing, i === 0 ? firstLeadIn : 0.1, isLast));
+  }
+}
+
+function blankSegment(id: string, lang: NarrationLang, pacing: PacingConfig, leadIn = 0): NarrationSegment {
+  return {
+    id,
+    text: "",
+    lang,
+    leadInSeconds: leadIn || undefined,
+    speakingRate: pacing.narrationRate,
+  };
 }
 
 function exampleSpoken(example: ExampleSentence): string | undefined {
@@ -140,63 +248,61 @@ interface Skeleton {
   blanks: BlankSlot[];
 }
 
+/** Turns an item's raw slots into budgeted ones using the pacing config. */
+function budgetItemSlots(
+  slots: { id: string; hint: string; weight?: number }[],
+  japaneseText: string[],
+  config: GenerateStoryboardConfig
+): BlankSlot[] {
+  const seconds = narrationSecondsForItem({
+    pacing: config.pacing,
+    japaneseText,
+    slotCount: slots.length,
+  });
+  return distributeSlotBudget(slots, seconds, config.narrationLang, config.pacing.narrationRate);
+}
+
+// ---------------------------------------------------------------------------
+// Skeletons
+// ---------------------------------------------------------------------------
+
 function vocabularySkeleton(snapshot: ContentSnapshot, config: GenerateStoryboardConfig): Skeleton {
   const lang = config.narrationLang;
+  const pacing = config.pacing;
   const scenes: Scene[] = [];
   const blanks: BlankSlot[] = [];
   const items = snapshot.items.map(toVocabItem);
   const level = snapshot.jlptLevel ? `${snapshot.jlptLevel} ` : "";
 
-  // --- Title card -----------------------------------------------------------
-  const introId = "sc-intro-nar";
-  scenes.push({
-    id: "sc-intro",
-    sceneType: "title_card",
-    durationMode: "auto",
-    durationSeconds: 3,
-    transitionIn: { kind: "fade", durationSeconds: 0.4 },
-    narration: [blankSegment(introId, lang)],
-    visual: {
-      sceneType: "title_card",
-      eyebrow: snapshot.jlptLevel ? `JLPT ${snapshot.jlptLevel}` : undefined,
-      title: `${items.length} ${level}words`,
-      subtitle: "Japanese vocabulary",
-      jlptLevel: snapshot.jlptLevel,
-    },
-  });
-  blanks.push({
-    id: introId,
-    hint: `Hook for a short video teaching ${items.length} ${level}Japanese vocabulary words. Make someone stop scrolling.`,
-    maxWords: 22,
-  });
-
-  // --- One card per word ----------------------------------------------------
   items.forEach((item, i) => {
     const base = `sc-w${i + 1}`;
     const narration: NarrationSegment[] = [];
+    const slots: { id: string; hint: string; weight?: number }[] = [];
+    const japanese: string[] = [item.word];
 
     const leadId = `${base}-lead`;
-    narration.push(blankSegment(leadId, lang));
-    blanks.push({
+    narration.push(blankSegment(leadId, lang, pacing));
+    slots.push({
       id: leadId,
       hint: `Introduce word ${i + 1} of ${items.length}: "${item.word}" (reading: ${item.reading ?? "n/a"}) meaning "${item.meaning}". Say the meaning naturally. Do NOT attempt to pronounce the Japanese — a native voice speaks it right after you.`,
-      maxWords: 18,
+      weight: 2,
     });
 
-    // Deterministic: the word itself, spoken by a native voice, twice for retention.
-    narration.push(jaSegment(`${base}-ja1`, item.word, item.reading, 0.25));
-    narration.push(jaSegment(`${base}-ja2`, item.word, item.reading, 0.35));
+    pushJapanese(narration, `${base}-ja`, item.word, item.reading, pacing);
 
     if (item.example) {
+      japanese.push(item.example.ja);
       const exId = `${base}-exlead`;
-      narration.push(blankSegment(exId, lang, 0.3));
-      blanks.push({
+      narration.push(blankSegment(exId, lang, pacing, 0.3));
+      slots.push({
         id: exId,
-        hint: `Introduce an example sentence for "${item.word}". The English meaning of the sentence is "${item.example.en}". One short lead-in clause only.`,
-        maxWords: 12,
+        hint: `Introduce an example sentence for "${item.word}". Its English meaning is "${item.example.en}". One short lead-in clause only.`,
+        weight: 1,
       });
-      narration.push(jaSegment(`${base}-exja`, item.example.ja, exampleSpoken(item.example), 0.25));
+      narration.push(jaSegment(`${base}-exja`, item.example.ja, exampleSpoken(item.example), pacing, 0.25));
     }
+
+    blanks.push(...budgetItemSlots(slots, japanese, config));
 
     scenes.push({
       id: base,
@@ -205,7 +311,7 @@ function vocabularySkeleton(snapshot: ContentSnapshot, config: GenerateStoryboar
         ? { kind: "post", id: snapshot.items[i].postId!, url: snapshot.items[i].url }
         : undefined,
       durationMode: "auto",
-      durationSeconds: 5,
+      durationSeconds: pacing.secondsPerItem,
       transitionIn: { kind: "slide", durationSeconds: 0.3 },
       narration,
       visual: {
@@ -218,7 +324,6 @@ function vocabularySkeleton(snapshot: ContentSnapshot, config: GenerateStoryboar
     });
   });
 
-  // --- Recap ----------------------------------------------------------------
   if (items.length > 1) {
     const recapId = "sc-recap-nar";
     scenes.push({
@@ -227,7 +332,7 @@ function vocabularySkeleton(snapshot: ContentSnapshot, config: GenerateStoryboar
       durationMode: "auto",
       durationSeconds: 4,
       transitionIn: { kind: "fade", durationSeconds: 0.4 },
-      narration: [blankSegment(recapId, lang)],
+      narration: [blankSegment(recapId, lang, pacing)],
       visual: {
         sceneType: "summary_recap",
         heading: "Quick recap",
@@ -241,56 +346,12 @@ function vocabularySkeleton(snapshot: ContentSnapshot, config: GenerateStoryboar
     });
   }
 
-  // --- Real-page B-roll -----------------------------------------------------
-  const brollUrl = snapshot.items[0]?.url;
-  if (config.includeBroll && brollUrl) {
-    const brollId = "sc-broll-nar";
-    scenes.push({
-      id: "sc-broll",
-      sceneType: "broll_page",
-      sourceRef: snapshot.items[0].postId ? { kind: "post", id: snapshot.items[0].postId!, url: brollUrl } : undefined,
-      durationMode: "auto",
-      durationSeconds: 5,
-      transitionIn: { kind: "fade", durationSeconds: 0.4 },
-      narration: [blankSegment(brollId, lang)],
-      visual: {
-        sceneType: "broll_page",
-        sourceUrl: brollUrl,
-        captureKind: "scroll_clip",
-        caption: "Every word has a full page",
-      },
-    });
-    blanks.push({
-      id: brollId,
-      hint: "One sentence telling the viewer each of these words has a full page on the site with more examples.",
-      maxWords: 20,
-    });
-  }
-
-  // --- Outro ----------------------------------------------------------------
-  const outroId = "sc-outro-nar";
-  scenes.push({
-    id: "sc-outro",
-    sceneType: "cta_outro",
-    durationMode: "auto",
-    durationSeconds: 3,
-    transitionIn: { kind: "fade", durationSeconds: 0.4 },
-    narration: [blankSegment(outroId, lang)],
-    visual: {
-      sceneType: "cta_outro",
-      headline: "Practise these on",
-      subline: config.siteName ?? "JapaneseWithAvnish",
-      url: config.siteUrl ?? "japanesewithavnish.com",
-      showLogo: true,
-    },
-  });
-  blanks.push({ id: outroId, hint: "A short closing call to action.", maxWords: 16 });
-
-  return { scenes, blanks };
+  return withIntroOutro(scenes, blanks, snapshot, config, `${items.length} ${level}words`);
 }
 
 function kanjiSkeleton(snapshot: ContentSnapshot, config: GenerateStoryboardConfig): Skeleton {
   const lang = config.narrationLang;
+  const pacing = config.pacing;
   const scenes: Scene[] = [];
   const blanks: BlankSlot[] = [];
 
@@ -300,23 +361,23 @@ function kanjiSkeleton(snapshot: ContentSnapshot, config: GenerateStoryboardConf
     const meaning = str(d.meaning) ?? item.summary ?? "";
     const onyomi = strArray(d.onyomi);
     const kunyomi = strArray(d.kunyomi);
-    // stroke_data is KanjiVG JSON; accept both {paths:[]} and a bare array, since the backfill
-    // script and the writing canvas have both shapes in the wild.
     const strokeRaw = d.stroke_data as { paths?: unknown } | unknown[] | null | undefined;
     const strokePaths = Array.isArray(strokeRaw)
       ? strArray(strokeRaw)
       : strArray((strokeRaw as { paths?: unknown } | null)?.paths);
+    const exampleWords = Array.isArray(d.exampleWords) ? (d.exampleWords as VocabItem[]) : [];
 
     const base = `sc-k${i + 1}`;
-    const exampleWords = Array.isArray(d.exampleWords) ? (d.exampleWords as VocabItem[]) : [];
     const narration: NarrationSegment[] = [];
+    const slots: { id: string; hint: string; weight?: number }[] = [];
+    const japanese: string[] = [];
 
     const leadId = `${base}-lead`;
-    narration.push(blankSegment(leadId, lang));
-    blanks.push({
+    narration.push(blankSegment(leadId, lang, pacing));
+    slots.push({
       id: leadId,
       hint: `Introduce the kanji ${character}, which means "${meaning}". Mention it has ${d.stroke_count ?? "several"} strokes.`,
-      maxWords: 24,
+      weight: 2,
     });
 
     // On/kun are stored in dictionary notation — す.き marks where the okurigana starts, and a
@@ -324,24 +385,29 @@ function kanjiSkeleton(snapshot: ContentSnapshot, config: GenerateStoryboardConf
     // scene renders the raw arrays) but a voice reads them aloud as "su dot ki", so speech gets
     // a cleaned copy via spokenAs.
     if (onyomi.length) {
-      narration.push(jaSegment(`${base}-on`, onyomi.join("、"), speakableReadings(onyomi), 0.3));
+      const spoken = speakableReadings(onyomi);
+      narration.push(jaSegment(`${base}-on`, onyomi.join("、"), spoken, pacing, 0.3, false));
+      if (spoken) japanese.push(spoken);
     }
     if (kunyomi.length) {
-      narration.push(jaSegment(`${base}-kun`, kunyomi.join("、"), speakableReadings(kunyomi), 0.3));
+      const spoken = speakableReadings(kunyomi);
+      narration.push(jaSegment(`${base}-kun`, kunyomi.join("、"), spoken, pacing, 0.3, false));
+      if (spoken) japanese.push(spoken);
     }
 
     // Words that actually use the character. For most kanji this is the only concrete usage the
     // video can show, since only ~5% have example sentences of their own.
     if (exampleWords.length > 0) {
       const wordsLeadId = `${base}-words`;
-      narration.push(blankSegment(wordsLeadId, lang, 0.3));
-      blanks.push({
+      narration.push(blankSegment(wordsLeadId, lang, pacing, 0.3));
+      slots.push({
         id: wordsLeadId,
         hint: `Introduce real words that use ${character}: ${exampleWords.map((w) => `${w.word} (${w.meaning})`).join(", ")}. Give the meanings; a native voice says the words.`,
-        maxWords: 26,
+        weight: 1.5,
       });
       exampleWords.forEach((word, wi) => {
-        narration.push(jaSegment(`${base}-w${wi}`, word.word, word.reading, 0.25));
+        narration.push(jaSegment(`${base}-w${wi}`, word.word, word.reading, pacing, 0.25));
+        japanese.push(word.word);
       });
     }
 
@@ -350,7 +416,7 @@ function kanjiSkeleton(snapshot: ContentSnapshot, config: GenerateStoryboardConf
       sceneType: "kanji_stroke",
       sourceRef: item.postId ? { kind: "post", id: item.postId, url: item.url } : undefined,
       durationMode: "auto",
-      durationSeconds: 8,
+      durationSeconds: pacing.secondsPerItem,
       transitionIn: { kind: "fade", durationSeconds: 0.4 },
       narration,
       visual: {
@@ -373,20 +439,20 @@ function kanjiSkeleton(snapshot: ContentSnapshot, config: GenerateStoryboardConf
         id: exBase,
         sceneType: "example_sentence",
         durationMode: "auto",
-        durationSeconds: 5,
+        durationSeconds: Math.max(4, pacing.secondsPerItem * 0.5),
         transitionIn: { kind: "slide", durationSeconds: 0.3 },
         narration: [
-          blankSegment(exLeadId, lang),
-          jaSegment(`${exBase}-ja`, example.ja, exampleSpoken(example), 0.25),
+          blankSegment(exLeadId, lang, pacing),
+          jaSegment(`${exBase}-ja`, example.ja, exampleSpoken(example), pacing, 0.25),
         ],
         visual: { sceneType: "example_sentence", sentences: [example], highlight: [character] },
       });
-      blanks.push({
-        id: exLeadId,
-        hint: `Lead into an example using ${character}. The sentence means "${example.en}".`,
-        maxWords: 14,
-      });
+      slots.push({ id: exLeadId, hint: `Lead into an example using ${character}. The sentence means "${example.en}".`, weight: 1 });
+      japanese.push(example.ja);
     });
+
+    // One budget for the whole item, examples included — see the note in grammarSkeleton.
+    blanks.push(...budgetItemSlots(slots, japanese, config));
   });
 
   return withIntroOutro(scenes, blanks, snapshot, config, `${snapshot.items.length} kanji`);
@@ -394,6 +460,7 @@ function kanjiSkeleton(snapshot: ContentSnapshot, config: GenerateStoryboardConf
 
 function grammarSkeleton(snapshot: ContentSnapshot, config: GenerateStoryboardConfig): Skeleton {
   const lang = config.narrationLang;
+  const pacing = config.pacing;
   const scenes: Scene[] = [];
   const blanks: BlankSlot[] = [];
 
@@ -403,38 +470,54 @@ function grammarSkeleton(snapshot: ContentSnapshot, config: GenerateStoryboardCo
     const meaning = str(d.meaning) ?? item.summary ?? "";
     const base = `sc-g${i + 1}`;
 
+    // THE mixed-pattern fix. `pattern` is often "Verb volitional form + と思います"; only the
+    // Japanese part may reach the Japanese voice, and if there is none we say nothing in
+    // Japanese rather than saying it wrong.
+    const spokenPattern = spokenGrammarPattern(d, pattern);
+
+    const narration: NarrationSegment[] = [];
+    const slots: { id: string; hint: string; weight?: number }[] = [];
+    const japanese: string[] = [];
+
     const leadId = `${base}-lead`;
     const useId = `${base}-use`;
+
+    narration.push(blankSegment(leadId, lang, pacing));
+    slots.push({
+      id: leadId,
+      hint: `Introduce the grammar pattern "${pattern}", which means "${meaning}". You MUST say the pattern's English scaffolding yourself (for example "verb volitional form plus") because the Japanese voice only speaks the Japanese part.`,
+      weight: 2,
+    });
+
+    if (spokenPattern) {
+      pushJapanese(narration, `${base}-ja`, pattern, spokenPattern, pacing);
+      japanese.push(spokenPattern);
+    }
+
+    narration.push(blankSegment(useId, lang, pacing, 0.3));
+    slots.push({
+      id: useId,
+      hint: `Explain when to use "${pattern}".${str(d.when_to_use) ? ` Source note: ${str(d.when_to_use)}` : ""}`,
+      weight: 3,
+    });
+
     scenes.push({
       id: base,
       sceneType: "grammar_pattern",
       sourceRef: item.postId ? { kind: "post", id: item.postId, url: item.url } : undefined,
       durationMode: "auto",
-      durationSeconds: 8,
+      durationSeconds: pacing.secondsPerItem,
       transitionIn: { kind: "fade", durationSeconds: 0.4 },
-      narration: [
-        blankSegment(leadId, lang),
-        jaSegment(`${base}-ja`, pattern, undefined, 0.25),
-        blankSegment(useId, lang, 0.3),
-      ],
+      narration,
       visual: {
         sceneType: "grammar_pattern",
         pattern,
+        reading: str(d.pattern_romaji),
         meaning,
         structure: str(d.structure),
         level: str(d.level) ?? item.jlptLevel,
         whenToUse: str(d.when_to_use),
       },
-    });
-    blanks.push({
-      id: leadId,
-      hint: `Introduce the grammar pattern "${pattern}", which means "${meaning}".`,
-      maxWords: 26,
-    });
-    blanks.push({
-      id: useId,
-      hint: `Explain when to use "${pattern}".${str(d.when_to_use) ? ` Source note: ${str(d.when_to_use)}` : ""}`,
-      maxWords: 34,
     });
 
     item.examples.slice(0, 3).forEach((example, ei) => {
@@ -444,29 +527,32 @@ function grammarSkeleton(snapshot: ContentSnapshot, config: GenerateStoryboardCo
         id: exBase,
         sceneType: "example_sentence",
         durationMode: "auto",
-        durationSeconds: 5,
+        durationSeconds: Math.max(4, pacing.secondsPerItem * 0.4),
         transitionIn: { kind: "slide", durationSeconds: 0.3 },
         narration: [
-          blankSegment(exLeadId, lang),
-          jaSegment(`${exBase}-ja`, example.ja, exampleSpoken(example), 0.25),
+          blankSegment(exLeadId, lang, pacing),
+          jaSegment(`${exBase}-ja`, example.ja, exampleSpoken(example), pacing, 0.25),
         ],
-        visual: { sceneType: "example_sentence", sentences: [example], highlight: [pattern] },
+        // Highlight only the Japanese part — "Verb volitional form" never appears in a sentence.
+        visual: { sceneType: "example_sentence", sentences: [example], highlight: spokenPattern ? [spokenPattern] : [] },
       });
-      blanks.push({
-        id: exLeadId,
-        hint: `Lead into example ${ei + 1} for "${pattern}". It means "${example.en}".`,
-        maxWords: 14,
-      });
+      slots.push({ id: exLeadId, hint: `Lead into example ${ei + 1} for "${pattern}". It means "${example.en}".`, weight: 1 });
+      japanese.push(example.ja);
     });
+
+    // ONE budget for the whole item — main scene and every example together. Budgeting each
+    // example separately gave a 10-item grammar video four times the narration it asked for.
+    blanks.push(...budgetItemSlots(slots, japanese, config));
   });
 
   return withIntroOutro(scenes, blanks, snapshot, config, snapshot.title);
 }
 
 /** Generic fallback: narrate an item's title + summary. Used for reading/listening/writing/
- * sounds/conversation and for curriculum lessons until their dedicated scenes land in Phase 3. */
+ * sounds/conversation/study_guide and for curriculum lessons. */
 function genericSkeleton(snapshot: ContentSnapshot, config: GenerateStoryboardConfig): Skeleton {
   const lang = config.narrationLang;
+  const pacing = config.pacing;
   const scenes: Scene[] = [];
   const blanks: BlankSlot[] = [];
 
@@ -478,9 +564,9 @@ function genericSkeleton(snapshot: ContentSnapshot, config: GenerateStoryboardCo
       sceneType: "title_card",
       sourceRef: item.postId ? { kind: "post", id: item.postId, url: item.url } : undefined,
       durationMode: "auto",
-      durationSeconds: 6,
+      durationSeconds: pacing.secondsPerItem,
       transitionIn: { kind: "fade", durationSeconds: 0.4 },
-      narration: [blankSegment(leadId, lang)],
+      narration: [blankSegment(leadId, lang, pacing)],
       visual: {
         sceneType: "title_card",
         eyebrow: item.jlptLevel ? `JLPT ${item.jlptLevel}` : undefined,
@@ -488,11 +574,18 @@ function genericSkeleton(snapshot: ContentSnapshot, config: GenerateStoryboardCo
         subtitle: item.summary?.slice(0, 120),
       },
     });
-    blanks.push({
-      id: leadId,
-      hint: `Explain "${item.title}". ${item.summary ? `Summary: ${item.summary.slice(0, 300)}` : ""}`,
-      maxWords: 45,
-    });
+    blanks.push(
+      ...budgetItemSlots(
+        [
+          {
+            id: leadId,
+            hint: `Explain "${item.title}". ${item.summary ? `Summary: ${item.summary.slice(0, 400)}` : ""}`,
+          },
+        ],
+        [],
+        config
+      )
+    );
 
     item.examples.slice(0, 2).forEach((example, ei) => {
       const exBase = `${base}-ex${ei + 1}`;
@@ -500,9 +593,9 @@ function genericSkeleton(snapshot: ContentSnapshot, config: GenerateStoryboardCo
         id: exBase,
         sceneType: "example_sentence",
         durationMode: "auto",
-        durationSeconds: 5,
+        durationSeconds: Math.max(4, pacing.secondsPerItem * 0.35),
         transitionIn: { kind: "slide", durationSeconds: 0.3 },
-        narration: [jaSegment(`${exBase}-ja`, example.ja, exampleSpoken(example), 0.2)],
+        narration: [jaSegment(`${exBase}-ja`, example.ja, exampleSpoken(example), pacing, 0.2)],
         visual: { sceneType: "example_sentence", sentences: [example] },
       });
     });
@@ -519,6 +612,7 @@ function withIntroOutro(
   titleText: string
 ): Skeleton {
   const lang = config.narrationLang;
+  const pacing = config.pacing;
   const introId = "sc-intro-nar";
   const outroId = "sc-outro-nar";
   const brollUrl = snapshot.items[0]?.url;
@@ -534,7 +628,7 @@ function withIntroOutro(
       durationMode: "auto",
       durationSeconds: 5,
       transitionIn: { kind: "fade", durationSeconds: 0.4 },
-      narration: [blankSegment(brollId, lang)],
+      narration: [blankSegment(brollId, lang, pacing)],
       visual: {
         sceneType: "broll_page",
         sourceUrl: brollUrl,
@@ -549,13 +643,39 @@ function withIntroOutro(
     });
   }
 
+  const branding = resolveBranding(config.branding);
+
+  // The mascot beat, when branding asks for it. Fixed duration and NO narration slot: its whole
+  // job is the first second of a Reel, and adding a spoken line would both lengthen it and
+  // compete with the greeting already on screen.
+  const mascotIntro: Scene[] = branding.mascots
+    ? [
+        {
+          id: "sc-mascot",
+          sceneType: "mascot_intro",
+          durationMode: "fixed",
+          durationSeconds: MASCOT_INTRO_SECONDS,
+          transitionIn: { kind: "fade", durationSeconds: 0.3 },
+          narration: [],
+          visual: {
+            sceneType: "mascot_intro",
+            mascot: "fox-wave",
+            greeting: MASCOT_GREETING[lang]?.ja ?? "こんにちは",
+            greetingRomaji: MASCOT_GREETING[lang]?.romaji,
+            topic: titleText,
+            eyebrow: snapshot.jlptLevel ? `JLPT ${snapshot.jlptLevel}` : undefined,
+          },
+        },
+      ]
+    : [];
+
   const intro: Scene = {
     id: "sc-intro",
     sceneType: "title_card",
     durationMode: "auto",
     durationSeconds: 3,
     transitionIn: { kind: "fade", durationSeconds: 0.4 },
-    narration: [blankSegment(introId, lang)],
+    narration: [blankSegment(introId, lang, pacing)],
     visual: {
       sceneType: "title_card",
       eyebrow: snapshot.jlptLevel ? `JLPT ${snapshot.jlptLevel}` : undefined,
@@ -569,20 +689,27 @@ function withIntroOutro(
     id: "sc-outro",
     sceneType: "cta_outro",
     durationMode: "auto",
-    durationSeconds: 3,
+    durationSeconds: OUTRO_MIN_SECONDS,
+    // The outro now carries a logo, headline, subline, URL pill, follow line and an icon row.
+    // Sized off narration alone it lands around two seconds and the icons flash past unread.
+    // `auto` still lets a longer closing line stretch it past the floor.
+    minDurationSeconds: OUTRO_MIN_SECONDS,
     transitionIn: { kind: "fade", durationSeconds: 0.4 },
-    narration: [blankSegment(outroId, lang)],
+    narration: [blankSegment(outroId, lang, pacing)],
     visual: {
       sceneType: "cta_outro",
       headline: "Learn more at",
-      subline: config.siteName ?? "JapaneseWithAvnish",
-      url: config.siteUrl ?? "japanesewithavnish.com",
-      showLogo: true,
+      subline: config.siteName ?? BRAND.shortName,
+      url: config.siteUrl ?? outroSiteUrl(),
+      showLogo: branding.logo !== "none",
+      handle: branding.handle,
+      socials: branding.socials,
+      mascot: branding.mascots ? "fox-celebrate" : undefined,
     },
   };
 
   return {
-    scenes: [intro, ...scenes, ...brollScenes, outro],
+    scenes: [...mascotIntro, intro, ...scenes, ...brollScenes, outro],
     blanks: [
       { id: introId, hint: `Hook for a video about ${titleText}. Make someone stop scrolling.`, maxWords: 22 },
       ...blanks,
@@ -601,7 +728,7 @@ export function buildSkeleton(snapshot: ContentSnapshot, config: GenerateStorybo
 }
 
 // ---------------------------------------------------------------------------
-// Narration: the LLM's only job
+// Prompt assembly — separated so the preview endpoint can show it without generating
 // ---------------------------------------------------------------------------
 
 export const VIDEO_PROMPT_KEY_BY_KIND: Record<string, string> = {
@@ -621,7 +748,7 @@ const LANGUAGE_INSTRUCTION: Record<NarrationLang, string> = {
 
 /** Built-in fallback so generation works before anyone edits the prompt at /admin/prompts. A
  * DB row with the same key overrides this entirely. */
-function defaultSystemPrompt(lang: NarrationLang, tone?: string | null): string {
+export function defaultSystemPrompt(lang: NarrationLang, tone?: string | null): string {
   return [
     "You write voiceover narration for short Japanese-language teaching videos.",
     "",
@@ -632,7 +759,7 @@ function defaultSystemPrompt(lang: NarrationLang, tone?: string | null): string 
     "- Never write Japanese text in a slot whose language is not Japanese. Every Japanese word and sentence in this video is already spoken by a separate native Japanese voice; if you write Japanese, it will be mispronounced by the wrong voice.",
     "- Never state a reading, pronunciation, romaji, or stroke count. Those are already on screen and already spoken. Stating them from memory risks being wrong.",
     "- Never invent example sentences, meanings, or grammar rules. Use only what the hint gives you.",
-    "- Respect each slot's word limit. These are timed to on-screen beats; going over desynchronises the video.",
+    "- Each slot's word count is a TARGET, not a ceiling. Write close to it — within about 10%. The numbers are computed from the video's pacing, so a slot that comes in far under leaves the on-screen card sitting in silence, and one that runs over desynchronises the audio from the visuals.",
     "- Write flowing speech, not headings. One or two sentences per slot.",
     tone ? `\nTone: ${tone}` : "",
     "",
@@ -641,6 +768,82 @@ function defaultSystemPrompt(lang: NarrationLang, tone?: string | null): string 
     .filter(Boolean)
     .join("\n");
 }
+
+export interface GenerationRequest {
+  systemPrompt: string;
+  userMessage: string;
+  slots: BlankSlot[];
+  promptKey: string;
+  model: string;
+  maxTokens: number;
+  /** What the pacing engine expects this script to run to, before a word is written. */
+  estimatedSeconds: number;
+  sceneCount: number;
+  itemCount: number;
+}
+
+export function buildUserMessage(snapshot: ContentSnapshot, config: GenerateStoryboardConfig, slots: BlankSlot[]): string {
+  const kind = snapshot.items[0]?.kind ?? "vocabulary";
+  return [
+    `Video title: ${snapshot.title}`,
+    snapshot.jlptLevel ? `JLPT level: ${snapshot.jlptLevel}` : "",
+    `Content type: ${kind}`,
+    `Pacing: about ${config.pacing.secondsPerItem} seconds per item. The word counts below are derived from that timing — aim for them rather than staying comfortably under.`,
+    "",
+    "Write narration for each slot below. Return a JSON object keyed by slot id.",
+    "",
+    ...slots.map((b) => `${b.id} (~${b.maxWords} words): ${b.hint}`),
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+/**
+ * Everything that would be sent to the model, without sending it.
+ *
+ * The prompt preview panel renders this, and `generateStoryboard` consumes the same shape — so
+ * what you inspect is exactly what runs.
+ */
+export async function buildGenerationRequest(
+  snapshot: ContentSnapshot,
+  config: GenerateStoryboardConfig
+): Promise<{ request: GenerationRequest; skeleton: Skeleton }> {
+  const skeleton = buildSkeleton(snapshot, config);
+  const kind = snapshot.items[0]?.kind ?? "vocabulary";
+  const promptKey = VIDEO_PROMPT_KEY_BY_KIND[kind] ?? "video_narration_shared";
+
+  const dbPrompt = await getPromptContent(promptKey);
+  const systemPrompt = dbPrompt || defaultSystemPrompt(config.narrationLang, config.tone);
+  const userMessage = buildUserMessage(snapshot, config, skeleton.blanks);
+
+  return {
+    skeleton,
+    request: {
+      systemPrompt,
+      userMessage,
+      slots: skeleton.blanks,
+      promptKey,
+      model: CHAT_MODEL,
+      maxTokens: Math.min(8000, 600 + skeleton.blanks.length * 90),
+      estimatedSeconds: estimateStoryboardDuration(
+        skeleton.scenes,
+        config.pacing,
+        new Map(
+          skeleton.blanks.map((b) => [
+            b.id,
+            secondsForWords(b.maxWords, config.narrationLang, config.pacing.narrationRate),
+          ])
+        )
+      ).totalSeconds,
+      sceneCount: skeleton.scenes.length,
+      itemCount: snapshot.items.length,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Generation
+// ---------------------------------------------------------------------------
 
 function parseSegmentMap(raw: string): Record<string, string> | null {
   const cleaned = raw.replace(/^```\w*\n?|\n?```$/g, "").trim();
@@ -702,49 +905,45 @@ function sanitizeNarration(text: string): string {
     .trim();
 }
 
+export interface GenerateOverrides {
+  /** Replaces the resolved system prompt for this run only. */
+  systemPrompt?: string;
+  /** Per-slot hint and word-budget overrides, keyed by slot id. */
+  slots?: Record<string, { hint?: string; maxWords?: number }>;
+}
+
 export async function generateStoryboard(
   snapshot: ContentSnapshot,
-  config: GenerateStoryboardConfig
+  config: GenerateStoryboardConfig,
+  overrides?: GenerateOverrides
 ): Promise<GeneratedStoryboard> {
-  const { scenes, blanks } = buildSkeleton(snapshot, config);
-  const kind = snapshot.items[0]?.kind ?? "vocabulary";
-  const promptKey = VIDEO_PROMPT_KEY_BY_KIND[kind] ?? "video_narration_shared";
+  const startedAt = Date.now();
+  const { request, skeleton } = await buildGenerationRequest(snapshot, config);
 
-  const dbPrompt = await getPromptContent(promptKey);
-  const systemPrompt = dbPrompt || defaultSystemPrompt(config.narrationLang, config.tone);
+  // Per-run overrides from the prompt preview panel. Applied here rather than baked into
+  // buildGenerationRequest so the preview always shows the unedited baseline first.
+  const slots = skeleton.blanks.map((slot) => ({
+    ...slot,
+    ...(overrides?.slots?.[slot.id]?.hint ? { hint: overrides.slots[slot.id].hint! } : {}),
+    ...(overrides?.slots?.[slot.id]?.maxWords ? { maxWords: overrides.slots[slot.id].maxWords! } : {}),
+  }));
+  const systemPrompt = overrides?.systemPrompt?.trim() || request.systemPrompt;
+  const userMessage = overrides ? buildUserMessage(snapshot, config, slots) : request.userMessage;
+  const effectiveRequest: GenerationRequest = { ...request, systemPrompt, userMessage, slots };
 
-  const durationNote = config.targetDurationSeconds
-    ? `\nTarget total length: about ${config.targetDurationSeconds} seconds of speech. Keep every slot tight.`
-    : "";
-  const userMessage = [
-    `Video title: ${snapshot.title}`,
-    snapshot.jlptLevel ? `JLPT level: ${snapshot.jlptLevel}` : "",
-    `Content type: ${kind}`,
-    durationNote,
-    "",
-    "Write narration for each slot below. Return a JSON object keyed by slot id.",
-    "",
-    ...blanks.map((b) => `${b.id} (max ${b.maxWords} words): ${b.hint}`),
-  ]
-    .filter(Boolean)
-    .join("\n");
-
-  // ~40 tokens per slot of output plus headroom for the JSON envelope.
-  const maxTokens = Math.min(8000, 600 + blanks.length * 90);
-  const { text, promptTokens, completionTokens } = await callDeepSeek(systemPrompt, userMessage, maxTokens);
+  const { text, promptTokens, completionTokens } = await callDeepSeek(systemPrompt, userMessage, request.maxTokens);
   const map = parseSegmentMap(text) ?? {};
 
-  const filled = scenes.map((scene) => ({
+  const filled = skeleton.scenes.map((scene) => ({
     ...scene,
     narration: scene.narration
       .map((segment) => {
         if (segment.text) return segment;
         const written = map[segment.id];
-        // A slot the model skipped becomes an empty segment, which the timeline treats as zero
-        // duration — a silent beat, not a crash. The editor shows it as blank so a human can fill it.
         return written ? { ...segment, text: sanitizeNarration(written) } : segment;
       })
-      // Drop blank slots entirely so they don't produce zero-length TTS requests.
+      // A slot the model skipped becomes an empty segment; drop it so it never produces a
+      // zero-length TTS request.
       .filter((segment) => segment.text.trim().length > 0),
   }));
 
@@ -756,6 +955,9 @@ export async function generateStoryboard(
     themeKey: config.themeKey,
     bgm: config.bgm,
     captions: { enabled: true, burnIn: config.burnInCaptions ?? true, style: "bold-center" },
+    // Frozen into the document, so re-rendering this version a year from now reproduces the
+    // branding it was approved with rather than picking up whatever the constants say then.
+    branding: resolveBranding(config.branding),
     scenes: filled,
   };
 
@@ -764,7 +966,10 @@ export async function generateStoryboard(
     usage: { promptTokens, completionTokens },
     estimatedCostUsd: promptTokens * PROMPT_COST_PER_TOKEN + completionTokens * COMPLETION_COST_PER_TOKEN,
     model: CHAT_MODEL,
-    promptKey,
+    promptKey: request.promptKey,
+    request: effectiveRequest,
+    rawResponse: text,
+    durationMs: Date.now() - startedAt,
   };
 }
 
@@ -773,18 +978,14 @@ export function newSceneId(): string {
   return `sc-${randomUUID().slice(0, 8)}`;
 }
 
-const PRODUCTION_DOMAIN = "japanesewithavnish.com";
-
 /**
  * The domain shown on screen in the outro card.
  *
- * Deliberately NOT just `NEXT_PUBLIC_SITE_URL`: on a developer machine that is
- * `http://localhost:3000`, and a video generated there would burn "localhost:3000" into a card
- * that ends up on YouTube. A dev-only host is ignored in favour of the real domain, since the
- * outro is brand copy rather than a functional link.
+ * Now a thin wrapper over BRAND.displayUrl, which carries the dev-host guard for every consumer
+ * rather than just this one. Kept as a named export because the generate routes call it.
  */
 export function outroSiteUrl(): string {
-  const raw = process.env.NEXT_PUBLIC_SITE_URL?.trim();
-  if (!raw || /localhost|127\.0\.0\.1|0\.0\.0\.0|\.local(?::|\/|$)/i.test(raw)) return PRODUCTION_DOMAIN;
-  return raw.replace(/^https?:\/\//, "").replace(/\/$/, "");
+  return BRAND.displayUrl;
 }
+
+export { resolvePacing };

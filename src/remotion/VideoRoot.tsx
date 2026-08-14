@@ -11,9 +11,11 @@ import React from "react";
 import { AbsoluteFill, Audio, Sequence, useVideoConfig } from "remotion";
 import type { ResolvedTimeline, Storyboard, VideoThemeTokens } from "@/lib/video/types";
 import { buildTimeline, segmentOffsets } from "@/lib/video/timeline";
+import { resolveBranding, showsHashtag } from "@/lib/video/branding";
 import { LayoutProvider } from "./LayoutContext";
 import { resolveTheme, type SceneLayout } from "./theme";
 import { SceneRenderer } from "./scenes";
+import { BrandOverlay } from "./components/BrandOverlay";
 import { Captions } from "./components/Captions";
 
 export interface VideoRootProps {
@@ -58,11 +60,13 @@ export const VideoRoot: React.FC<VideoRootProps> = ({
   const { fps } = useVideoConfig();
   const theme = resolveTheme(themeTokens);
 
+  const format = layout === "vertical" ? "vertical" : layout === "square" ? "square" : "landscape";
+
   // A storyboard opened in the editor before the worker has run has no resolved timeline yet.
   // Build a provisional one so the preview still plays instead of rendering nothing.
-  const timeline: ResolvedTimeline =
-    storyboard.resolved ??
-    buildTimeline(storyboard, { format: layout === "vertical" ? "vertical" : layout === "square" ? "square" : "landscape" });
+  const timeline: ResolvedTimeline = storyboard.resolved ?? buildTimeline(storyboard, { format });
+
+  const branding = resolveBranding(storyboard.branding);
 
   return (
     <LayoutProvider layout={layout} theme={theme}>
@@ -86,6 +90,15 @@ export const VideoRoot: React.FC<VideoRootProps> = ({
             </Sequence>
           );
         })}
+
+        {/* Above every scene, below the captions: a caption is the one thing that must never be
+            obscured, and the watermark is the one thing that must never be cropped out. */}
+        <BrandOverlay
+          branding={branding}
+          showHashtag={showsHashtag(format, branding)}
+          scenes={storyboard.scenes}
+          timeline={timeline}
+        />
 
         {(!preview || previewBgm) && bgmUrl && storyboard.bgm ? (
           <Audio
