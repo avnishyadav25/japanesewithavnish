@@ -52,6 +52,11 @@ async function post(path: string, body: unknown): Promise<ProxyResponse> {
     method: "POST",
     headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
     body: JSON.stringify(body),
+    // Next.js patches global fetch with its Data Cache. A cached query response would mean
+    // serving stale rows — silently, and indistinguishably from a fast database. This was
+    // caught by a latency probe reporting a 1ms round trip to Singapore, which is not
+    // physically possible. Never remove this.
+    cache: "no-store",
   });
 
   // The proxy returns JSON for every outcome including errors, but a Traefik-level failure

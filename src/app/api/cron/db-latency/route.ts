@@ -32,6 +32,10 @@ interface Sample {
   medianMs: number | null;
   p95Ms: number | null;
   tenSequentialMs: number | null;
+  /** Round trip for a server-side pg_sleep(0.25). A real network call cannot beat 250ms. */
+  sanityMs: number | null;
+  /** False means the numbers above are not measuring the database. Do not act on them. */
+  trustworthy: boolean;
   error?: string;
 }
 
@@ -41,31 +45,51 @@ function percentile(sorted: number[], p: number): number {
   return sorted[idx];
 }
 
-async function measure(provider: string, driver: PgDriver): Promise<Sample> {
-  const base: Sample = { provider, reachable: false, firstCallMs: null, warmMs: [], medianMs: null, p95Ms: null, tenSequentialMs: null };
+/** Every query must be textually unique.
+ *
+ * The first version of this route measured `SELECT 1` in a loop and reported a 1ms median
+ * from a US region to Singapore — physically impossible, since light alone needs ~200ms
+ * round trip. Both drivers go through fetch, and Next.js patches fetch: identical repeated
+ * requests were being served from its cache rather than the network. The route was
+ * measuring the cache. A unique literal per call defeats any dedupe keyed on request
+ * identity. */
+function uniqueSelect(tag: string, i: number): string {
+  return `SELECT ${i} AS n, '${tag}-${i}' AS tag`;
+}
+
+async function measure(provider: string, driver: PgDriver, runId: string): Promise<Sample> {
+  const base: Sample = { provider, reachable: false, firstCallMs: null, warmMs: [], medianMs: null, p95Ms: null, tenSequentialMs: null, sanityMs: null, trustworthy: false };
   try {
     const t0 = Date.now();
-    await driver.query("SELECT 1");
+    await driver.query(uniqueSelect(`${runId}-first`, 0));
     base.firstCallMs = Date.now() - t0;
 
     const warm: number[] = [];
     for (let i = 0; i < 12; i++) {
       const s = Date.now();
-      await driver.query("SELECT 1");
+      await driver.query(uniqueSelect(`${runId}-warm`, i));
       warm.push(Date.now() - s);
     }
 
     // Ten sequential queries is the shape that actually hurts: a page issuing N dependent
-    // queries pays N round trips, so this is the number that predicts page latency.
+    // queries pays N round trips, so this predicts page latency far better than one SELECT.
     const seqStart = Date.now();
-    for (let i = 0; i < 10; i++) await driver.query("SELECT 1");
+    for (let i = 0; i < 10; i++) await driver.query(uniqueSelect(`${runId}-seq`, i));
     base.tenSequentialMs = Date.now() - seqStart;
+
+    // Self-check: ask the server to sleep 250ms. A real round trip cannot come back faster
+    // than that. If it does, the numbers above are measuring something other than the
+    // database and must not be used to justify a cutover.
+    const sanityStart = Date.now();
+    await driver.query(`SELECT pg_sleep(0.25), '${runId}-sanity' AS tag`);
+    base.sanityMs = Date.now() - sanityStart;
 
     const sorted = [...warm].sort((a, b) => a - b);
     base.reachable = true;
     base.warmMs = warm;
     base.medianMs = percentile(sorted, 50);
     base.p95Ms = percentile(sorted, 95);
+    base.trustworthy = base.sanityMs >= 240;
     return base;
   } catch (e) {
     base.error = e instanceof Error ? e.message : "unknown error";
@@ -82,25 +106,27 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const samples: Sample[] = [];
 
   // Current primary, whatever it is today.
   try {
-    samples.push(await measure("neon (current primary)", getDriverFor("neon")));
+    samples.push(await measure("neon (current primary)", getDriverFor("neon"), runId));
   } catch (e) {
-    samples.push({ provider: "neon", reachable: false, firstCallMs: null, warmMs: [], medianMs: null, p95Ms: null, tenSequentialMs: null, error: e instanceof Error ? e.message : "unknown" });
+    samples.push({ provider: "neon", reachable: false, firstCallMs: null, warmMs: [], medianMs: null, p95Ms: null, tenSequentialMs: null, sanityMs: null, trustworthy: false, error: e instanceof Error ? e.message : "unknown" });
   }
 
   if (vpsConfigured()) {
-    samples.push(await measure("vps (http proxy)", createHttpDriver()));
+    samples.push(await measure("vps (http proxy)", createHttpDriver(), runId));
   } else {
-    samples.push({ provider: "vps", reachable: false, firstCallMs: null, warmMs: [], medianMs: null, p95Ms: null, tenSequentialMs: null, error: "DB_PROXY_URL / DB_PROXY_TOKEN not set in this environment" });
+    samples.push({ provider: "vps", reachable: false, firstCallMs: null, warmMs: [], medianMs: null, p95Ms: null, tenSequentialMs: null, sanityMs: null, trustworthy: false, error: "DB_PROXY_URL / DB_PROXY_TOKEN not set in this environment" });
   }
 
   const neon = samples[0];
   const vps = samples[1];
+  const bothTrustworthy = neon.trustworthy && vps.trustworthy;
   const verdict =
-    neon.medianMs && vps.medianMs
+    bothTrustworthy && neon.medianMs && vps.medianMs
       ? {
           vpsVsPrimaryPct: Math.round(((vps.medianMs - neon.medianMs) / neon.medianMs) * 100),
           // The agreed cutover bar: within ~20% of the current primary, measured warm.
@@ -111,6 +137,10 @@ export async function GET(req: Request) {
   return NextResponse.json({
     measuredFrom: "netlify function (the only region that counts)",
     note: "firstCallMs includes TLS handshake; compare medianMs (warm) across providers, not firstCallMs.",
+    trustworthy: bothTrustworthy,
+    warning: bothTrustworthy
+      ? undefined
+      : "sanityMs shows a pg_sleep(0.25) returning faster than 250ms, so these timings are not measuring the database. Do not use them to justify a cutover.",
     samples,
     verdict,
   });
