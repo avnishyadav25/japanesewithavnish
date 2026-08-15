@@ -32,7 +32,11 @@ SRC="${PRIMARY_URL:-${NEON_URL:-}}"
 : "${SRC:?PRIMARY_URL or NEON_URL must be set in .env}"
 : "${R2_ENDPOINT:?}" ; : "${R2_ACCESS_KEY_ID:?}" ; : "${R2_SECRET_ACCESS_KEY:?}" ; : "${R2_BUCKET_NAME:?}"
 
+# Paths as the HOST sees them, and as the CONTAINER sees them via the ./backups bind mount.
+# Everything pg_dump/pg_restore touches uses the container path so the archive is a real
+# seekable file; the host paths are only for linking, pruning and uploading.
 ROOT=/opt/jwa/backups
+CROOT=/backups
 DAILY="$ROOT/daily"; WEEKLY="$ROOT/weekly"; MONTHLY="$ROOT/monthly"
 mkdir -p "$DAILY" "$WEEKLY" "$MONTHLY"
 
@@ -46,8 +50,9 @@ echo "[$STAMP] backup starting -> $FILE"
 # Dump to a temp name and only promote on success, so a failed or truncated run can never
 # masquerade as that day's backup. Custom format (-Fc) is compressed and restores selectively.
 TMP="$DAILY/.${FILE}.partial"
+CTMP="$CROOT/daily/.${FILE}.partial"
 docker exec -e SRC="$SRC" jwa-postgres \
-  pg_dump -Fc --no-owner --no-privileges --schema=public "$SRC" > "$TMP"
+  pg_dump -Fc --no-owner --no-privileges --schema=public -f "$CTMP" "$SRC"
 
 # A dump small enough to be an error page or an empty archive is not a backup. The real one
 # is ~8MB; 1MB is a generous floor that still catches catastrophic truncation.
@@ -60,10 +65,12 @@ fi
 # Verify the archive is readable before trusting it. pg_restore --list parses the table of
 # contents without touching a database, so this is cheap and catches corruption at write time
 # rather than during an incident.
-if ! docker exec -i jwa-postgres pg_restore --list /dev/stdin < "$TMP" > /dev/null 2>&1; then
+if ! VERIFY=$(docker exec jwa-postgres pg_restore --list "$CTMP" 2>&1); then
   echo "[$STAMP] FAILED: archive is not readable by pg_restore" >&2
+  echo "$VERIFY" | head -5 >&2
   rm -f "$TMP"; exit 1
 fi
+echo "[$STAMP] archive verified: $(echo "$VERIFY" | grep -c 'TABLE DATA') tables of data"
 
 mv "$TMP" "$DEST"
 echo "[$STAMP] dump ok: $(du -h "$DEST" | cut -f1)"

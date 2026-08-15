@@ -55,8 +55,11 @@ docker exec -e PGPASSWORD="$PGPASSWORD" jwa-postgres createdb -U "$PGUSER" "$SCR
 docker exec -e PGPASSWORD="$PGPASSWORD" jwa-postgres \
   psql -U "$PGUSER" -d "$SCRATCH" -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";' >/dev/null
 
-docker exec -i -e PGPASSWORD="$PGPASSWORD" jwa-postgres \
-  pg_restore -U "$PGUSER" -d "$SCRATCH" --no-owner --no-privileges /dev/stdin < "$LATEST" \
+# Container path via the ./backups bind mount: a custom-format archive must be seekable,
+# so it cannot be piped in over stdin.
+CLATEST="/backups/daily/$(basename "$LATEST")"
+docker exec -e PGPASSWORD="$PGPASSWORD" jwa-postgres \
+  pg_restore -U "$PGUSER" -d "$SCRATCH" --no-owner --no-privileges "$CLATEST" \
   > /tmp/jwa-restore-test.log 2>&1 || true
 
 TABLES=$(psql_scratch "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE'")

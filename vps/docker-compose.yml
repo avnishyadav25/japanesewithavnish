@@ -29,6 +29,11 @@ services:
       - "127.0.0.1:5433:5432"
     volumes:
       - jwa-pgdata:/var/lib/postgresql/data
+      # Backups are written and read as real files inside the container, never streamed
+      # through the host. A custom-format pg_dump archive has to be seekable, so piping one
+      # into `pg_restore` over stdin fails with "archive is not readable" -- which is exactly
+      # how the first version of backup.sh broke.
+      - ./backups:/backups
     networks:
       - jwa-internal
     # 8GB box already running n8n, Traefik and a second Postgres. Capping prevents this one
