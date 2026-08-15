@@ -190,7 +190,18 @@ async function syncTableOnce(primary: PgDriver, standby: PgDriver, plan: TablePl
            ORDER BY "${plan.cursorColumn}", ${pk} LIMIT ${BATCH_SIZE}`
         );
 
-    if (rows.length === 0) return { table: plan.table, ok: true, rowsSynced: 0 };
+    if (rows.length === 0) {
+      // Record the check even though nothing moved, and clear any stale error. Without
+      // this, last_synced_at means "last time rows changed" rather than "last time we
+      // verified we were current" — so an idle-but-healthy standby reports ever-growing
+      // lag on /admin/settings/failover (health.ts derives lagSeconds from this column),
+      // and a previous failure's message lingers on a table that is now fine.
+      await standby.query(
+        `UPDATE replication_poll_state SET last_synced_at = NOW(), last_error = NULL WHERE table_name = $1`,
+        [plan.table]
+      );
+      return { table: plan.table, ok: true, rowsSynced: 0 };
+    }
 
     const cols = plan.columns;
     const colList = cols.map((c) => `"${c}"`).join(", ");
