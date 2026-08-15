@@ -12,7 +12,13 @@ const CRON_SECRET = process.env.CRON_SECRET;
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const key = url.searchParams.get("key");
-  if (!CRON_SECRET || key !== CRON_SECRET) {
+  // Accept the Authorization header as well as ?key=. This route was the only cron endpoint
+  // checking the query parameter alone, while .github/workflows/crons.yml sends a Bearer
+  // header — so dispatching it from the workflow returned 401 every time. Found by timing
+  // every cron endpoint against the measured ~30s Netlify ceiling on 2026-08-15.
+  const authHeader = req.headers.get("authorization");
+  const bearerMatches = CRON_SECRET && authHeader === `Bearer ${CRON_SECRET}`;
+  if (!CRON_SECRET || (key !== CRON_SECRET && !bearerMatches)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
