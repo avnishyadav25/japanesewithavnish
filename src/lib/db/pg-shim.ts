@@ -17,7 +17,10 @@ interface Queryable {
   query(text: string, params?: unknown[]): Promise<{ rows: Record<string, any>[] }>;
 }
 
-function buildTaggedQuery(strings: TemplateStringsArray, values: unknown[]): { text: string; params: unknown[] } {
+/** Converts a tagged-template call into ($1, $2, …) text plus its parameter array.
+ * Exported so the HTTP driver (http-driver.ts) produces byte-identical SQL to the pooled
+ * driver — two implementations of this would be two places for a placeholder bug to hide. */
+export function buildTaggedQuery(strings: TemplateStringsArray, values: unknown[]): { text: string; params: unknown[] } {
   let text = strings[0];
   for (let i = 0; i < values.length; i++) {
     text += `$${i + 1}${strings[i + 1]}`;
