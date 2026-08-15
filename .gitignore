@@ -43,7 +43,15 @@ supabase/.branches
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-docs/
+# docs/* (contents), NOT docs/ (the directory). Git does not descend into an excluded
+# directory, so a "!docs/FILE" negation under "docs/" is silently ignored — the file stays
+# untracked and nobody notices. Excluding the contents keeps the directory walkable so the
+# negation below actually applies.
+docs/*
+# The engineering log is the one doc that MUST be shared: it holds the current architecture,
+# the gotchas, and the open backlog that future sessions read before touching databases,
+# crons or deploys. Ignored, it would exist on one machine only.
+!docs/ENGINEERING_LOG.md
 google-cloud-sdk/
 google-cloud-cli-*.tar.gz
 

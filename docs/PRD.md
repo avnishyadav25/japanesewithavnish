@@ -1,5 +1,12 @@
 # PRD v1.0 — JapanesewithAvnish.com
 
+> **⚠ Partially out of date — reviewed 2026-08-15.** The stack line ("Supabase: Postgres,
+> Storage, Auth") is wrong on all three counts: Postgres is Neon with Supabase as a hot
+> standby, storage is Cloudflare R2 (see `scripts/migrate-storage-supabase-to-r2.ts`), and
+> auth is Neon-backed. Downloads do not use Supabase Storage signed URLs. Product and
+> business requirements below were not re-verified. See
+> [ENGINEERING_LOG.md](ENGINEERING_LOG.md).
+
 ## 1) Product Vision
 
 Build a clean, premium, Japanese-inspired learning site that:
