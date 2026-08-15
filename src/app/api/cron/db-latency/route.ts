@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDriverFor } from "@/lib/db/drivers";
-import { createHttpDriver, vpsConfigured } from "@/lib/db/http-driver";
+import { createHttpDriver, queryBatch, vpsConfigured } from "@/lib/db/http-driver";
 import type { PgDriver } from "@/lib/db/pg-shim";
 
 export const maxDuration = 60;
@@ -122,6 +122,21 @@ export async function GET(req: Request) {
     samples.push({ provider: "vps", reachable: false, firstCallMs: null, warmMs: [], medianMs: null, p95Ms: null, tenSequentialMs: null, sanityMs: null, trustworthy: false, error: "DB_PROXY_URL / DB_PROXY_TOKEN not set in this environment" });
   }
 
+  // The architectural question, separate from which host is faster: ten INDEPENDENT queries
+  // in one round trip versus ten sequential ones. Only the proxy can do this; Neon's driver
+  // has no equivalent, which is why there is no per-provider comparison here.
+  let batchedTenMs: number | null = null;
+  if (vpsConfigured()) {
+    try {
+      const stmts = Array.from({ length: 10 }, (_, i) => ({ sql: `SELECT ${i} AS n, '${runId}-batch-${i}' AS tag` }));
+      const t = Date.now();
+      await queryBatch(stmts);
+      batchedTenMs = Date.now() - t;
+    } catch {
+      batchedTenMs = null;
+    }
+  }
+
   const neon = samples[0];
   const vps = samples[1];
   const bothTrustworthy = neon.trustworthy && vps.trustworthy;
@@ -143,5 +158,13 @@ export async function GET(req: Request) {
       : "sanityMs shows a pg_sleep(0.25) returning faster than 250ms, so these timings are not measuring the database. Do not use them to justify a cutover.",
     samples,
     verdict,
+    batching: {
+      vpsTenBatchedMs: batchedTenMs,
+      vpsTenSequentialMs: vps.tenSequentialMs,
+      // How much of a multi-query page's latency is round trips rather than database work.
+      speedupVsSequential:
+        batchedTenMs && vps.tenSequentialMs ? Number((vps.tenSequentialMs / batchedTenMs).toFixed(1)) : null,
+      note: "Ten independent queries in one round trip vs ten sequential. Batching is worth far more than the choice of host.",
+    },
   });
 }
