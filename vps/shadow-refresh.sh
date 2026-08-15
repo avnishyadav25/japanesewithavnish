@@ -35,16 +35,35 @@ echo "[$STAMP] shadow refresh starting"
 # Streamed rather than staged through a file: no dump is left on disk holding a copy of the
 # whole database, and nothing has to be cleaned up if this dies halfway.
 #
-# --clean --if-exists emits two harmless errors on every run: DROP SCHEMA public fails
+# --clean --if-exists emits exactly two harmless errors every run: DROP SCHEMA public fails
 # because the uuid-ossp extension depends on it, and CREATE SCHEMA public fails because it
-# already exists. Both are expected; the tables themselves drop and recreate normally.
+# already exists. The tables themselves drop and recreate normally.
+#
+# Output is captured rather than filtered line-by-line. Suppressing individual lines also
+# suppressed the "Command was:" context belonging to genuine errors, which is the part you
+# actually need when something breaks. Instead: count the errors, stay quiet at the expected
+# two, and dump the whole log verbatim at any other count.
+RESTORE_LOG=$(mktemp)
+trap 'rm -f "$RESTORE_LOG"' EXIT
+
+set +e
 docker exec \
   -e SRC="$NEON_URL" \
   -e DST="$DST" \
   jwa-postgres \
   sh -c 'pg_dump -Fc --no-owner --no-privileges --schema=public "$SRC" \
          | pg_restore -d "$DST" --no-owner --no-privileges --clean --if-exists' \
-  2>&1 | grep -viE 'DROP SCHEMA IF EXISTS public|schema "public" already exists|cannot drop schema public|extension uuid-ossp depends|Use DROP \.\.\. CASCADE|^$' || true
+  >"$RESTORE_LOG" 2>&1
+RESTORE_RC=$?
+set -e
+
+ERR_COUNT=$(grep -c 'pg_restore: error:' "$RESTORE_LOG" || true)
+if [ "$RESTORE_RC" -ne 0 ] || [ "$ERR_COUNT" -ne 2 ]; then
+  echo "[$STAMP] unexpected restore output (exit=$RESTORE_RC, errors=$ERR_COUNT, expected 2) — full log:" >&2
+  cat "$RESTORE_LOG" >&2
+else
+  echo "[$STAMP] restore completed with the 2 expected schema notices"
+fi
 
 # Assert the reload actually produced a usable database. A refresh that silently restores
 # nothing is worse than one that fails loudly, because the shadow would still look present.
