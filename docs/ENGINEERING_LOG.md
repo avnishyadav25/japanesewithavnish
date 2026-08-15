@@ -228,6 +228,16 @@ reconstruction. Where a period is thin, that reflects the record, not the effort
 - **Retire `users`** — 0 rows in both providers while `profiles`/`user_auth` hold the real data.
   Left in `TIGHT_REPLICATION_TABLES` as a trap for the next reader.
 
+- **Turso archive writes are failing — every table, every run.** `backup_sync_log` shows
+  `turso: Turso not configured` × 138 on the latest run: `TURSO_DB_URL` /
+  `TURSO_DB_AUTH_TOKEN` are set locally but **not in Netlify**, so the entire Turso archive
+  tier has written nothing since backups resumed. R2 is unaffected. Found 2026-08-15 by the
+  first run of the weekly report — exactly the kind of silent failure it exists for.
+  Note Turso also holds `db_failover_flag`; routing still works because that is read with
+  credentials from a different code path, but this needs the env vars set in Netlify.
+- **One table still reports a replication error** on the standby. Surfaced by the weekly
+  report; check `replication_poll_state WHERE last_error IS NOT NULL`.
+
 ### Application
 
 - **491 queued content-review jobs.** Needs `DEEPSEEK_API_KEY` as a GitHub Actions secret, then

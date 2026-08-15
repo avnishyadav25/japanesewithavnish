@@ -1,0 +1,83 @@
+# Weekly infrastructure review: emails a health report and keeps one GitHub issue current.
+#
+# Every check it runs is something that has already failed silently on this project — crons
+# declared in a file the platform never read (a month of dead backups), a standby 44 tables
+# behind, a queue re-claiming one poisoned job while 491 waited, a cost cap that could never
+# trip because killed attempts recorded nothing. None of those announced themselves.
+#
+# The issue is written from the same report as the email and is the durable copy: Gmail SMTP
+# from a CI runner is the least reliable link here (unfamiliar-IP blocks, app-password rate
+# limits), so the report must survive the email failing.
+name: weekly-review
+
+on:
+  schedule:
+    # Friday 17:00 IST = 11:30 UTC. End-of-week review.
+    - cron: "30 11 * * 5"
+  workflow_dispatch:
+
+concurrency:
+  group: weekly-review
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # git log --since="7 days ago" needs history; the default shallow clone has none.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build report and send email
+        # Never fail the job here: a dead SMTP link must not stop the issue below from being
+        # written. The report itself flags problems; this step failing would hide them.
+        continue-on-error: true
+        run: npm run report:weekly
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          # Kept as a secret rather than inline: this repository is public, and an address in
+          # a workflow file is scrapeable.
+          REPORT_EMAIL: ${{ secrets.REPORT_EMAIL }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+
+      - name: Open or update the weekly review issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          [ -f weekly-report.md ] || { echo "no weekly-report.md — the report step failed hard"; exit 1; }
+
+          TITLE="Weekly infrastructure review"
+          # One long-lived issue rather than a new one each week: 52 issues a year of mostly
+          # "everything fine" is noise, and a single updated thread keeps the history readable.
+          NUM=$(gh issue list --state open --search "$TITLE in:title" --json number,title \
+                  --jq ".[] | select(.title == \"$TITLE\") | .number" | head -1)
+
+          if [ -n "$NUM" ]; then
+            gh issue comment "$NUM" --body-file weekly-report.md
+            echo "commented on issue #$NUM"
+          else
+            gh issue create --title "$TITLE" --body-file weekly-report.md --label "" 2>/dev/null \
+              || gh issue create --title "$TITLE" --body-file weekly-report.md
+            echo "opened a new issue"
+          fi
