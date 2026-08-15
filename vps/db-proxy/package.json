@@ -1,0 +1,17 @@
+{
+  "name": "jwa-db-proxy",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "HTTPS-fronted SQL proxy so Netlify Functions can reach the VPS Postgres without exposing a database port to the internet",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,95 @@
+# App database + HTTPS SQL proxy, to run alongside the existing n8n/Traefik stack.
+#
+# Deliberately does NOT touch the existing `shared-postgres` container. That one is
+# postgres:16, and the primary being migrated from is 17.10 -- pg_restore refuses an archive
+# produced by a newer major version, so the app needs its own 17.x instance. Keeping them
+# separate also means rolling this back is `docker compose down`, not a restore.
+#
+# Traefik discovers containers via the Docker provider with exposedbydefault=false, so only
+# the proxy opts in. The cert resolver name below must match the one Traefik was started
+# with (--certificatesresolvers.mytlschallenge.*) or issuance silently never happens.
+
+name: jwa
+
+services:
+  postgres:
+    image: postgres:17
+    container_name: jwa-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${PGUSER:?set in .env}
+      POSTGRES_PASSWORD: ${PGPASSWORD:?set in .env}
+      POSTGRES_DB: ${PGDATABASE:-japanesewithavnish}
+      # scram-sha-256 rather than the md5 default on older images.
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --auth-local=scram-sha-256"
+    # Bound to loopback only, and on a different port from shared-postgres (5432) so the two
+    # cannot collide. The proxy does not use this -- it talks over the private network below.
+    # This is here for psql/pg_dump access over an SSH tunnel.
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - jwa-pgdata:/var/lib/postgresql/data
+    networks:
+      - jwa-internal
+    # 8GB box already running n8n, Traefik and a second Postgres. Capping prevents this one
+    # from starving the others -- there is no swap on this host, so an OOM kills outright.
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+    command:
+      - postgres
+      - -c
+      - shared_buffers=1GB
+      - -c
+      - effective_cache_size=3GB
+      - -c
+      - work_mem=16MB
+      - -c
+      - max_connections=100
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  db-proxy:
+    build: ./db-proxy
+    container_name: jwa-db-proxy
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${PGUSER}:${PGPASSWORD}@postgres:5432/${PGDATABASE:-japanesewithavnish}
+      DB_PROXY_TOKEN: ${DB_PROXY_TOKEN:?set in .env}
+    # No `ports:` on purpose. The proxy is reachable only through Traefik, so there is no
+    # host port to firewall and nothing listening on a public interface.
+    networks:
+      - jwa-internal
+      - n8n_default
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    labels:
+      - "traefik.enable=true"
+      # Required when a container sits on more than one network -- otherwise Traefik may
+      # pick the internal one and every request times out.
+      - "traefik.docker.network=n8n_default"
+      - "traefik.http.routers.jwaproxy.rule=Host(`api.japanesewithavnish.com`)"
+      - "traefik.http.routers.jwaproxy.entrypoints=websecure"
+      - "traefik.http.routers.jwaproxy.tls=true"
+      - "traefik.http.routers.jwaproxy.tls.certresolver=mytlschallenge"
+      - "traefik.http.services.jwaproxy.loadbalancer.server.port=8080"
+
+volumes:
+  jwa-pgdata:
+
+networks:
+  jwa-internal:
+    driver: bridge
+  # Traefik's network, created by the n8n stack. External so this compose file joins it
+  # rather than trying to own it.
+  n8n_default:
+    external: true
