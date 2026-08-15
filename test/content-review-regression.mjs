@@ -83,17 +83,28 @@ async function main() {
   // script's fixture jobs are guaranteed to be next in line.
   const [{ c: backlogBefore }] = await sql`SELECT count(*)::int AS c FROM content_review_jobs WHERE status IN ('queued', 'claimed', 'running')`;
   if (backlogBefore > 0) {
-    if (!env.CRON_SECRET) {
-      console.warn(`⚠️  ${backlogBefore} job(s) already active in the queue and CRON_SECRET isn't set to drain them — this may cause the review-pipeline checks below to fail spuriously.\n`);
-    } else {
-      console.log(`Draining ${backlogBefore} pre-existing active job(s) before starting (avoids FIFO interference)...`);
-      for (let tick = 0; tick < 10; tick++) {
-        const drainRes = await fetch(`${BASE_URL}/api/cron/content-review-worker?key=${env.CRON_SECRET}`);
-        const drainBody = await drainRes.json().catch(() => ({ processed: 0 }));
-        if (!drainBody.processed) break;
-      }
-      const [{ c: backlogAfter }] = await sql`SELECT count(*)::int AS c FROM content_review_jobs WHERE status IN ('queued', 'claimed', 'running')`;
-      console.log(`  ${backlogBefore - backlogAfter} drained, ${backlogAfter} remaining.\n`);
+    // Draining used to go through GET /api/cron/content-review-worker. That route no longer
+    // drains: jobs measured p90 64s against a ~30s Netlify ceiling, so it returned 502 on
+    // every production invocation and the work moved to scripts/content-review-worker.ts
+    // (see .github/workflows/content-review.yml). Shell out to the same worker here.
+    const { execFileSync } = await import("node:child_process");
+    // Bounded at 30, matching the old loop's ceiling of 10 ticks x 3 jobs. Every job is real
+    // LLM spend, so this must never become "drain whatever is queued" — at the time of
+    // writing the production backlog was 491 jobs.
+    const DRAIN_CAP = 30;
+    console.log(`Draining up to ${Math.min(backlogBefore, DRAIN_CAP)} of ${backlogBefore} pre-existing active job(s) (avoids FIFO interference)...`);
+    try {
+      execFileSync("npm", ["run", "review:worker", "--", `--max-jobs=${Math.min(backlogBefore, DRAIN_CAP)}`], {
+        stdio: "inherit",
+        env: process.env,
+      });
+    } catch {
+      console.warn("⚠️  Worker drain failed (is DEEPSEEK_API_KEY set?) — the review-pipeline checks below may fail spuriously.\n");
+    }
+    const [{ c: backlogAfter }] = await sql`SELECT count(*)::int AS c FROM content_review_jobs WHERE status IN ('queued', 'claimed', 'running')`;
+    console.log(`  ${backlogBefore - backlogAfter} drained, ${backlogAfter} remaining.\n`);
+    if (backlogAfter > 0) {
+      console.warn(`⚠️  ${backlogAfter} job(s) still queued. claimNextJob() is strict FIFO, so this script's fixture jobs are behind them and the review-pipeline checks will fail spuriously. Clear the backlog first.\n`);
     }
   }
 

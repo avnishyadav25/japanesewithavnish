@@ -315,7 +315,22 @@ export async function runClaimedJob(job: ContentReviewJob): Promise<void> {
         const result = await runner(snapshot, { modelName: meta?.model_name ?? "deepseek-chat", temperature: meta?.temperature ?? 0.1 });
         agentKeysRun.add(agentKey);
         for (const f of result.findings) allFindings.push({ agentKey, finding: f });
-        if (result.usage) totalUsage = { promptTokens: totalUsage.promptTokens + result.usage.promptTokens, completionTokens: totalUsage.completionTokens + result.usage.completionTokens };
+        if (result.usage) {
+          totalUsage = { promptTokens: totalUsage.promptTokens + result.usage.promptTokens, completionTokens: totalUsage.completionTokens + result.usage.completionTokens };
+          // Record spend as it is incurred, not only in the completion UPDATE below. Tokens
+          // are billed the moment the call returns, so a run killed part-way through has
+          // really cost money — but with cost written only at the end, that row keeps a NULL
+          // estimated_cost_usd and contributes 0 to isDailyCostCapReached(). That is how the
+          // $5 cap stayed decorative while the worker burned ~7 calls per tick for hours:
+          // last_24h_usd read NULL because nothing ever finished.
+          await sql`
+            UPDATE content_review_runs
+            SET total_prompt_tokens = ${totalUsage.promptTokens},
+                total_completion_tokens = ${totalUsage.completionTokens},
+                estimated_cost_usd = ${totalUsage.promptTokens * DEEPSEEK_PROMPT_COST_PER_TOKEN + totalUsage.completionTokens * DEEPSEEK_COMPLETION_COST_PER_TOKEN}
+            WHERE id = ${runId}
+          `;
+        }
       } catch (err) {
         console.error(`[content-review] agent ${agentKey} failed:`, err);
         failedAgentKeys.push(agentKey);
