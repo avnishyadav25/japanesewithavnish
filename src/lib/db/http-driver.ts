@@ -134,3 +134,24 @@ export function createHttpDriver(): PgDriver {
 export function vpsConfigured(): boolean {
   return Boolean(process.env.DB_PROXY_URL && process.env.DB_PROXY_TOKEN);
 }
+
+/**
+ * Runs several statements in ONE round trip, returning rows per statement.
+ *
+ * This is the capability the whole proxy design exists for, and it is not expressible
+ * through PgDriver (which is one-query-at-a-time by construction, because that is the shape
+ * the ~300 existing call sites use). Measured from a Netlify function, a single round trip
+ * costs ~212ms while ten sequential ones cost ~2142ms — so any code path that issues
+ * several *independent* queries should batch them here rather than awaiting each in turn.
+ *
+ * Only for independent statements: results come back together, so nothing in the list can
+ * depend on an earlier one's rows. Use transaction() when it does.
+ */
+export async function queryBatch(
+  statements: { sql: string; params?: unknown[] }[],
+  opts: { transaction?: boolean } = {}
+): Promise<DriverRows[]> {
+  const normalised = statements.map((s) => ({ sql: s.sql, params: s.params ?? [] }));
+  const response = await post("/query", { statements: normalised, transaction: opts.transaction === true });
+  return resultsOf(response).map((r) => r.rows);
+}
