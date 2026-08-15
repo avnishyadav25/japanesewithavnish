@@ -1,20 +1,23 @@
 import { NextResponse } from "next/server";
-import { drainQueue } from "@/lib/contentReview/jobRunner";
+import { reapExhaustedJobs } from "@/lib/contentReview/jobRunner";
 import { queueStaleReviews } from "@/lib/contentReview/scheduledReReview";
+import { sql } from "@/lib/db";
 
 const CRON_SECRET = process.env.CRON_SECRET;
-const JOBS_PER_TICK = 3; // smaller than backup-sync's batch: each job here is several
-// sequential LLM calls, not one DB copy.
 
 /**
- * Called every 10 minutes by .github/workflows/crons.yml, same CRON_SECRET auth pattern as
- * src/app/api/cron/backup-sync/route.ts. Drains the content_review_jobs queue in small
- * batches — the only path that processes bulk-sweep jobs (single-item reviews are already
- * processed inline by POST /api/admin/review/jobs); also recovers any job left stale-claimed
- * by a killed/timed-out invocation. Also checks a small batch of already-reviewed content for
- * "Scheduled re-review" (Phase 3) — content edited since last review, or simply reviewed
- * long ago — and queues it; that queued work drains on this or a later tick, same as any
- * other job, not inline here.
+ * Queue maintenance and health, NOT a worker any more.
+ *
+ * This route used to call drainQueue(3), and returned HTTP 502 on every single invocation.
+ * Review jobs make ~7 sequential DeepSeek calls each — measured p90 64s, max 82s — against a
+ * Netlify function ceiling of ~30s (an 18.4s request returns 200; the 502 arrived at exactly
+ * 30.55s). One job could not finish here, let alone three.
+ *
+ * Draining now happens in .github/workflows/content-review.yml, which has no such limit, the
+ * same way video renders moved to video-render.yml for the same reason.
+ *
+ * What stays here is the cheap part: queueing scheduled re-reviews, reaping jobs that can
+ * never succeed again, and reporting queue depth so the schedule still produces a signal.
  */
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -24,13 +27,29 @@ export async function GET(req: Request) {
   if (!CRON_SECRET || (key !== CRON_SECRET && !bearerMatches)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  if (!sql) return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
 
   try {
-    const processed = await drainQueue(JOBS_PER_TICK);
+    const reaped = await reapExhaustedJobs();
     const staleQueued = await queueStaleReviews();
-    return NextResponse.json({ processed, staleQueued });
+
+    const rows = (await sql`
+      SELECT
+        COUNT(*) FILTER (WHERE status = 'queued')::int              AS queued,
+        COUNT(*) FILTER (WHERE status IN ('claimed','running'))::int AS running,
+        COUNT(*) FILTER (WHERE status = 'failed')::int              AS failed,
+        COUNT(*) FILTER (WHERE status = 'completed')::int           AS completed
+      FROM content_review_jobs
+    `) as { queued: number; running: number; failed: number; completed: number }[];
+
+    return NextResponse.json({
+      note: "Draining runs in .github/workflows/content-review.yml — jobs exceed this platform's function timeout.",
+      reaped,
+      staleQueued,
+      queue: rows[0] ?? null,
+    });
   } catch (e) {
-    console.error("Content review worker (cron):", e);
-    return NextResponse.json({ error: e instanceof Error ? e.message : "Worker failed" }, { status: 500 });
+    console.error("Content review maintenance (cron):", e);
+    return NextResponse.json({ error: e instanceof Error ? e.message : "Maintenance failed" }, { status: 500 });
   }
 }

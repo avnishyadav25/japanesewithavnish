@@ -132,7 +132,15 @@ export async function cancelJob(jobId: string): Promise<{ ok: true } | { error: 
 
 /** Atomic claim: FOR UPDATE SKIP LOCKED prevents a concurrent claimer (inline single-item
  * call racing the cron tick) from double-processing the same job. The stale-reclaim branch
- * recovers jobs orphaned by a killed/timed-out invocation. */
+ * recovers jobs orphaned by a killed/timed-out invocation.
+ *
+ * The `attempt_count < max_attempts` guard is load-bearing. Without it the queue head-of-line
+ * blocks: max_attempts was only ever enforced in failJob(), which runs *after* a job fails
+ * and therefore never runs when the platform kills the invocation mid-job. A killed job stays
+ * 'running', becomes re-claimable after STALE_CLAIM_MINUTES, and — being oldest under
+ * ORDER BY created_at ASC — is picked again on the very next tick. Observed in production on
+ * 2026-08-15: one job reached attempt_count 31 against max_attempts 3 while 491 newer jobs
+ * sat at attempt_count 0, never once claimed. */
 export async function claimNextJob(): Promise<ContentReviewJob | null> {
   if (!sql) return null;
   const rows = (await sql`
@@ -140,8 +148,11 @@ export async function claimNextJob(): Promise<ContentReviewJob | null> {
     SET status = 'claimed', claimed_at = NOW(), attempt_count = attempt_count + 1
     WHERE id = (
       SELECT id FROM content_review_jobs
-      WHERE status = 'queued'
-         OR (status IN ('claimed', 'running') AND claimed_at < NOW() - make_interval(mins => ${STALE_CLAIM_MINUTES}))
+      WHERE attempt_count < max_attempts
+        AND (
+          status = 'queued'
+          OR (status IN ('claimed', 'running') AND claimed_at < NOW() - make_interval(mins => ${STALE_CLAIM_MINUTES}))
+        )
       ORDER BY created_at ASC
       LIMIT 1
       FOR UPDATE SKIP LOCKED
@@ -385,11 +396,39 @@ async function isDailyCostCapReached(): Promise<boolean> {
  * (before claimNextJob, not inside runClaimedJob) so a cap-blocked tick never claims a job in
  * the first place — leaves it 'queued' with attempt_count untouched, rather than counting
  * against max_attempts as if the job itself had failed. */
+/** Marks stale jobs that have exhausted their attempts as 'failed'.
+ *
+ * claimNextJob() now refuses to re-claim them, but without this they would sit as 'claimed'
+ * or 'running' forever — invisible to the queue-depth counts and impossible to distinguish
+ * from work in progress. failJob() cannot do this: it only runs when a job fails *in-process*,
+ * and the whole problem is invocations dying before they reach it.
+ *
+ * Returns how many were reaped so callers can report it rather than doing this silently. */
+export async function reapExhaustedJobs(): Promise<number> {
+  if (!sql) return 0;
+  const rows = (await sql`
+    UPDATE content_review_jobs
+    SET status = 'failed',
+        completed_at = NOW(),
+        error_message = COALESCE(error_message, 'Abandoned: attempts exhausted without completing (likely killed mid-run)')
+    WHERE status IN ('claimed', 'running')
+      AND attempt_count >= max_attempts
+      AND claimed_at < NOW() - make_interval(mins => ${STALE_CLAIM_MINUTES})
+    RETURNING id
+  `) as { id: string }[];
+  return rows.length;
+}
+
 export async function drainQueue(limit: number): Promise<number> {
   if (await isDailyCostCapReached()) {
     console.warn(`[content-review] daily cost cap ($${DAILY_COST_CAP_USD}) reached — skipping this drain tick`);
     return 0;
   }
+  // Before claiming anything: clear out jobs that can never succeed again, so queue depth
+  // reflects reality and a caller can tell "nothing to do" from "jammed".
+  const reaped = await reapExhaustedJobs();
+  if (reaped > 0) console.warn(`[content-review] reaped ${reaped} abandoned job(s) that had exhausted their attempts`);
+
   let processed = 0;
   for (let i = 0; i < limit; i++) {
     const job = await claimNextJob();

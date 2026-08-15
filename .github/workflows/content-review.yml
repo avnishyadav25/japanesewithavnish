@@ -1,0 +1,61 @@
+# Content-review queue worker.
+#
+# Review jobs make ~7 sequential DeepSeek calls each and measured a p90 of 64s and a max of
+# 82s. Netlify functions are killed at ~30s (measured 2026-08-15: an 18.4s request returns
+# 200, the 502 arrived at exactly 30.55s), so /api/cron/content-review-worker could never
+# finish one. Same reasoning as video-render.yml: the app enqueues, this drains.
+#
+# Running this alongside anything else is safe — claimNextJob() uses FOR UPDATE SKIP LOCKED,
+# so two workers take different jobs.
+name: content-review
+
+on:
+  # Fired by the admin panel or by hand when a sweep is queued, so a backlog starts draining
+  # without waiting for the schedule.
+  repository_dispatch:
+    types: [content-review]
+  workflow_dispatch:
+    inputs:
+      max_jobs:
+        description: "How many jobs to drain in this run (blank = until the queue is empty)"
+        required: false
+        default: ""
+  # Hourly rather than every 10 minutes: a run can now drain many jobs instead of failing at
+  # one, so frequent ticks bought nothing except more overlap.
+  schedule:
+    - cron: "0 * * * *"
+
+# Never two workers from this repo at once. The claim is safe under concurrency, but
+# serialising keeps LLM spend predictable — the daily cost cap is checked per drain tick, and
+# parallel runs could each pass the check before either had recorded its spend.
+concurrency:
+  group: content-review
+  cancel-in-progress: false
+
+jobs:
+  drain:
+    runs-on: ubuntu-latest
+    # Long enough for a real backlog (491 jobs at ~17s median), short enough that a wedged run
+    # does not hold the concurrency group all day.
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Drain the content-review queue
+        run: npm run review:worker -- ${{ github.event.inputs.max_jobs && format('--max-jobs={0}', github.event.inputs.max_jobs) || '' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          # The agents call DeepSeek directly (src/lib/contentReview/callReviewAgent.ts). The
+          # worker refuses to start without this rather than "succeeding" with the LLM pass
+          # skipped, which would mark jobs reviewed without reviewing them.
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          # Optional: overrides the $5 default in jobRunner.ts.
+          REVIEW_DAILY_COST_CAP_USD: ${{ secrets.REVIEW_DAILY_COST_CAP_USD }}
