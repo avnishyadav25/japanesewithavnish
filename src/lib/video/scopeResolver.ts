@@ -458,11 +458,53 @@ async function scopeTitle(scopeKind: ScopeKind, ref: ScopeRef): Promise<string> 
     )) as { title: string }[];
     if (rows[0]?.title) return rows[0].title;
   }
+  if (scopeKind === "topic") {
+    // The topic text is what the viewer hears in the intro, so it is used verbatim rather than
+    // decorated with a level prefix.
+    return ref.topic?.trim() || "Untitled topic";
+  }
   if (scopeKind === "content_batch") {
     const level = ref.jlptLevel ? `${ref.jlptLevel} ` : "";
     return `${level}${ref.contentType ?? "content"}`.trim();
   }
   return "Untitled";
+}
+
+/**
+ * Resolves a hand-confirmed topic basket.
+ *
+ * A topic spans content types — "greetings" is vocabulary *and* grammar — while `queryPosts`
+ * takes exactly one. So group the ids by their post's type and run the existing per-type query
+ * once per group, rather than growing a second sidecar-join implementation for mixed sets.
+ *
+ * The returned order follows `postIds`, which is the order shown in the picker. Falling back to
+ * database order would silently reorder the video away from the list the admin approved.
+ */
+async function resolveTopicItems(postIds: string[]): Promise<ContentItem[]> {
+  if (!sql || postIds.length === 0) return [];
+
+  const rows = (await sql.query(
+    `SELECT id, content_type FROM posts WHERE id = ANY($1::uuid[]) AND status = 'published'`,
+    [postIds]
+  )) as { id: string; content_type: string }[];
+
+  const byType = new Map<string, string[]>();
+  for (const row of rows) {
+    const list = byType.get(row.content_type) ?? [];
+    list.push(row.id);
+    byType.set(row.content_type, list);
+  }
+
+  const resolved = new Map<string, ContentItem>();
+  // Array.from, not the Map directly: this tsconfig's target predates downlevelIteration.
+  for (const [contentType, ids] of Array.from(byType)) {
+    const posts = await queryPosts({ contentType, postIds: ids });
+    for (const item of await toContentItems(posts, contentType, false)) {
+      if (item.postId) resolved.set(item.postId, item);
+    }
+  }
+
+  return postIds.map((id) => resolved.get(id)).filter((item): item is ContentItem => Boolean(item));
 }
 
 /**
@@ -499,6 +541,9 @@ export async function resolveScope(scopeKind: ScopeKind, ref: ScopeRef): Promise
       postIds: ref.postIds,
     });
     items = await toContentItems(rows, contentType, false);
+  } else if (scopeKind === "topic") {
+    if (!ref.postIds?.length) throw new Error("topic scope requires at least one selected item");
+    items = await resolveTopicItems(ref.postIds);
   } else {
     items = await resolveLessonItems(await lessonIdsUnder(scopeKind, ref));
   }
@@ -507,7 +552,9 @@ export async function resolveScope(scopeKind: ScopeKind, ref: ScopeRef): Promise
     throw new Error(
       scopeKind === "content_batch"
         ? `No published ${ref.contentType ?? "content"} matched those filters.`
-        : "That scope contains no published content yet."
+        : scopeKind === "topic"
+          ? "None of the selected items are published any more."
+          : "That scope contains no published content yet."
     );
   }
 

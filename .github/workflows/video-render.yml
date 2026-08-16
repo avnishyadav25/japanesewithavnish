@@ -84,3 +84,11 @@ jobs:
           # Only needed once B-roll capture lands; harmless before then.
           VIDEO_CAPTURE_BASE_URL: ${{ secrets.VIDEO_CAPTURE_BASE_URL }}
           VIDEO_CAPTURE_ADMIN_COOKIE: ${{ secrets.VIDEO_CAPTURE_ADMIN_COOKIE }}
+          # The pipeline's last stage writes social copy for the finished render
+          # (scripts/lib/social/autoGenerate.ts). These were missing, so every CI render logged
+          # "Social copy: skipped (DEEPSEEK_API_KEY not set)" and the stage silently did nothing —
+          # while the same worker run on a Mac, which reads .env, generated it fine. The skip is
+          # deliberate and non-fatal, which is exactly why nobody noticed for a month.
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          SOCIAL_AUTOGEN: ${{ vars.SOCIAL_AUTOGEN }}
+          SOCIAL_DAILY_COST_CAP_USD: ${{ vars.SOCIAL_DAILY_COST_CAP_USD }}

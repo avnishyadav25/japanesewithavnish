@@ -5,7 +5,23 @@ import { NewVideoWizard } from "./NewVideoWizard";
 
 export const dynamic = "force-dynamic";
 
-export default async function NewVideoPage() {
+/**
+ * Read here rather than with useSearchParams in the client wizard: the deep links that produce
+ * them come from the content plan's coverage table and its "what should I make next" popup, both
+ * of which were silently ignored — the wizard always opened on vocabulary/N5/10 no matter which
+ * gap you clicked. A server component already has the params, so the wizard just gets defaults.
+ */
+export default async function NewVideoPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+  const one = (key: string): string | undefined => {
+    const v = params[key];
+    return Array.isArray(v) ? v[0] : v;
+  };
+
   let themes: { key: string; label: string; description: string | null }[] = [];
   let bgm: { id: string; title: string; mood: string | null }[] = [];
   let levels: { id: string; code: string; name: string | null }[] = [];
@@ -43,7 +59,18 @@ export default async function NewVideoPage() {
         ]}
       />
       <AdminCard>
-        <NewVideoWizard themes={themes} bgmTracks={bgm} levels={levels} lessons={lessons} />
+        <NewVideoWizard
+          themes={themes}
+          bgmTracks={bgm}
+          levels={levels}
+          lessons={lessons}
+          initial={{
+            scopeKind: one("scopeKind"),
+            contentType: one("contentType"),
+            jlptLevel: one("jlptLevel"),
+            topic: one("topic"),
+          }}
+        />
       </AdminCard>
     </div>
   );

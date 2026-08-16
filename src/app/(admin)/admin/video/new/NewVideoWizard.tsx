@@ -14,9 +14,15 @@ interface Props {
   bgmTracks: { id: string; title: string; mood: string | null }[];
   levels: { id: string; code: string; name: string | null }[];
   lessons: { id: string; title: string; code: string; level_code: string }[];
+  /** Query-string defaults from the content plan's deep links. Validated here, not trusted. */
+  initial?: { scopeKind?: string; contentType?: string; jlptLevel?: string; topic?: string };
 }
 
 const JLPT_LEVELS = ["N5", "N4", "N3", "N2", "N1"];
+
+/** Scope kinds this wizard can drive. The API accepts more (content_item, module, submodule);
+ * those are reachable only programmatically. */
+const WIZARD_SCOPE_KINDS: ScopeKind[] = ["content_batch", "curriculum_lesson", "curriculum_level", "topic"];
 
 /** These have bespoke scene templates; the rest fall back to a generic title-card layout, which
  * is honest but not what you want for a flagship video. */
@@ -28,17 +34,42 @@ const label = "block text-sm font-semibold text-charcoal mb-1.5";
 const input =
   "w-full border border-[var(--divider)] rounded-button px-3 py-2 text-sm focus:outline-none focus:border-primary";
 
-export function NewVideoWizard({ themes, bgmTracks, levels, lessons }: Props) {
+export function NewVideoWizard({ themes, bgmTracks, levels, lessons, initial }: Props) {
   const router = useRouter();
   const [step, setStep] = useState(0);
 
   // --- step 1: content ---
-  const [scopeKind, setScopeKind] = useState<ScopeKind>("content_batch");
-  const [contentType, setContentType] = useState("vocabulary");
-  const [jlptLevel, setJlptLevel] = useState("N5");
+  // Deep-link defaults are validated against the known lists rather than used raw: these arrive
+  // from a URL, and an unrecognised contentType would put the select into a blank state whose
+  // estimate call then fails with a server error instead of a visible wrong choice.
+  const [scopeKind, setScopeKind] = useState<ScopeKind>(
+    WIZARD_SCOPE_KINDS.includes(initial?.scopeKind as ScopeKind)
+      ? (initial!.scopeKind as ScopeKind)
+      : initial?.topic
+        ? "topic"
+        : "content_batch"
+  );
+  const [contentType, setContentType] = useState(
+    LEARN_CONTENT_TYPES.includes(initial?.contentType as (typeof LEARN_CONTENT_TYPES)[number])
+      ? initial!.contentType!
+      : "vocabulary"
+  );
+  const [jlptLevel, setJlptLevel] = useState(
+    JLPT_LEVELS.includes(initial?.jlptLevel ?? "") ? initial!.jlptLevel! : "N5"
+  );
   const [limit, setLimit] = useState(10);
   const [levelId, setLevelId] = useState(levels[0]?.id ?? "");
   const [lessonId, setLessonId] = useState(lessons[0]?.id ?? "");
+  const [topic, setTopic] = useState(initial?.topic ?? "");
+
+  /**
+   * The confirmed item basket, or null for "whatever the filters pick".
+   *
+   * null and [] mean different things and the difference matters: null leaves the scope as a
+   * query (contentType + level + limit) exactly as before, while [] is an explicit empty
+   * selection that must not silently fall back to picking ten items you did not choose.
+   */
+  const [selectedPostIds, setSelectedPostIds] = useState<string[] | null>(null);
 
   // --- step 2: output ---
   const [grouping, setGrouping] = useState<"single_video" | "video_per_item">("single_video");
@@ -62,11 +93,27 @@ export function NewVideoWizard({ themes, bgmTracks, levels, lessons }: Props) {
   const [creating, setCreating] = useState(false);
 
   const scopeRef: ScopeRef = useMemo(() => {
-    if (scopeKind === "content_batch") return { contentType, jlptLevel: jlptLevel || undefined, limit: Number(limit) || 10 };
+    if (scopeKind === "topic") return { topic: topic.trim(), postIds: selectedPostIds ?? [] };
+    if (scopeKind === "content_batch") {
+      return {
+        contentType,
+        jlptLevel: jlptLevel || undefined,
+        limit: Number(limit) || 10,
+        // Only sent once you have touched the picker. Absent means "use the filters", which is
+        // the behaviour every existing project was created with.
+        ...(selectedPostIds ? { postIds: selectedPostIds } : {}),
+      };
+    }
     if (scopeKind === "curriculum_level") return { levelId };
     if (scopeKind === "curriculum_lesson") return { lessonId };
     return {};
-  }, [scopeKind, contentType, jlptLevel, limit, levelId, lessonId]);
+  }, [scopeKind, contentType, jlptLevel, limit, levelId, lessonId, topic, selectedPostIds]);
+
+  // A filter change invalidates a basket picked under the old filters — otherwise switching from
+  // N5 to N4 keeps ten N5 ids selected and the level dropdown quietly does nothing.
+  useEffect(() => {
+    setSelectedPostIds(null);
+  }, [contentType, jlptLevel, limit, scopeKind]);
 
   /**
    * Re-prices on every change, debounced.

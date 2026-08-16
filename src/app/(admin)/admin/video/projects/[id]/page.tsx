@@ -4,7 +4,7 @@ import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminCard } from "@/components/admin/AdminCard";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { getProject, listJobs, listRenders, listStoryboards } from "@/lib/video/projects";
-import { publicationSummaryForRender } from "@/lib/social/publications";
+import { attachPublications } from "@/lib/social/publications";
 import { ProjectWorkspace } from "./ProjectWorkspace";
 import { DeleteProjectButton } from "../DeleteProjectButton";
 
@@ -38,14 +38,8 @@ export default async function VideoProjectPage({ params }: { params: Promise<{ i
 
   // Distribution state for the current renders only — the ones whose cards show a status line.
   // Loaded here rather than inside listRenders() so the 60-row /admin/video/renders grid does
-  // not pay for lookups it never displays.
-  const current = renders.filter((r) => r.isCurrent);
-  const publications = await Promise.all(current.map((r) => publicationSummaryForRender(r.id)));
-  const publicationsByRender = new Map(current.map((r, i) => [r.id, publications[i]]));
-  const rendersWithPublications = renders.map((r) => ({
-    ...r,
-    publications: publicationsByRender.get(r.id),
-  }));
+  // not pay for lookups it never displays. Shared with the poll endpoint, which used to omit it.
+  const rendersWithPublications = await attachPublications(renders);
 
   return (
     <div>

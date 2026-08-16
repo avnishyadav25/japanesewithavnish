@@ -55,8 +55,24 @@ function sanitiseVoices(raw: unknown): VoiceConfig | null {
 
 const SCOPE_KINDS: ScopeKind[] = [
   "curriculum_level", "curriculum_module", "curriculum_submodule", "curriculum_lesson",
-  "content_batch", "content_item",
+  "content_batch", "content_item", "topic",
 ];
+
+/**
+ * Makes an auto-generated project label identifiable in a list.
+ *
+ * `scopeTitle` returns "N5 kanji" for every content_batch with that type and level, and nothing
+ * dedupes. Two same-day projects were then distinguishable only by their status badge, so it was
+ * genuinely easy to open the empty twin of a finished video and see a Generate-script page.
+ *
+ * Only the PROJECT ROW is decorated. The storyboard re-resolves its own title from the snapshot
+ * at generation time (storyboard.ts reads `snapshot.title`, never `project.title`), so none of
+ * this reaches the screen in the finished video.
+ */
+function disambiguateTitle(base: string, itemCount: number): string {
+  const stamp = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  return `${base} · ${itemCount} item${itemCount === 1 ? "" : "s"} · ${stamp}`;
+}
 
 export async function GET(req: Request) {
   const admin = await getAdminSession();
@@ -96,14 +112,20 @@ export async function POST(req: Request) {
   // Resolve the scope before inserting anything: a project pointing at zero published items is
   // a dead row that will only fail later at generation time, with a worse error message.
   let resolvedTitle: string;
+  let resolvedItemCount: number;
   try {
-    resolvedTitle = (await resolveScope(scopeKind, scopeRef)).title;
+    const snapshot = await resolveScope(scopeKind, scopeRef);
+    resolvedTitle = snapshot.title;
+    resolvedItemCount = snapshot.items.length;
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to resolve scope" }, { status: 400 });
   }
 
+  const typedTitle = typeof body?.title === "string" ? body.title.trim() : "";
+
   const project = await createProject({
-    title: (typeof body?.title === "string" && body.title.trim()) || resolvedTitle,
+    // A title you typed is used exactly as typed; only the fallback gets disambiguated.
+    title: typedTitle || disambiguateTitle(resolvedTitle, resolvedItemCount),
     scopeKind,
     scopeRef,
     grouping: body?.grouping === "video_per_item" ? "video_per_item" : "single_video",
