@@ -299,7 +299,11 @@ async function captureImage(recipe: CaptureRecipe, hash: string): Promise<Captur
       kind: "image",
       width: recipe.viewportWidth,
       height: fullPage ? Math.round((dimensions.h / dimensions.w) * recipe.viewportWidth) : recipe.viewportHeight,
-      durationSeconds: null,
+      // A scroll_clip is a still that Remotion PANS, so it does have a duration even though it is
+      // a JPEG. This was null for every row — all six in the cache summed to zero seconds — which
+      // left the scene sizing itself from a default rather than from the capture it is showing.
+      // A still genuinely has no duration and stays null.
+      durationSeconds: fullPage ? (recipe.durationSeconds ?? null) : null,
     });
   } finally {
     await context.close().catch(() => {});
