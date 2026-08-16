@@ -16,12 +16,42 @@ export type MascotId =
   | "tanuki-think"
   | "owl-point"
   | "owl-think"
-  | "red-panda-wave";
+  | "red-panda-wave"
+  // Second cast. Declared here before the art exists so the picker can offer them and
+  // scripts/generate-mascots.ts has a target list; `availableMascots()` below is what any
+  // renderer should use, since it filters to ids whose PNG is actually on disk.
+  | "cat-point"
+  | "cat-bow"
+  | "shiba-celebrate"
+  | "shiba-wave"
+  | "crane-think"
+  | "crane-bow"
+  | "rabbit-read"
+  | "rabbit-wave";
 
+/** Every id the cast defines. Not every one necessarily has art yet — see GENERATED. */
 export const MASCOTS: readonly MascotId[] = [
   "fox-wave", "fox-point", "fox-celebrate", "tanuki-write", "tanuki-think",
   "owl-point", "owl-think", "red-panda-wave",
+  "cat-point", "cat-bow", "shiba-celebrate", "shiba-wave",
+  "crane-think", "crane-bow", "rabbit-read", "rabbit-wave",
 ];
+
+/**
+ * The ids with a PNG in public/mascots.
+ *
+ * Maintained by hand rather than read from disk on purpose: this module is imported by the
+ * Remotion tree, which is bundled for the browser and has no filesystem. A mascot referenced but
+ * missing renders as a broken <Img> mid-video, which is worse than not offering it.
+ */
+export const GENERATED: readonly MascotId[] = [
+  "fox-wave", "fox-point", "fox-celebrate", "tanuki-write", "tanuki-think",
+  "owl-point", "owl-think", "red-panda-wave",
+];
+
+export function isGenerated(id: string): id is MascotId {
+  return (GENERATED as readonly string[]).includes(id);
+}
 
 /** Path relative to `public/`, for `staticFile()`. */
 export function mascotAsset(id: MascotId): string {

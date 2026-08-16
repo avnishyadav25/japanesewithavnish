@@ -47,7 +47,14 @@ import {
 loadEnv({ path: ".env.local" });
 loadEnv({ path: ".env" });
 
-/** The cells actually used by the video: an intro wave, per-scene-type corners, an outro. */
+/**
+ * The cells actually used by the video: an intro wave, per-scene-type corners, an outro.
+ *
+ * Kept in step with MascotId in src/lib/video/mascots.ts — a cell here with no id there is art
+ * nothing can select, and an id there with no cell here is a broken staticFile() at render time.
+ * The `--only` flag exists so a second cast can be generated without re-running the first eight
+ * and paying to replace art already approved.
+ */
 const CAST: { character: MascotCharacter; pose: MascotPose }[] = [
   { character: "fox", pose: "wave" },
   { character: "fox", pose: "point" },
@@ -57,6 +64,14 @@ const CAST: { character: MascotCharacter; pose: MascotPose }[] = [
   { character: "owl", pose: "point" },
   { character: "owl", pose: "think" },
   { character: "redPanda", pose: "wave" },
+  { character: "cat", pose: "point" },
+  { character: "cat", pose: "bow" },
+  { character: "shiba", pose: "celebrate" },
+  { character: "shiba", pose: "wave" },
+  { character: "crane", pose: "think" },
+  { character: "crane", pose: "bow" },
+  { character: "rabbit", pose: "read" },
+  { character: "rabbit", pose: "wave" },
 ];
 
 /**

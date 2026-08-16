@@ -22,7 +22,7 @@ import { randomUUID } from "crypto";
 import { getPromptContent } from "@/lib/ai/load-prompts";
 import { BRAND } from "../brand";
 import { MASCOT_INTRO_SECONDS, OUTRO_MIN_SECONDS, resolveBranding } from "./branding";
-import { MASCOT_GREETING } from "./mascots";
+import { MASCOT_GREETING, isGenerated, type MascotId } from "./mascots";
 import {
   defaultPacingFor,
   distributeSlotBudget,
@@ -664,7 +664,10 @@ function withIntroOutro(
           narration: [],
           visual: {
             sceneType: "mascot_intro",
-            mascot: "fox-wave",
+            // branding.mascot is the project's lead character. It has existed on the type since
+            // branding landed and nothing ever read it — both bookends were hardcoded to the fox,
+            // so the Brand Check panel's character picker had no effect on any render.
+            mascot: leadMascotFor(branding, "wave"),
             greeting: MASCOT_GREETING[lang]?.ja ?? "こんにちは",
             greetingRomaji: MASCOT_GREETING[lang]?.romaji,
             topic: titleText,
@@ -709,7 +712,7 @@ function withIntroOutro(
       showLogo: branding.logo !== "none",
       handle: branding.handle,
       socials: branding.socials,
-      mascot: branding.mascots ? "fox-celebrate" : undefined,
+      mascot: branding.mascots ? leadMascotFor(branding, "celebrate") : undefined,
     },
   };
 
@@ -1283,6 +1286,22 @@ export async function generateStoryboard(
     callCount,
     missingSlots: missing,
   };
+}
+
+/**
+ * The project's lead character in a given pose, falling back to the fox.
+ *
+ * `branding.mascot` names a specific id like "shiba-wave", so the character is taken from it and
+ * recombined with the pose each bookend needs — picking "shiba-celebrate" for the outro when the
+ * lead is "shiba-wave". A combination with no artwork falls back rather than rendering a broken
+ * image mid-video.
+ */
+function leadMascotFor(branding: BrandingSettings, pose: string): MascotId {
+  const character = branding.mascot ? String(branding.mascot).replace(/-(wave|point|celebrate|think|write|bow|read)$/, "") : "fox";
+  const candidate = `${character}-${pose}`;
+  if (isGenerated(candidate)) return candidate;
+  if (branding.mascot && isGenerated(String(branding.mascot))) return branding.mascot as MascotId;
+  return pose === "celebrate" ? "fox-celebrate" : "fox-wave";
 }
 
 /** Stable id for a scene added by hand in the editor. */

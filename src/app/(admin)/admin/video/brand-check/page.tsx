@@ -23,6 +23,7 @@ import { VideoRoot } from "@/remotion/VideoRoot";
 import { SAMPLE_STORYBOARD } from "@/remotion/sampleStoryboard";
 import { buildTimeline } from "@/lib/video/timeline";
 import { FORMAT_SPECS, type VideoFormat } from "@/lib/video/types";
+import { BrandAssets } from "./BrandAssets";
 
 const Player = dynamic(() => import("@remotion/player").then((m) => m.Player), { ssr: false });
 
@@ -67,8 +68,17 @@ function Frame({ label, format, at }: { label: string; format: VideoFormat; at: 
 export default function BrandCheckPage() {
   return (
     <div>
-      <div style={{ marginBottom: 12 }}>
+      <div style={{ marginBottom: 16 }}>
         <h1 className="font-heading text-2xl font-bold text-charcoal">Brand check</h1>
+        <p className="text-sm text-secondary mt-1">
+          What is available to put in a video, and what a video made from it looks like.
+        </p>
+      </div>
+
+      <BrandAssets />
+
+      <div style={{ marginBottom: 12 }}>
+        <h2 className="font-heading text-lg font-bold text-charcoal">Rendered frames</h2>
         <p className="text-sm text-secondary mt-1">
           The same composition the worker renders, seeked to the frames most likely to be wrong. Vertical and
           square carry the hashtag; landscape deliberately does not.
