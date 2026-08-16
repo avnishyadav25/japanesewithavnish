@@ -255,6 +255,12 @@ reconstruction. Where a period is thin, that reflects the record, not the effort
   credentials from a different code path, but this needs the env vars set in Netlify.
 - **One table still reports a replication error** on the standby. Surfaced by the weekly
   report; check `replication_poll_state WHERE last_error IS NOT NULL`.
+- **`writeToTurso` has no retry, and the largest tables need dozens of sequential calls.**
+  `examples` is 11,550 rows at 200 rows per chunk — **58 HTTP round trips**, any one of which
+  fails the whole table (`turso: fetch failed`, observed 2026-08-16). The chunk loop should
+  retry a failed chunk a couple of times with backoff before giving up; without it the biggest
+  and most valuable tables are the ones most likely to be missing from the archive. R2 is
+  unaffected — it is a single upload per table.
 
 ### Application
 
