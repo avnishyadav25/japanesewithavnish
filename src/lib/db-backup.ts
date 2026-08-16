@@ -191,7 +191,24 @@ export async function runBackupSyncBatch(force = false): Promise<BackupSyncResul
 
   const batch = allTables.slice(offset, offset + BATCH_SIZE);
 
+  // Progress is committed after EVERY table, not once at the end of the batch, and the loop
+  // stops early when the time budget is spent.
+  //
+  // Without this the job deadlocks the moment a batch cannot finish inside the platform's
+  // function timeout: the tables are copied, the offset update never runs, the next call
+  // restarts at the same offset, forever. Observed 2026-08-16 the instant Turso credentials
+  // were finally set in Netlify — writes that had been failing instantly ("Turso not
+  // configured") started doing real work, batches went from fast to over-limit, and
+  // backup-sync logged the same 3 tables 27 times while next_table_offset stayed at 5.
+  // The batch size was only ever survivable because a third of its work was silently failing.
+  const startedAtMs = Date.now();
+  const BUDGET_MS = Number(process.env.BACKUP_SYNC_BUDGET_MS ?? 20_000);
+  let processed = 0;
+
   for (const tableName of batch) {
+    // Stop before starting a table we probably cannot finish. Everything already committed
+    // stays committed, and the next call resumes exactly here.
+    if (processed > 0 && Date.now() - startedAtMs > BUDGET_MS) break;
     try {
       // tableName comes from information_schema.tables (trusted, not user input), so
       // identifier-quoting it and interpolating is safe — sql`` tags can't parameterize
@@ -234,9 +251,21 @@ export async function runBackupSyncBatch(force = false): Promise<BackupSyncResul
         VALUES (${runStartedAt}, ${tableName}, 0, ${null}, false, false, ${errMsg})
       `;
     }
+
+    // Commit this table's progress immediately. If the platform kills the invocation on the
+    // next table, everything up to here is durable and the next call resumes past it.
+    processed++;
+    await sql`
+      UPDATE backup_sync_state SET
+        next_table_offset = ${offset + processed},
+        tables_synced_ok = ${okCount},
+        tables_synced_failed = ${failCount},
+        updated_at = NOW()
+      WHERE id = 1
+    `;
   }
 
-  const newOffset = offset + batch.length;
+  const newOffset = offset + processed;
   const isComplete = newOffset >= allTables.length;
 
   await sql`
@@ -253,7 +282,7 @@ export async function runBackupSyncBatch(force = false): Promise<BackupSyncResul
   return {
     status: isComplete ? "completed" : "running",
     totalTables: allTables.length,
-    processedThisCall: batch.length,
+    processedThisCall: processed,
     nextOffset: newOffset,
     runStartedAt,
     tablesSyncedOk: okCount,
