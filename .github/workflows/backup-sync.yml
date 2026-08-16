@@ -1,0 +1,59 @@
+# Full-database archive sync to Turso and Cloudflare R2.
+#
+# Moved off Netlify 2026-08-16. writeToTurso() sends 200 rows per HTTP round trip, so
+# content_events (5,332 rows) alone needs 27 sequential calls plus a 3.7MB R2 upload — against
+# a ~30s function ceiling. Eight tables exceed 2,000 rows and the largest is 11,550, so no
+# batch size makes this fit: the work is larger than a serverless invocation.
+#
+# This was masked for months. While TURSO_DB_URL was unset in Netlify every Turso write failed
+# instantly, so batches were fast and the job "completed" nightly having archived nothing to
+# Turso. Setting the credentials made the writes real, and the job immediately deadlocked.
+#
+# Third worker to move here for the same reason, after video-render and content-review.
+name: backup-sync
+
+on:
+  schedule:
+    # 02:40 UTC daily, before the VPS shadow refresh at 03:17 — snapshot the primary's state
+    # first, then mirror it.
+    - cron: "40 2 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Start a fresh run even if one completed within 20h"
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: backup-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    # 138 tables, the largest 11,550 rows, each a series of Turso round trips plus an R2
+    # upload. Generous, but bounded so a wedged run cannot hold the group all day.
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Archive every table to Turso and R2
+        run: npm run backup:worker -- ${{ github.event.inputs.force == 'true' && '--force' || '' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          TURSO_DB_URL: ${{ secrets.TURSO_DB_URL }}
+          TURSO_DB_AUTH_TOKEN: ${{ secrets.TURSO_DB_AUTH_TOKEN }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+          R2_BUCKET_URL: ${{ secrets.R2_BUCKET_URL }}
