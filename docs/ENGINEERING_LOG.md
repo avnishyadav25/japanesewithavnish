@@ -123,6 +123,24 @@ nothing — the file stays untracked and `git status` never mentions it. Exclude
 (`docs/*`) to keep the directory walkable. This file was invisible to git until that was
 fixed; `docs/` has been ignored since the first commit on 2026-02-26.
 
+**`CREATE TABLE IF NOT EXISTS` cannot repair schema drift.** The Turso archive schema was
+generated with it, so once a migration added a column to the primary, the archive could never
+catch up: regenerating and reapplying appeared to succeed while every insert failed with
+`table X has no column named Y`. Twelve tables had drifted this way by 2026-08-16
+(`profiles.is_test_user`, `posts.blog_category`, `vocabulary.transitivity` and others), and
+none of it surfaced while Turso was simultaneously misconfigured and failing for a different
+reason. The generator now emits `DROP TABLE IF EXISTS` + `CREATE TABLE`, which is safe only
+because Turso is a pure snapshot target rewritten in full on every run — apply it immediately
+before a backup, never on its own. **Any migration that adds a column silently breaks the
+Turso archive until the schema is regenerated.**
+
+**One oversized table can deadlock a resumable job.** Committing progress per batch is not
+enough if a single item exceeds the platform's timeout: `content_events` (5,332 rows) takes
+**123 seconds** to archive — 27 sequential Turso round trips plus a 3.7 MB R2 upload — against
+a ~30s ceiling, so the run wedged on it and 502'd forever. Per-item commits fix the batch
+case; work genuinely larger than an invocation has to move off the platform entirely. Eight
+tables exceed 2,000 rows here; the largest is 11,550.
+
 **Claude Code hooks need a nested `hooks` array.** `.claude/settings.json` carried three
 entries in a flat `{matcher, command, timeout}` shape, which fails schema validation
 (`required: ["hooks"]`), so **none of them had ever fired** — while `CLAUDE.md` claimed "the
