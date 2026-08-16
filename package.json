@@ -39,7 +39,8 @@
     "db:replicate": "tsx scripts/replication-poll-once.ts",
     "db:migrate": "tsx scripts/migrate.ts",
     "review:worker": "tsx scripts/content-review-worker.ts",
-    "report:weekly": "tsx scripts/weekly-report.ts"
+    "report:weekly": "tsx scripts/weekly-report.ts",
+    "backup:worker": "tsx scripts/backup-sync-worker.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1000.0",

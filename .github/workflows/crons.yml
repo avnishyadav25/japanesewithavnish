@@ -18,7 +18,7 @@ on:
     - cron: "*/5 * * * *"    # replication-poll        (was "* * * * *"; Actions' floor is 5m)
     - cron: "*/10 * * * *"   # content-review-worker
     - cron: "*/30 * * * *"   # sheets-export
-    - cron: "0 * * * *"      # send-scheduled-newsletters + backup-sync
+    - cron: "0 * * * *"      # send-scheduled-newsletters + replication-full (tier 2)
     - cron: "0 9 * * *"      # reengagement-nudge
     - cron: "0 6 1 * *"      # leaderboard-monthly-reward
   workflow_dispatch:
@@ -29,7 +29,6 @@ on:
         type: choice
         options:
           - replication-poll
-          - backup-sync
           - content-review-worker
           - sheets-export
           - send-scheduled-newsletters
@@ -58,7 +57,7 @@ jobs:
             "*/5 * * * *")  eps="replication-poll" ;;
             "*/10 * * * *") eps="content-review-worker" ;;
             "*/30 * * * *") eps="sheets-export" ;;
-            "0 * * * *")    eps="send-scheduled-newsletters backup-sync replication-full" ;;
+            "0 * * * *")    eps="send-scheduled-newsletters replication-full" ;;
             "0 9 * * *")    eps="reengagement-nudge" ;;
             "0 6 1 * *")    eps="leaderboard-monthly-reward" ;;
             *)              eps="${{ inputs.endpoint }}" ;;
@@ -130,22 +129,6 @@ jobs:
                   echo "    offset=$off done=$dn"
                   if [ "$dn" = "true" ]; then break; fi
                   sleep 1
-                done
-                ;;
-
-              backup-sync)
-                # Resumable: 5 tables per call against 143 tables. One call an hour would
-                # need ~29 hours to finish a single full run, so drain it to completion here.
-                for i in $(seq 1 40); do
-                  call "$ep"; rc=$?
-                  [ $rc -eq 2 ] && exit 1
-                  if [ $rc -ne 0 ]; then fail=1; break; fi
-                  status=$(jq -r '.status // empty' "$BODY" 2>/dev/null || echo "")
-                  if [ "$status" = "completed" ] || [ "$status" = "idle" ]; then
-                    echo "  drained after $i call(s): status=$status"
-                    break
-                  fi
-                  sleep 2
                 done
                 ;;
 
