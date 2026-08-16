@@ -9,6 +9,8 @@
 import { sql } from "@/lib/db";
 import type {
   ApprovalMode,
+  BrandingSettings,
+  CaptionSettings,
   NarrationLang,
   PacingConfig,
   VoiceConfig,
@@ -88,6 +90,8 @@ function toProjectRow(row: Record<string, unknown>): VideoProjectRow {
     includeBroll: Boolean(row.include_broll),
     pacing: (row.pacing as PacingConfig | null) ?? null,
     voices: (row.voices as VoiceConfig | null) ?? null,
+    captions: (row.captions as Partial<CaptionSettings> | null) ?? null,
+    branding: (row.branding as Partial<BrandingSettings> | null) ?? null,
     status: row.status as ProjectStatus,
     currentStoryboardId: (row.current_storyboard_id as string | null) ?? null,
     errorMessage: (row.error_message as string | null) ?? null,
@@ -99,6 +103,7 @@ function toProjectRow(row: Record<string, unknown>): VideoProjectRow {
 
 const PROJECT_COLUMNS = `id, title, scope_kind, scope_ref, grouping, theme_key, bgm_track_id,
   narration_langs, formats, target_duration_seconds, tone, include_broll, pacing, voices,
+  captions, branding,
   status, current_storyboard_id, error_message, created_by, created_at::text, updated_at::text`;
 
 export interface CreateProjectInput {

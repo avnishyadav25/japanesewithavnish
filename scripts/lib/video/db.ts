@@ -13,6 +13,7 @@
  */
 import { neon } from "@neondatabase/serverless";
 import type {
+  CaptionSettings,
   NarrationLang,
   RenderStage,
   Storyboard,
@@ -150,6 +151,14 @@ export interface LoadedStoryboard {
   projectVoices: Partial<Record<NarrationLang, string>> | null;
   bgmUrl: string | null;
   projectTitle: string;
+  /**
+   * Live caption style from the project, overriding the storyboard's frozen copy.
+   *
+   * Read from the project for the same reason bgm_track_id is: it is presentation, not content.
+   * That makes restyling captions a re-cut — narration is cached by content hash, so it costs
+   * render minutes and no TTS or LLM spend.
+   */
+  projectCaptions: Partial<CaptionSettings> | null;
 }
 
 export async function loadStoryboard(storyboardId: string): Promise<LoadedStoryboard> {
@@ -157,6 +166,7 @@ export async function loadStoryboard(storyboardId: string): Promise<LoadedStoryb
     SELECT s.id, s.project_id, s.narration_lang, s.doc,
            p.title AS project_title, p.theme_key,
            t.tokens AS theme_tokens, t.default_voices AS theme_voices, p.voices AS project_voices,
+           p.captions AS project_captions,
            b.audio_url AS bgm_url
     FROM video_storyboards s
     JOIN video_projects p ON p.id = s.project_id
@@ -179,6 +189,7 @@ export async function loadStoryboard(storyboardId: string): Promise<LoadedStoryb
     projectVoices: (row.project_voices as Partial<Record<NarrationLang, string>> | null) ?? null,
     bgmUrl: (row.bgm_url as string | null) ?? null,
     projectTitle: String(row.project_title),
+    projectCaptions: (row.project_captions as Partial<CaptionSettings> | null) ?? null,
   };
 }
 

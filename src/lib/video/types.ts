@@ -707,6 +707,10 @@ export interface VideoProjectRow {
   includeBroll: boolean;
   pacing: PacingConfig | null;
   voices: VoiceConfig | null;
+  /** Caption style. Read at render time, so changing it is a re-cut rather than a regenerate. */
+  captions: Partial<CaptionSettings> | null;
+  /** Per-project brand overrides. NULL = DEFAULT_BRANDING. */
+  branding: Partial<BrandingSettings> | null;
   status: ProjectStatus;
   currentStoryboardId: string | null;
   errorMessage: string | null;

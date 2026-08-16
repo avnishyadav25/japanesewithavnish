@@ -9,7 +9,8 @@
  */
 import React from "react";
 import { AbsoluteFill, Audio, Sequence, useVideoConfig } from "remotion";
-import type { ResolvedTimeline, Storyboard, VideoThemeTokens } from "@/lib/video/types";
+import { resolveCaptions } from "@/lib/video/types";
+import type { CaptionSettings, ResolvedTimeline, Storyboard, VideoThemeTokens } from "@/lib/video/types";
 import { buildTimeline, segmentOffsets } from "@/lib/video/timeline";
 import { resolveBranding, showsHashtag } from "@/lib/video/branding";
 import { LayoutProvider } from "./LayoutContext";
@@ -31,6 +32,16 @@ export interface VideoRootProps {
   preview?: boolean;
   /** Play BGM even in preview, for checking the mix. */
   previewBgm?: boolean;
+  /**
+   * Live caption style from `video_projects.captions`, overriding the copy frozen into the
+   * storyboard at generation time.
+   *
+   * The override direction is deliberate. Branding is frozen so a re-render reproduces what was
+   * approved; caption size is the opposite — you change it precisely because the approved render
+   * was wrong, and you want the fix without paying for a new script. Omitted, the storyboard's
+   * own copy applies, so nothing changes for a render nobody has re-styled.
+   */
+  captionSettings?: Partial<CaptionSettings> | null;
 }
 
 /**
@@ -56,6 +67,7 @@ export const VideoRoot: React.FC<VideoRootProps> = ({
   bgmUrl,
   preview,
   previewBgm,
+  captionSettings,
 }) => {
   const { fps } = useVideoConfig();
   const theme = resolveTheme(themeTokens);
@@ -67,6 +79,9 @@ export const VideoRoot: React.FC<VideoRootProps> = ({
   const timeline: ResolvedTimeline = storyboard.resolved ?? buildTimeline(storyboard, { format });
 
   const branding = resolveBranding(storyboard.branding);
+  // Project override wins over the storyboard's frozen copy; resolveCaptions fills the fields
+  // storyboards written before caption styling existed do not carry.
+  const captions = resolveCaptions({ ...storyboard.captions, ...(captionSettings ?? {}) });
 
   return (
     <LayoutProvider layout={layout} theme={theme}>
@@ -108,9 +123,9 @@ export const VideoRoot: React.FC<VideoRootProps> = ({
           />
         ) : null}
 
-        {storyboard.captions.enabled && storyboard.captions.burnIn ? (
-          <Captions timeline={timeline} style={storyboard.captions.style} />
-        ) : null}
+        {/* Captions decides for itself whether to draw: `enabled`/`burnIn` can be turned off by
+            the project override, not only by the frozen storyboard copy. */}
+        <Captions timeline={timeline} style={captions.style} settings={captions} />
       </AbsoluteFill>
     </LayoutProvider>
   );

@@ -3,7 +3,13 @@
 import dynamic from "next/dynamic";
 import { useMemo } from "react";
 import { buildTimeline } from "@/lib/video/timeline";
-import { FORMAT_SPECS, type Storyboard, type VideoFormat, type VideoThemeTokens } from "@/lib/video/types";
+import {
+  FORMAT_SPECS,
+  type CaptionSettings,
+  type Storyboard,
+  type VideoFormat,
+  type VideoThemeTokens,
+} from "@/lib/video/types";
 import { VideoRoot } from "@/remotion/VideoRoot";
 
 /**
@@ -40,9 +46,19 @@ interface Props {
   bgmUrl?: string | null;
   /** Music is muted while scrubbing by default — every seek restarts the track. */
   previewBgm?: boolean;
+  /** Live caption style, so the picker's effect is visible here before paying for a re-cut. */
+  captionSettings?: Partial<CaptionSettings> | null;
 }
 
-export function StoryboardPlayer({ storyboard, format, themeTokens, playerRef, bgmUrl, previewBgm }: Props) {
+export function StoryboardPlayer({
+  storyboard,
+  format,
+  themeTokens,
+  playerRef,
+  bgmUrl,
+  previewBgm,
+  captionSettings,
+}: Props) {
   const spec = FORMAT_SPECS[format];
 
   // A storyboard that has never been rendered has no resolved timeline (durations come from
@@ -55,8 +71,16 @@ export function StoryboardPlayer({ storyboard, format, themeTokens, playerRef, b
   }, [storyboard, format]);
 
   const inputProps = useMemo(
-    () => ({ storyboard, layout: spec.layout, themeTokens, bgmUrl: bgmUrl ?? null, preview: true, previewBgm }),
-    [storyboard, spec.layout, themeTokens, bgmUrl, previewBgm]
+    () => ({
+      storyboard,
+      layout: spec.layout,
+      themeTokens,
+      bgmUrl: bgmUrl ?? null,
+      captionSettings: captionSettings ?? null,
+      preview: true,
+      previewBgm,
+    }),
+    [storyboard, spec.layout, themeTokens, bgmUrl, previewBgm, captionSettings]
   );
 
   return (

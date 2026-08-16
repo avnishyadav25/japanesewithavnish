@@ -7,6 +7,7 @@ import { AdminCard } from "@/components/admin/AdminCard";
 import { FORMAT_SPECS, NARRATION_LANG_LABELS } from "@/lib/video/types";
 import { arrayMove } from "@dnd-kit/sortable";
 import type {
+  CaptionSettings,
   NarrationLang,
   Scene,
   Storyboard,
@@ -19,6 +20,7 @@ import type { RenderRow, StoryboardRow } from "@/lib/video/projects";
 import { StoryboardPlayer, type PlayerHandle } from "./StoryboardPlayer";
 import { Timeline, usePlayerTime } from "./Timeline";
 import { PromptPanel, type GenerateOverrides } from "./PromptPanel";
+import { CaptionControls } from "./CaptionControls";
 
 interface Props {
   project: VideoProjectRow;
@@ -69,6 +71,9 @@ export function ProjectWorkspace({
   const [notice, setNotice] = useState<string | null>(null);
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
   const [previewBgm, setPreviewBgm] = useState(false);
+  // Live caption style. Seeded from the project so the preview matches what a render would
+  // produce, and updated as the sliders move so the effect is visible before saving.
+  const [captions, setCaptions] = useState<Partial<CaptionSettings> | null>(project.captions);
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
   const [restoredDraft, setRestoredDraft] = useState(false);
   /** Open when a render covers more than one page and you have to say which ones. */
@@ -305,6 +310,41 @@ export function ProjectWorkspace({
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Request failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  /**
+   * Re-renders the formats this project already has, so a caption change reaches finished videos.
+   *
+   * Uses the existing "recut to formats" path rather than a new mode: enqueueRenderJobs only
+   * refuses a format with a job already queued or running, so asking for a format that is merely
+   * *finished* legitimately produces a fresh render which supersedes it. The storyboard is
+   * untouched, so no DeepSeek call — and every narration segment keeps its cached audio url, so
+   * no TTS either.
+   */
+  async function restyleRenders() {
+    if (!selected) return;
+    const formats = Array.from(new Set(renders.filter((r) => r.isCurrent).map((r) => r.format)));
+    if (formats.length === 0) return;
+
+    setBusy("restyle");
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/admin/video/renders/${renders.find((r) => r.isCurrent)!.id}/recut`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "formats", formats }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not queue the re-render");
+      setNotice(data.message ?? "Queued.");
+      await refresh();
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not queue the re-render");
     } finally {
       setBusy(null);
     }
@@ -594,6 +634,7 @@ export function ProjectWorkspace({
                   playerRef={playerRef}
                   bgmUrl={bgmUrl}
                   previewBgm={previewBgm}
+                  captionSettings={captions}
                 />
               )}
               <p className="text-xs text-secondary mt-2">
@@ -610,6 +651,15 @@ export function ProjectWorkspace({
                 </label>
               )}
             </AdminCard>
+
+            <CaptionControls
+              projectId={project.id}
+              value={captions}
+              onChange={setCaptions}
+              hasRenders={renders.some((r) => r.isCurrent)}
+              recutting={busy === "restyle"}
+              onRecut={restyleRenders}
+            />
 
             <AdminCard>
               <div className="flex items-center justify-between mb-3">
