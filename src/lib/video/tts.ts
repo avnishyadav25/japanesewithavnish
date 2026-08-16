@@ -20,6 +20,8 @@ import { SignJWT, importPKCS8 } from "jose";
 // Same reason for "./types" below. Everything else in src/ keeps the house "@/" convention.
 import { uploadToR2 } from "../r2";
 import { languageCodeFromVoice, supportsSsml } from "./voices";
+// Relative for the same reason as ../r2 above: the worker imports this module by path.
+import { providerForVoice } from "./ttsProvider";
 import type { NarrationLang, NarrationSegment } from "./types";
 
 const TTS_SCOPE = "https://www.googleapis.com/auth/cloud-platform";
@@ -325,9 +327,26 @@ async function synthesizeChunk(ssml: string, req: SynthesisRequest): Promise<Buf
   return Buffer.from(data.audioContent, "base64");
 }
 
-/** Synthesizes one request, chunking if it exceeds Google's input cap. No caching, no upload —
- * `resolveNarrationAudio` layers those on top. */
+/**
+ * Synthesizes one request, chunking if it exceeds Google's input cap. No caching, no upload —
+ * `resolveNarrationAudio` layers those on top.
+ *
+ * Dispatches to a registered provider when one claims the voice name, so a cloned voice can be
+ * produced by a different engine without any caller changing. Nothing is registered by default,
+ * so the Google path below is what runs unless something opts in.
+ */
 export async function synthesize(req: SynthesisRequest): Promise<SynthesizedAudio> {
+  const provider = providerForVoice(req.voiceName);
+  if (provider) {
+    if (!provider.configured()) {
+      throw new Error(
+        `Voice "${req.voiceName}" needs the ${provider.id} provider, which is not configured on this machine. ` +
+          `Pre-generate that audio where it is (see scripts/clone-voice.ts) — the render then hits the cache.`
+      );
+    }
+    return provider.synthesize(req);
+  }
+
   const inner = req.ssml.replace(/^<speak>/, "").replace(/<\/speak>$/, "");
   const needsChunking = Buffer.byteLength(req.ssml, "utf8") > MAX_INPUT_BYTES;
 
