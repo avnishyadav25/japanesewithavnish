@@ -3,20 +3,42 @@
     "PostToolUse": [
       {
         "matcher": "Edit|Write|Bash",
-        "command": "code-review-graph update --quiet --skip-flows",
-        "timeout": 5000
+        "hooks": [
+          {
+            "type": "command",
+            "command": "code-review-graph update --quiet --skip-flows 2>/dev/null || true",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "SessionStart": [
       {
-        "command": "code-review-graph status --json",
-        "timeout": 3000
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "code-review-graph status --json 2>/dev/null || true",
+            "timeout": 3
+          },
+          {
+            "type": "command",
+            "command": "f=docs/ENGINEERING_LOG.md; if [ -f \"$f\" ]; then m=$(stat -f %m \"$f\" 2>/dev/null || stat -c %Y \"$f\" 2>/dev/null); d=$(( ($(date +%s) - m) / 86400 )); [ \"$d\" -gt 7 ] && printf '%s' \"{\\\"systemMessage\\\":\\\"docs/ENGINEERING_LOG.md has not been updated in $d days - review its Open Backlog section.\\\"}\"; fi; true",
+            "timeout": 5
+          }
+        ]
       }
     ],
-    "PreCommit": [
+    "Stop": [
       {
-        "command": "code-review-graph detect-changes --brief",
-        "timeout": 10000
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "git status --porcelain 2>/dev/null | grep -qE '(src/lib/db/|\\.github/workflows/|vps/|supabase/migrations/)' && printf '%s' '{\"systemMessage\":\"Infrastructure files changed this session - append what changed, why, and any new gotcha to docs/ENGINEERING_LOG.md before finishing.\"}' || true",
+            "timeout": 5
+          }
+        ]
       }
     ]
   }
