@@ -89,8 +89,22 @@ async function main() {
     const sqliteCols = cols
       .map((c) => `  "${c.column_name}" ${pgTypeToSqlite(c.data_type, c.udt_name)}`)
       .join(",\n");
+
+    // DROP then CREATE, not CREATE TABLE IF NOT EXISTS.
+    //
+    // IF NOT EXISTS silently does nothing to a table that already exists, so once a migration
+    // added a column to the primary, the Turso archive could never catch up: regenerating and
+    // reapplying appeared to work while every insert kept failing with "table X has no column
+    // named Y". Twelve tables had drifted this way by 2026-08-16 — profiles.is_test_user,
+    // posts.blog_category, vocabulary.transitivity and others — and none of it surfaced while
+    // Turso was misconfigured and failing instantly for a different reason.
+    //
+    // Safe because Turso is a pure snapshot target: db-backup.ts rewrites every row of every
+    // table on each run, so there is nothing here to preserve. Apply these immediately before
+    // a backup run, never on their own.
+    tursoStatements.push({ sql: `DROP TABLE IF EXISTS "${tableName}"` });
     tursoStatements.push({
-      sql: `CREATE TABLE IF NOT EXISTS "${tableName}" (\n${sqliteCols},\n  "_synced_at" TEXT\n)`,
+      sql: `CREATE TABLE "${tableName}" (\n${sqliteCols},\n  "_synced_at" TEXT\n)`,
     });
   }
 
