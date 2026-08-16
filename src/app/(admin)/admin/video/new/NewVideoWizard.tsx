@@ -8,6 +8,7 @@ import type { NarrationLang, PacingConfig, ScopeKind, ScopeRef, VideoFormat, Voi
 import { formatDuration } from "@/lib/video/pacing";
 import { VOICE_CATALOGUE } from "@/lib/video/voices";
 import { EstimatePanel, type ScopeEstimate } from "./EstimatePanel";
+import { ItemPicker, type PickerItem } from "./ItemPicker";
 
 interface Props {
   themes: { key: string; label: string; description: string | null }[];
@@ -71,6 +72,12 @@ export function NewVideoWizard({ themes, bgmTracks, levels, lessons, initial }: 
    */
   const [selectedPostIds, setSelectedPostIds] = useState<string[] | null>(null);
 
+  /** Everything on offer in the picker, and which of it is ticked. */
+  const [pickerItems, setPickerItems] = useState<PickerItem[]>([]);
+  const [pickerSelected, setPickerSelected] = useState<string[]>([]);
+  const [topicBusy, setTopicBusy] = useState(false);
+  const [topicNotice, setTopicNotice] = useState<string | null>(null);
+
   // --- step 2: output ---
   const [grouping, setGrouping] = useState<"single_video" | "video_per_item">("single_video");
   const [formats, setFormats] = useState<VideoFormat[]>(["vertical"]);
@@ -114,6 +121,85 @@ export function NewVideoWizard({ themes, bgmTracks, levels, lessons, initial }: 
   useEffect(() => {
     setSelectedPostIds(null);
   }, [contentType, jlptLevel, limit, scopeKind]);
+
+
+  /**
+   * Seeds the picker from whatever the filters resolved.
+   *
+   * Only for query-driven scopes. A topic's list is built by resolveTopic() and must not be
+   * overwritten when the estimate comes back for the ids it just chose.
+   */
+  useEffect(() => {
+    if (scopeKind === "topic") return;
+    if (!estimate) {
+      setPickerItems([]);
+      setPickerSelected([]);
+      return;
+    }
+    // Only when the user has not curated yet — re-seeding on every estimate would undo a
+    // deselection the moment the estimate refreshed in response to it.
+    if (selectedPostIds !== null) return;
+    const items: PickerItem[] = estimate.items
+      .filter((i) => i.postId)
+      .map((i) => ({
+        postId: i.postId!,
+        contentType: i.kind,
+        title: i.title,
+        jlptLevel: i.jlptLevel ?? undefined,
+        url: i.url ?? undefined,
+        source: "library" as const,
+      }));
+    setPickerItems(items);
+    setPickerSelected(items.map((i) => i.postId!));
+  }, [estimate, scopeKind, selectedPostIds]);
+
+  /** Ticked ids flow back into the scope, which re-prices the estimate. */
+  useEffect(() => {
+    if (pickerItems.length === 0) return;
+    const ids = pickerSelected.filter((k) => !k.startsWith("llm:"));
+    const everything = pickerItems.every((i) => pickerSelected.includes(i.postId ?? `llm:${i.word ?? i.title}`));
+    // Untouched means "leave the scope as a query", which is how every existing project was made.
+    if (everything && scopeKind !== "topic") return;
+    setSelectedPostIds(ids);
+  }, [pickerSelected, pickerItems, scopeKind]);
+
+  /** Topic -> expanded terms -> library matches + newly written words. Saves nothing. */
+  async function resolveTopic() {
+    if (!topic.trim()) return;
+    setTopicBusy(true);
+    setTopicNotice(null);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/video/topics/resolve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic, jlptLevel: jlptLevel || undefined, count: limit }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Could not resolve that topic");
+
+      const items: PickerItem[] = [...(data.library ?? []), ...(data.proposed ?? [])];
+      setPickerItems(items);
+      setPickerSelected(items.map((i) => i.postId ?? `llm:${i.word ?? i.title}`));
+      setTopicNotice(
+        data.notice ??
+          `${data.library?.length ?? 0} from your library` +
+            ((data.proposed?.length ?? 0) > 0 ? `, ${data.proposed.length} newly written` : "") +
+            ` · matched on: ${(data.terms ?? []).slice(0, 8).join(", ")}`
+      );
+      if (data.llmError) setError(`Library search worked; writing new words failed: ${data.llmError}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not resolve that topic");
+    } finally {
+      setTopicBusy(false);
+    }
+  }
+
+  function addPickerItem(item: PickerItem) {
+    const key = item.postId ?? `llm:${item.word ?? item.title}`;
+    setPickerItems((prev) => (prev.some((i) => (i.postId ?? `llm:${i.word ?? i.title}`) === key) ? prev : [...prev, item]));
+    setPickerSelected((prev) => (prev.includes(key) ? prev : [...prev, key]));
+  }
 
   /**
    * Re-prices on every change, debounced.
@@ -183,13 +269,43 @@ export function NewVideoWizard({ themes, bgmTracks, levels, lessons, initial }: 
     setCreating(true);
     setError(null);
     try {
+      // LLM-written words become draft posts FIRST, because a topic scope resolves through
+      // postIds and a word with no post cannot be in one. Committing here rather than at search
+      // time means only the words you actually kept are written — searching four topics and
+      // using one does not leave three topics' worth of drafts behind.
+      let effectivePostIds = selectedPostIds;
+      if (scopeKind === "topic") {
+        const keptProposals = pickerItems
+          .filter((i) => !i.postId && pickerSelected.includes(`llm:${i.word ?? i.title}`))
+          .map((i) => i.proposal)
+          .filter(Boolean);
+
+        const libraryIds = pickerSelected.filter((k) => !k.startsWith("llm:"));
+        if (keptProposals.length > 0) {
+          const res = await fetch("/api/admin/video/topics/commit", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ topic, words: keptProposals }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error ?? "Could not save the new words");
+          effectivePostIds = [...libraryIds, ...(data.postIds ?? [])];
+        } else {
+          effectivePostIds = libraryIds;
+        }
+
+        if (effectivePostIds.length === 0) {
+          throw new Error("Pick at least one item for this topic.");
+        }
+      }
+
       const res = await fetch("/api/admin/video/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: title.trim() || undefined,
           scopeKind,
-          scopeRef,
+          scopeRef: scopeKind === "topic" ? { topic: topic.trim(), postIds: effectivePostIds ?? [] } : scopeRef,
           grouping,
           formats,
           narrationLangs,
@@ -254,10 +370,11 @@ export function NewVideoWizard({ themes, bgmTracks, levels, lessons, initial }: 
         {/* ---- step 1 ---- */}
         {step === 0 && (
           <section className="space-y-5">
-            <div className="grid sm:grid-cols-3 gap-3">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {(
                 [
                   ["content_batch", "A batch of items", "e.g. 10 N5 vocabulary words"],
+                  ["topic", "A topic", "e.g. birds, numbers, family"],
                   ["curriculum_lesson", "One lesson", "A full curriculum lesson, block by block"],
                   ["curriculum_level", "A whole level", "Every lesson in N5, N4, …"],
                 ] as [ScopeKind, string, string][]
@@ -321,24 +438,72 @@ export function NewVideoWizard({ themes, bgmTracks, levels, lessons, initial }: 
               </div>
             )}
 
-            {estimate && estimate.items.length > 0 && (
-              <div className="border border-[var(--divider)] rounded-card p-3 max-h-56 overflow-y-auto">
-                <div className="text-xs uppercase tracking-wider text-secondary mb-2">
-                  {estimate.itemCount} item{estimate.itemCount === 1 ? "" : "s"} — “{estimate.title}”
+            {scopeKind === "topic" && (
+              <div className="space-y-3">
+                <div className="grid sm:grid-cols-[1fr_auto_auto] gap-3 items-end">
+                  <div>
+                    <label className={label} htmlFor="topic">Topic</label>
+                    <input
+                      id="topic"
+                      type="text"
+                      className={input}
+                      value={topic}
+                      placeholder="birds in Japanese"
+                      onChange={(e) => setTopic(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), resolveTopic())}
+                    />
+                  </div>
+                  <div>
+                    <label className={label} htmlFor="topicLevel">Level</label>
+                    <select id="topicLevel" className={input} value={jlptLevel} onChange={(e) => setJlptLevel(e.target.value)}>
+                      <option value="">Any</option>
+                      {JLPT_LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}
+                    </select>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={resolveTopic}
+                    disabled={!topic.trim() || topicBusy}
+                    className="btn-primary text-sm disabled:opacity-50 h-[38px]"
+                  >
+                    {topicBusy ? "Looking…" : "Find items"}
+                  </button>
                 </div>
-                <ul className="text-sm space-y-1">
-                  {estimate.items.map((item, i) => (
-                    <li key={i} className="flex justify-between gap-3">
-                      <span className="text-charcoal">{item.title}</span>
-                      <span className="text-xs text-secondary shrink-0">
-                        {item.jlptLevel ?? "—"} · {item.exampleCount} example{item.exampleCount === 1 ? "" : "s"}
-                      </span>
-                    </li>
-                  ))}
-                  {estimate.itemCount > estimate.items.length && (
-                    <li className="text-xs italic text-secondary">…and {estimate.itemCount - estimate.items.length} more</li>
-                  )}
-                </ul>
+
+                {topicNotice && <p className="text-xs text-secondary">{topicNotice}</p>}
+
+                {/* Said plainly rather than hidden: the model's Japanese has been read by nobody,
+                    and a wrong reading burned into a video is the failure worth preventing. */}
+                {pickerItems.some((i) => i.source === "llm") && (
+                  <p className="text-xs text-amber-700">
+                    Items marked <strong>unreviewed</strong> were written just now. Keeping them saves each
+                    one as a draft post so it goes through Content Review — check them before publishing
+                    the pages.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* One picker for both scopes. A batch arrives pre-ticked with exactly what the query
+                chose, so leaving it alone behaves as it always did. */}
+            {pickerItems.length > 0 && (
+              <div>
+                <div className="text-xs uppercase tracking-wider text-secondary mb-2">
+                  Items in this video{estimate ? ` — “${estimate.title}”` : ""}
+                </div>
+                <ItemPicker
+                  items={pickerItems}
+                  selectedIds={pickerSelected}
+                  onChange={setPickerSelected}
+                  onAdd={addPickerItem}
+                  onRemoveProposed={(key) => {
+                    setPickerItems((prev) => prev.filter((i) => (i.postId ?? `llm:${i.word ?? i.title}`) !== key));
+                    setPickerSelected((prev) => prev.filter((k) => k !== key));
+                  }}
+                  contentType={scopeKind === "content_batch" ? contentType : undefined}
+                  jlptLevel={jlptLevel || undefined}
+                  busy={topicBusy}
+                />
               </div>
             )}
           </section>

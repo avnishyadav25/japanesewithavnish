@@ -104,7 +104,11 @@ export async function POST(req: Request) {
         },
       },
       warnings: buildWarnings(snapshot.items, kind, pacing, achievedPerItem, grouping, perVideoSeconds),
-      items: snapshot.items.slice(0, 25).map((item) => ({
+      // Was sliced to 25 to keep the payload small, which was fine for a read-only list and is
+      // not for a picker — you cannot deselect the 26th item you cannot see. 200 is the wizard's
+      // own maximum batch size, so this never truncates a set the wizard can produce.
+      items: snapshot.items.slice(0, 200).map((item) => ({
+        postId: item.postId ?? null,
         title: item.title,
         kind: item.kind,
         url: item.url ?? null,

@@ -84,6 +84,10 @@ export interface GeneratedStoryboard {
   request: GenerationRequest;
   rawResponse: string;
   durationMs: number;
+  /** DeepSeek requests made. >1 means the scope was chunked. */
+  callCount: number;
+  /** Slot ids still empty after a retry — a short video with a reason attached. */
+  missingSlots: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -1069,6 +1073,149 @@ export interface GenerateOverrides {
   slots?: Record<string, { hint?: string; maxWords?: number }>;
 }
 
+/**
+ * How many narration slots go in one request.
+ *
+ * Generation used to be ONE call for the whole snapshot with `maxTokens` capped at 8000 and no
+ * input-size guard, so a whole-level scope (50+ lessons, each embedding its vocabulary, kanji and
+ * grammar) became a single enormous prompt. When the response ran out of tokens the missing slots
+ * were silently dropped — `.filter(segment => segment.text.trim())` below turned a truncated
+ * answer into a shorter video rather than an error.
+ *
+ * 40 slots costs roughly 3,600 completion tokens at the 90-tokens-per-slot budget, comfortably
+ * inside the cap with room for a long system prompt.
+ */
+const SLOTS_PER_CALL = 40;
+
+/** Concurrent DeepSeek requests. Matches the bound used for lesson block resolution. */
+const GENERATION_CONCURRENCY = 3;
+
+interface FilledSlots {
+  map: Record<string, string>;
+  text: string;
+  promptTokens: number;
+  completionTokens: number;
+  callCount: number;
+  /** Slots the model left empty even after a retry. Reported, never silently dropped. */
+  missing: string[];
+}
+
+/**
+ * Fills every narration slot, in as many calls as it takes.
+ *
+ * Batches are cut on SCENE boundaries, never inside one: a scene's segments are written to follow
+ * each other, and splitting them across two independent requests produces two halves of a
+ * thought. That means a batch can exceed SLOTS_PER_CALL slightly rather than divide a scene.
+ *
+ * Each batch is retried once on a slot it left empty, and what is still missing afterwards is
+ * reported rather than dropped.
+ */
+export function planGenerationBatches<T extends { id: string }>(
+  scenes: { id: string; narration: { id: string }[] }[],
+  slots: T[]
+): T[][] {
+  // Which scene each slot belongs to, taken from the scenes themselves rather than parsed out of
+  // the slot id. Segment ids are prefixed for embedded groups, so a string heuristic would
+  // mis-group exactly the lesson scopes this chunking exists for.
+  const sceneOfSlot = new Map<string, number>();
+  scenes.forEach((scene, i) => {
+    for (const segment of scene.narration) sceneOfSlot.set(segment.id, i);
+  });
+
+  const bySceneOrder: T[][] = [];
+  const sceneIndex = new Map<number, number>();
+  for (const slot of slots) {
+    const sceneKey = sceneOfSlot.get(slot.id) ?? -1;
+    let idx = sceneIndex.get(sceneKey);
+    if (idx === undefined) {
+      idx = bySceneOrder.length;
+      sceneIndex.set(sceneKey, idx);
+      bySceneOrder.push([]);
+    }
+    bySceneOrder[idx].push(slot);
+  }
+
+  const batches: T[][] = [];
+  let current: T[] = [];
+  for (const sceneSlots of bySceneOrder) {
+    if (current.length > 0 && current.length + sceneSlots.length > SLOTS_PER_CALL) {
+      batches.push(current);
+      current = [];
+    }
+    current.push(...sceneSlots);
+  }
+  if (current.length > 0) batches.push(current);
+  return batches;
+}
+
+/**
+ * The most planned batches one HTTP request may attempt.
+ *
+ * MEASURED, not guessed. Against the live API:
+ *   4-item topic,  13 slots, 1 batch  ->  1 call,  3.2 s
+ *   3-lesson submodule, 43 slots, 2 batches -> 3 calls (one retry), 31.4 s
+ *
+ * Netlify's real ceiling is ~30 s (docs/ENGINEERING_LOG.md), so that submodule ALREADY exceeds
+ * it — which is why this is 2 and not the 3 it started as. A retry is one extra sequential call
+ * and cannot be predicted in advance, so the budget has to leave room for one.
+ *
+ * Chunking makes a big scope CORRECT but not FASTER — a whole N5 level is 2,820 slots across 71
+ * calls, which no serverless request can survive. The route refuses above this and says what to
+ * do instead, rather than timing out halfway and leaving the project in generating_script
+ * forever. That failure mode already exists in this database once.
+ */
+export const MAX_BATCHES_PER_REQUEST = 2;
+
+async function fillSlots(params: {
+  snapshot: ContentSnapshot;
+  config: GenerateStoryboardConfig;
+  scenes: Scene[];
+  slots: BlankSlot[];
+  systemPrompt: string;
+}): Promise<FilledSlots> {
+  const { snapshot, config, scenes, slots, systemPrompt } = params;
+  const batches = planGenerationBatches(scenes, slots);
+
+  const map: Record<string, string> = {};
+  const texts: string[] = [];
+  let promptTokens = 0;
+  let completionTokens = 0;
+  let callCount = 0;
+
+  async function runBatch(batch: BlankSlot[], attempt: number): Promise<void> {
+    const userMessage = buildUserMessage(snapshot, config, batch);
+    const maxTokens = Math.min(8000, 600 + batch.length * 90);
+    const res = await callDeepSeek(systemPrompt, userMessage, maxTokens);
+    callCount += 1;
+    promptTokens += res.promptTokens;
+    completionTokens += res.completionTokens;
+    texts.push(res.text);
+
+    const parsed = parseSegmentMap(res.text) ?? {};
+    for (const [k, v] of Object.entries(parsed)) map[k] = v;
+
+    // One retry for whatever came back missing, which is usually a truncated response rather
+    // than a refusal. Beyond that, leaving it empty is more honest than looping.
+    const missing = batch.filter((s) => !map[s.id]);
+    if (missing.length > 0 && attempt === 0) await runBatch(missing, 1);
+  }
+
+  // Bounded concurrency: a 12-batch level scope runs in ~4 waves instead of 12 sequential
+  // round trips, without opening 12 simultaneous connections to DeepSeek.
+  for (let i = 0; i < batches.length; i += GENERATION_CONCURRENCY) {
+    await Promise.all(batches.slice(i, i + GENERATION_CONCURRENCY).map((b) => runBatch(b, 0)));
+  }
+
+  return {
+    map,
+    text: texts.join("\n"),
+    promptTokens,
+    completionTokens,
+    callCount,
+    missing: slots.filter((s) => !map[s.id]).map((s) => s.id),
+  };
+}
+
 export async function generateStoryboard(
   snapshot: ContentSnapshot,
   config: GenerateStoryboardConfig,
@@ -1088,8 +1235,13 @@ export async function generateStoryboard(
   const userMessage = overrides ? buildUserMessage(snapshot, config, slots) : request.userMessage;
   const effectiveRequest: GenerationRequest = { ...request, systemPrompt, userMessage, slots };
 
-  const { text, promptTokens, completionTokens } = await callDeepSeek(systemPrompt, userMessage, request.maxTokens);
-  const map = parseSegmentMap(text) ?? {};
+  const { map, text, promptTokens, completionTokens, callCount, missing } = await fillSlots({
+    snapshot,
+    config,
+    scenes: skeleton.scenes,
+    slots,
+    systemPrompt,
+  });
 
   const filled = skeleton.scenes.map((scene) => ({
     ...scene,
@@ -1100,7 +1252,8 @@ export async function generateStoryboard(
         return written ? { ...segment, text: sanitizeNarration(written) } : segment;
       })
       // A slot the model skipped becomes an empty segment; drop it so it never produces a
-      // zero-length TTS request.
+      // zero-length TTS request. `missing` above counts these, so a truncated generation is
+      // visible in the audit row rather than just producing a mysteriously short video.
       .filter((segment) => segment.text.trim().length > 0),
   }));
 
@@ -1127,6 +1280,8 @@ export async function generateStoryboard(
     request: effectiveRequest,
     rawResponse: text,
     durationMs: Date.now() - startedAt,
+    callCount,
+    missingSlots: missing,
   };
 }
 
