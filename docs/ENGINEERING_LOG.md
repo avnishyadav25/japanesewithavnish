@@ -324,6 +324,12 @@ were `by-nc-*` and one was usable. Verify `license_ccurl` itself, and order by d
 than popularity — the most popular tracks are overwhelmingly NC, so popularity spends the page on
 results that get rejected.
 
+### Still needs a human
+
+See [VIDEO_MANUAL_STEPS.md](VIDEO_MANUAL_STEPS.md). Two gated steps: mascot artwork (generator
+verified working 2026-08-16; 8 of 16 ids have art) and cloned voice (needs ~60 s reference audio
+per language and an hourly GPU — an M1/8 GB is below Chatterbox's floor).
+
 ### Architecture changes
 
 - **Migration 147**: `video_projects.captions` / `.branding` JSONB, `scope_kind` widened with
