@@ -18,8 +18,14 @@
  * accident, and re-running this costs nothing for lines that have not changed.
  *
  *   npm run voice:clone -- --storyboard=<uuid>            what would be generated
- *   npm run voice:clone -- --storyboard=<uuid> --apply    generate and cache
+ *   npm run voice:clone -- --storyboard=<uuid> --queue    hand it to a free GPU notebook
+ *   npm run voice:clone -- --storyboard=<uuid> --apply    generate now via CHATTERBOX_URL
  *   npm run voice:clone -- --storyboard=<uuid> --lang=en  only English segments
+ *
+ * TWO WAYS TO REACH A GPU. `--queue` writes the work list to video_voice_queue for
+ * notebooks/clone-voice.ipynb to drain on Kaggle or Colab — free, and the only option that works
+ * on Kaggle, which cannot expose an inbound HTTP server. `--apply` posts to CHATTERBOX_URL and
+ * suits a rented box you control. Both end in the same cache.
  *
  * WHAT YOU HAVE TO DO FIRST
  *   1. Record ~60 s of clean speech per language. One mic, quiet room, no music, no processing.
@@ -83,6 +89,7 @@ async function main() {
   const storyboardId = arg("storyboard");
   const onlyLang = arg("lang");
   const apply = process.argv.includes("--apply");
+  const queue = process.argv.includes("--queue");
   if (!storyboardId) throw new Error("Pass --storyboard=<uuid>");
 
   const { sql } = await import("../src/lib/db");
@@ -102,12 +109,15 @@ async function main() {
   const segments = (rows[0].doc.scenes ?? []).flatMap((s) => s.narration ?? []);
   const projectVoices = rows[0].voices ?? {};
 
-  console.log(`${apply ? "APPLY" : "PILOT"} — ${segments.length} segment(s) in this storyboard\n`);
+  const mode = queue ? "QUEUE" : apply ? "APPLY" : "PILOT";
+  console.log(`${mode} — ${segments.length} segment(s) in this storyboard\n`);
 
   let cloned = 0;
   let cached = 0;
   let skipped = 0;
   let generated = 0;
+  let queued = 0;
+  let alreadyQueued = 0;
 
   for (const segment of segments) {
     if (!segment.text?.trim()) continue;
@@ -136,7 +146,31 @@ async function main() {
       continue;
     }
 
-    console.log(`  ${apply ? "+" : "·"} ${segment.lang} ${segment.id}  ${segment.text.slice(0, 60)}`);
+    console.log(`  ${apply || queue ? "+" : "·"} ${segment.lang} ${segment.id}  ${segment.text.slice(0, 60)}`);
+
+    // ---- queue mode: hand the work to an external GPU -----------------------
+    //
+    // The hash is written here, by the same ttsHash() the renderer looks up with, and never
+    // recomputed on the GPU side. JS renders `${1.0}` as "1" and Python's f"{1.0}" gives "1.0",
+    // so a notebook deriving its own key would miss the cache on every clip — silently, because
+    // a missing entry just means "synthesize it", and the renderer would fall back to Google.
+    if (queue) {
+      // RETURNING, so the count reflects what was actually inserted rather than what was
+      // attempted. Without it a second run reports "13 queued" having queued nothing, which is
+      // the number you would act on.
+      const inserted = (await db`
+        INSERT INTO video_voice_queue
+          (storyboard_id, text_hash, segment_id, text, ssml, lang, voice_name, speaking_rate, pitch)
+        VALUES (${storyboardId}::uuid, ${hash}, ${segment.id}, ${segment.text}, ${ssml},
+                ${segment.lang}, ${voiceName}, ${req.speakingRate}, ${req.pitch})
+        ON CONFLICT (text_hash) DO NOTHING
+        RETURNING id
+      `) as { id: string }[];
+      if (inserted.length > 0) queued += 1;
+      else alreadyQueued += 1;
+      continue;
+    }
+
     if (!apply) {
       generated += 1;
       continue;
@@ -162,12 +196,30 @@ async function main() {
     generated += 1;
   }
 
+  if (queue) {
+    const pending = (await db`
+      SELECT COUNT(*)::int AS n FROM video_voice_queue WHERE status = 'pending'
+    `) as { n: number }[];
+    console.log(
+      `\n${cloned} cloned-voice segment(s): ${cached} already cached, ${queued} newly queued` +
+        `${alreadyQueued > 0 ? `, ${alreadyQueued} already queued` : ""}. ` +
+        `${skipped} left to Google.\n` +
+        `${pending[0].n} line(s) now pending across all storyboards.\n\n` +
+        `Next: open notebooks/clone-voice.ipynb on Kaggle or Colab and run it.\n` +
+        `See docs/VIDEO_MANUAL_STEPS.md for the free-GPU walkthrough.`
+    );
+    return;
+  }
+
   console.log(
     `\n${cloned} cloned-voice segment(s): ${cached} already cached, ` +
       `${generated} ${apply ? "generated" : "would be generated"}. ` +
       `${skipped} left to Google.`
   );
-  if (!apply && generated > 0) console.log("\nRe-run with --apply on a GPU box to generate them.");
+  if (!apply && generated > 0) {
+    console.log("\nEither: --queue to send them to a free GPU notebook (see docs/VIDEO_MANUAL_STEPS.md),");
+    console.log("or:     --apply with CHATTERBOX_URL set, if you have a box running.");
+  }
 }
 
 main()

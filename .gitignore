@@ -69,3 +69,8 @@ japanesewithavnish.com-audit
 # Mascot pilot output and brand preview stills — regenerable, never committed.
 # public/mascots/*.png IS committed; this is the review scratch area.
 video-brand-preview/
+
+# Voice-cloning reference audio. NEVER commit this — the repo is public and a clean
+# 60-second sample is precisely what someone needs to clone the voice. Lives in R2 instead;
+# see docs/VIDEO_MANUAL_STEPS.md.
+reference/
