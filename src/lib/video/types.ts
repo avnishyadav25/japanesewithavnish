@@ -165,6 +165,14 @@ export type SceneType =
   | "broll_page"
   | "cta_outro";
 
+/**
+ * Scenes the storyboard builder adds around the content — the mascot beat, the title, the outro,
+ * the b-roll shot. Lives here rather than in storyboard.ts because both the highlight builder and
+ * the editor need it, and storyboard.ts reaches src/lib/db (and therefore `pg` and `fs`) through
+ * load-prompts, which cannot be in a client bundle.
+ */
+export const CHROME_SCENE_IDS: ReadonlySet<string> = new Set(["sc-mascot", "sc-intro", "sc-outro", "sc-broll"]);
+
 export const SCENE_TYPES: SceneType[] = [
   "mascot_intro", "title_card", "vocab_card", "vocab_list", "kanji_stroke", "kanji_detail", "kana_grid",
   "grammar_pattern", "grammar_formation", "example_sentence", "dialogue", "reading_passage",

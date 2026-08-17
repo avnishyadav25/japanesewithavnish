@@ -31,6 +31,7 @@ import {
   resolvePacing,
   secondsForWords,
 } from "./pacing";
+import { CHROME_SCENE_IDS } from "./types";
 import type {
   BrandingSettings,
   ContentItem,
@@ -731,7 +732,8 @@ function withIntroOutro(
  * Scene ids that `withIntroOutro` adds. Stripped when one skeleton is embedded inside another,
  * so a lesson does not get three intros and three outros.
  */
-const CHROME_SCENE_IDS: ReadonlySet<string> = new Set(["sc-mascot", "sc-intro", "sc-outro", "sc-broll"]);
+// Defined in ./types so the highlight builder and the editor can use it without pulling this
+// module — and its database imports — into a client bundle.
 const CHROME_SLOT_IDS: ReadonlySet<string> = new Set(["sc-intro-nar", "sc-outro-nar", "sc-broll-nar"]);
 
 /**

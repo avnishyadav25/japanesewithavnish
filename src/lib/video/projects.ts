@@ -123,6 +123,9 @@ export interface CreateProjectInput {
   voices?: VoiceConfig | null;
   /** Shared by the siblings of one video_per_item split. NULL for a standalone project. */
   batchId?: string | null;
+  /** Inherited when a project is derived from another — a Short keeps its parent's look. */
+  captions?: Partial<CaptionSettings> | null;
+  branding?: Partial<BrandingSettings> | null;
   createdBy: string;
 }
 
@@ -133,8 +136,10 @@ export async function createProject(input: CreateProjectInput): Promise<VideoPro
   const rows = (await db.query(
     `INSERT INTO video_projects
        (title, scope_kind, scope_ref, grouping, theme_key, bgm_track_id, narration_langs, formats,
-        target_duration_seconds, tone, include_broll, pacing, voices, batch_id, created_by)
-     VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7::text[], $8::text[], $9, $10, $11, $12::jsonb, $13::jsonb, $14::uuid, $15)
+        target_duration_seconds, tone, include_broll, pacing, voices, batch_id, captions, branding,
+        created_by)
+     VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7::text[], $8::text[], $9, $10, $11, $12::jsonb, $13::jsonb,
+             $14::uuid, $15::jsonb, $16::jsonb, $17)
      RETURNING ${PROJECT_COLUMNS}`,
     [
       input.title,
@@ -151,6 +156,8 @@ export async function createProject(input: CreateProjectInput): Promise<VideoPro
       input.pacing ? JSON.stringify(input.pacing) : null,
       input.voices ? JSON.stringify(input.voices) : null,
       input.batchId ?? null,
+      input.captions ? JSON.stringify(input.captions) : null,
+      input.branding ? JSON.stringify(input.branding) : null,
       input.createdBy,
     ]
   )) as Record<string, unknown>[];
