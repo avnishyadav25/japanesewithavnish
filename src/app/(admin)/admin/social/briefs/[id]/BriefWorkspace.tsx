@@ -82,6 +82,17 @@ export function BriefWorkspace({
     return json;
   }
 
+  /** Re-reads current variants. Shared by generate and by restoring an earlier version. */
+  async function reloadVariants() {
+    try {
+      const refreshed = await call(`/api/admin/social/briefs/${brief.id}/variants`, undefined, "GET");
+      setVariants(refreshed.variants);
+      if (refreshed.posts) setPosts(refreshed.posts);
+    } catch {
+      // A failed refresh leaves the current view alone rather than blanking it.
+    }
+  }
+
   async function generate() {
     if (selected.length === 0) return;
     setBusy("generate");
@@ -243,6 +254,7 @@ export function BriefWorkspace({
               onQueue={queue}
               onMarkPosted={markPosted}
               onPublishArticle={publishArticle}
+              onRestored={reloadVariants}
             />
           ))}
         </div>
@@ -261,6 +273,7 @@ function SurfaceCard({
   onQueue,
   onMarkPosted,
   onPublishArticle,
+  onRestored,
 }: {
   surface: SurfaceId;
   variants: Partial<Record<SocialLang, SocialVariantRow>>;
@@ -271,12 +284,49 @@ function SurfaceCard({
   onQueue: (v: SocialVariantRow) => void;
   onMarkPosted: (p: PostWithMeta, url: string) => void;
   onPublishArticle: (v: SocialVariantRow) => void;
+  onRestored: () => void;
 }) {
   const rule = getRule(surface);
   const available = SOCIAL_LANGS.filter((l) => variants[l]);
   const [lang, setLang] = useState<SocialLang>(available[0] ?? "en");
   const [pasteUrl, setPasteUrl] = useState("");
+  const [history, setHistory] = useState<
+    { id: string; version: number; isCurrent: boolean; source: string; createdAt: string; preview: string; mediaCount: number }[] | null
+  >(null);
+  const [historyBusy, setHistoryBusy] = useState(false);
   const variant = variants[lang];
+
+  /**
+   * Earlier drafts of this surface.
+   *
+   * Loaded on demand rather than with the page: fifteen surfaces times two languages would be
+   * thirty extra queries to render a list most of which nobody opens.
+   */
+  async function loadHistory(variantId: string) {
+    setHistoryBusy(true);
+    try {
+      const res = await fetch(`/api/admin/social/variants/${variantId}/history`);
+      const data = await res.json();
+      setHistory(data.versions ?? []);
+    } finally {
+      setHistoryBusy(false);
+    }
+  }
+
+  async function restore(versionId: string, variantId: string) {
+    setHistoryBusy(true);
+    try {
+      await fetch(`/api/admin/social/variants/${variantId}/history`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ versionId }),
+      });
+      setHistory(null);
+      onRestored();
+    } finally {
+      setHistoryBusy(false);
+    }
+  }
 
   if (!variant) return null;
   const post = postByVariant.get(variant.id);
@@ -290,8 +340,54 @@ function SurfaceCard({
           <MaybeSocialIcon platform={rule.platform} className="w-4 h-4 text-charcoal" />
           <span className="font-heading font-bold text-charcoal">{rule.label}</span>
         </div>
-        {post ? <StatusBadge status={post.status} /> : null}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Version, and a way back to earlier ones. Nothing is ever deleted — saveVariant
+              supersedes and inserts — but until now the workspace only loaded is_current, so a
+              regenerate that produced worse copy than the attempt before it was unrecoverable
+              without a SQL client. */}
+          {variant.version > 1 && (
+            <button
+              type="button"
+              onClick={() => (history ? setHistory(null) : loadHistory(variant.id))}
+              disabled={historyBusy}
+              title="Earlier drafts of this surface. They are all still stored."
+              className="text-xs text-secondary hover:text-primary disabled:opacity-50"
+            >
+              v{variant.version} · {history ? "hide" : "history"}
+            </button>
+          )}
+          {post ? <StatusBadge status={post.status} /> : null}
+        </div>
       </div>
+
+      {history && (
+        <div className="mb-3 border border-[var(--divider)] rounded-card divide-y divide-[var(--divider)]">
+          {history.length === 0 && <p className="px-3 py-2 text-xs text-secondary">No earlier drafts.</p>}
+          {history.map((h) => (
+            <div key={h.id} className="px-3 py-2 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-charcoal">v{h.version}</span>
+                {h.isCurrent ? (
+                  <span className="text-emerald-700">current</span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => restore(h.id, variant.id)}
+                    disabled={historyBusy}
+                    className="text-primary hover:underline disabled:opacity-50"
+                  >
+                    restore
+                  </button>
+                )}
+                <span className="text-secondary">{h.source.replace(/_/g, " ")}</span>
+                {h.mediaCount > 0 && <span className="text-secondary">· {h.mediaCount} image</span>}
+                <span className="text-secondary ml-auto">{new Date(h.createdAt).toLocaleString()}</span>
+              </div>
+              <p className="text-secondary mt-0.5 line-clamp-2">{h.preview}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {available.length > 1 && (
         <div className="flex gap-1 mb-3">

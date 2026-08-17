@@ -25,6 +25,18 @@ interface Background {
   prompt: string;
 }
 
+/**
+ * Canvas font stack.
+ *
+ * NO `var(--font-sans)` here, even though the CSS uses it: a CSS custom property is invalid inside
+ * a canvas `font` string, and an invalid value makes canvas SILENTLY KEEP the previous font rather
+ * than throwing. The brand face would have been quietly ignored with no error anywhere.
+ *
+ * next/font hashes its family name, so "DM Sans" is named explicitly and the Japanese faces follow
+ * for any CJK the headline contains.
+ */
+const FONT_STACK = '"DM Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", system-ui, sans-serif';
+
 const THEME = {
   ink: "#1A1A1A",
   paper: "#FAF8F5",
@@ -152,7 +164,7 @@ export function ImageStudio({
       // Wrap by measured width, not by character count — a CJK headline and a Latin one of the
       // same length are wildly different widths.
       const titleSize = Math.round(isBottom ? W * 0.075 : W * 0.085);
-      ctx.font = `700 ${titleSize}px "DM Sans", var(--font-sans), system-ui, sans-serif`;
+      ctx.font = `700 ${titleSize}px ${FONT_STACK}`;
       const words = headline.trim().split(/\s+/).filter(Boolean);
       const lines: string[] = [];
       let line = "";
@@ -198,13 +210,13 @@ export function ImageStudio({
 
       let y = blockY;
       if (eyebrow) {
-        ctx.font = `700 ${eyebrowSize}px "DM Sans", system-ui, sans-serif`;
+        ctx.font = `700 ${eyebrowSize}px ${FONT_STACK}`;
         ctx.fillStyle = THEME.accent;
         ctx.textBaseline = "top";
         ctx.fillText(eyebrow.toUpperCase(), boxX, y);
         y += eyebrowSize * 2;
       }
-      ctx.font = `700 ${titleSize}px "DM Sans", var(--font-sans), system-ui, sans-serif`;
+      ctx.font = `700 ${titleSize}px ${FONT_STACK}`;
       ctx.fillStyle = THEME.ink;
       ctx.textBaseline = "top";
       for (const l of lines) {
