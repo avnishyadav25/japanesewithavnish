@@ -16,8 +16,20 @@
  * What is left is commentary: headings, callouts, comparisons, recaps, quizzes. Those are the
  * scenes a human actually wants to add to a generated script.
  */
-import { newSceneId } from "./storyboard";
 import type { NarrationLang, Scene, SceneType } from "./types";
+
+/**
+ * A scene id, generated without importing storyboard.ts.
+ *
+ * storyboard.ts reaches src/lib/db through load-prompts, which pulls `pg` and therefore `fs` into
+ * whatever bundle imports it. This module's constants are used by the editor — a client component
+ * — so importing newSceneId() from there broke the production build with "Can't resolve 'fs'".
+ * Web Crypto's randomUUID is available in both Node 19+ and every modern browser, so this module
+ * stays isomorphic and imports nothing but types.
+ */
+function sceneId(): string {
+  return `sc-${globalThis.crypto.randomUUID().slice(0, 8)}`;
+}
 
 export const INSERTABLE_SCENE_TYPES = [
   "title_card",
@@ -56,7 +68,7 @@ export const INSERTABLE_SCENE_LABELS: Record<InsertableSceneType, string> = {
  * instead of collapsing to the minimum.
  */
 export function blankScene(sceneType: InsertableSceneType, lang: NarrationLang): Scene {
-  const id = newSceneId();
+  const id = sceneId();
   const narrationId = `${id}-nar`;
 
   const visual = (() => {
