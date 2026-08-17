@@ -42,6 +42,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   const project = await getProject(id);
   if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
+  // Captured before anything overwrites it, so a finished project can be put back afterwards.
+  const previousStatus = project.status;
 
   const body = await req.json().catch(() => ({}));
   const lang = (body?.narrationLang ?? project.narrationLangs[0]) as NarrationLang;
@@ -170,7 +172,29 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       actor: admin.email,
     });
 
-    await setProjectStatus(id, approvalStatus === "approved" ? "script_ready" : "script_pending_review");
+    // A project that was already finished stays finished.
+    //
+    // This route used to leave every regenerate at script_ready/script_pending_review, so
+    // rewriting one line of narration on a rendered project dropped it out of `render_ready` —
+    // and the only ways back are rendering again or approving a render. The existing renders were
+    // never touched (`is_current` stays true), so the MP4 was still there; only the status that
+    // the "Done" filter and the batch panel's rendered count read was lost.
+    //
+    // Restored only when the new script needs no review AND a current render still exists. A
+    // script awaiting a human read must not claim the project is done.
+    const currentRenders = (await sql`
+      SELECT COUNT(*)::int AS n FROM video_renders
+      WHERE project_id = ${id}::uuid AND is_current AND approval_status <> 'rejected'
+    `) as { n: number }[];
+    const stillRendered = (currentRenders[0]?.n ?? 0) > 0;
+
+    const nextStatus =
+      approvalStatus === "approved"
+        ? stillRendered && previousStatus === "render_ready"
+          ? "render_ready"
+          : "script_ready"
+        : "script_pending_review";
+    await setProjectStatus(id, nextStatus);
 
     // Same AI audit trail as every other generated-content path in the admin.
     await insertAiLog({

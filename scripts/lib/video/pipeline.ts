@@ -109,11 +109,24 @@ export async function runJob(job: ClaimedJob, options: PipelineOptions): Promise
         const scene = scenes[i];
         if (scene.sceneType !== "broll_page") continue;
         const visual = scene.visual as BrollPageVisual;
+        // durationSeconds comes from the SCENE, which is the only place it is authored.
+        //
+        // It was omitted, so every cached capture recorded duration_seconds = NULL — all six rows
+        // in the cache summed to zero. An earlier pass plumbed the value through captureImage and
+        // achieved nothing, because nothing upstream ever set it.
+        //
+        // NOTE it is part of recipeHash, so adding it invalidates the existing cache rows once and
+        // they are re-captured on the next render. That is the intended cost.
+        //
+        // NOTE ALSO that this corrects the recorded data, not the video: a broll_page scene is
+        // durationMode "auto" with a narration slot, so its on-screen length comes from the
+        // narration, and nothing in the render path reads visual.asset.durationSeconds at all.
         const recipe: CaptureRecipe = {
           url: visual.sourceUrl,
           kind: visual.captureKind,
           viewportWidth: spec.width,
           viewportHeight: spec.height,
+          durationSeconds: scene.durationSeconds > 0 ? scene.durationSeconds : undefined,
           contentRef: scene.sourceRef?.kind === "post" ? { postId: scene.sourceRef.id } : undefined,
         };
         try {

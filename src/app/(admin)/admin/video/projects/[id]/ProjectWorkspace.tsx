@@ -197,13 +197,18 @@ export function ProjectWorkspace({
     wasActive.current = hasActiveJob;
   }, [hasActiveJob, router]);
 
-  async function call(action: string, url: string, body?: unknown) {
+  /**
+   * `method` is explicit because it used to be `body === undefined ? "POST" : "POST"` — both
+   * branches the same, evidently a leftover from a refactor. The storyboard route exports only GET
+   * and PUT, so "Save as new version" has been answering 405 for as long as it has existed.
+   */
+  async function call(action: string, url: string, body?: unknown, method: "POST" | "PUT" = "POST") {
     setBusy(action);
     setError(null);
     setNotice(null);
     try {
       const res = await fetch(url, {
-        method: body === undefined ? "POST" : "POST",
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body ?? {}),
       });
@@ -240,7 +245,7 @@ export function ProjectWorkspace({
 
   async function saveEdits() {
     if (!selected || !draft) return;
-    const data = await call("save", `/api/admin/video/storyboards/${selected.id}`, { doc: draft });
+    const data = await call("save", `/api/admin/video/storyboards/${selected.id}`, { doc: draft }, "PUT");
     if (data) {
       // The draft has been promoted, so stop offering to restore work that is already saved.
       await fetch(`/api/admin/video/storyboards/${selected.id}/draft`, { method: "DELETE" }).catch(() => {});

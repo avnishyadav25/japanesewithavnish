@@ -46,6 +46,14 @@ export const VOICE_CATALOGUE: Record<NarrationLang, VoiceOption[]> = {
     { name: "en-IN-Neural2-A", label: "Ananya (Indian English)", gender: "female", tier: "Neural2", note: "Matches the core audience" },
     { name: "en-IN-Neural2-B", label: "Rohan (Indian English)", gender: "male", tier: "Neural2" },
   ],
+  // Romanised Hinglish on Indian ENGLISH voices, deliberately. A hi-IN voice handed Latin script
+  // reads it as Hindi phonetics; en-IN handles "Aaj hum paanch shabd seekhenge" naturally, and
+  // measured almost exactly at the English rate (15.45 vs 16.30 c/s).
+  hinglish: [
+    { name: "en-IN-Neural2-A", label: "Ananya (Indian English)", gender: "female", tier: "Neural2", note: "Current default" },
+    { name: "en-IN-Neural2-B", label: "Rohan (Indian English)", gender: "male", tier: "Neural2" },
+    { name: "hi-IN-Neural2-A", label: "Aditi (Hindi voice, more Hindi-leaning accent)", gender: "female", tier: "Neural2" },
+  ],
   hi: [
     { name: "hi-IN-Neural2-A", label: "Aditi", gender: "female", tier: "Neural2", note: "Current default" },
     { name: "hi-IN-Neural2-D", label: "Kavya", gender: "female", tier: "Neural2" },
@@ -68,6 +76,7 @@ export const VOICE_CATALOGUE: Record<NarrationLang, VoiceOption[]> = {
 export const VOICE_SAMPLE_TEXT: Record<NarrationLang, string> = {
   en: "Here's your first word. Listen carefully, then say it back.",
   hi: "यह आपका पहला शब्द है। ध्यान से सुनिए, फिर दोहराइए।",
+  hinglish: "Yeh aapka pehla word hai. Dhyaan se suniye, phir dohraiye.",
   ja: "はじめまして。今日は日本語を勉強しましょう。",
 };
 

@@ -907,6 +907,16 @@ export const VIDEO_PROMPT_KEY_BY_KIND: Record<string, string> = {
 const LANGUAGE_INSTRUCTION: Record<NarrationLang, string> = {
   en: "Write in natural spoken English. Indian-English learners are the core audience, so keep vocabulary plain and avoid US-specific idioms.",
   hi: "Write in natural spoken Hindi using Devanagari script. Keep it conversational, the way a friendly teacher speaks — not formal written Hindi.",
+  // Lifted from languageBrief() in src/lib/social/generate.ts, which was tuned against real
+  // output — including the failure it exists to prevent, where the model returns the English text
+  // unchanged and calls it Hinglish. LATIN SCRIPT IS LOAD-BEARING: this is read by an Indian
+  // English voice, and Devanagari handed to en-IN comes out as nonsense.
+  hinglish:
+    "Write in romanised Hindi-English as an Indian learner actually speaks — Hindi connectives and " +
+    "verbs carrying English nouns and technical words. For example: \"yeh 10 words roz kaam aayenge\", " +
+    "\"iska matlab hai\", \"yaad rakhna easy hai\". Latin script ONLY, never Devanagari — a Devanagari " +
+    "word here will be mispronounced by the English voice reading it. This must NOT be plain English: " +
+    "if a sentence would read identically to the English version, you have not done this correctly.",
   ja: "Write in simple spoken Japanese suitable for the learner's level, using kana and only common kanji.",
 };
 

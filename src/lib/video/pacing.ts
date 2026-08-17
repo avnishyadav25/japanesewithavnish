@@ -17,23 +17,40 @@
 import type { ContentSnapshot, NarrationLang, PacingConfig, Scene } from "./types";
 
 /**
- * Characters per second of finished audio, measured from 49 real clips.
+ * Characters per second of finished audio, per language.
  *
- *   en-US-Neural2-F @1.0x : 19 clips, 767 chars, 53.3s -> 14.38 c/s
- *   ja-JP-Neural2-B @0.9x : 30 clips, 169 chars, 44.3s ->  3.82 c/s
+ * MEASURED, and reproducible: `npm run video:measure-rates` synthesises 15 varied narration
+ * sentences per language through the same synthesize() the renderer uses and prints these numbers.
  *
- * Japanese is ~4x slower per character because each kana is a full mora, where a Latin character
- * is a fraction of a phoneme. Estimating both at one rate — the obvious mistake — would put a
+ *   en-US-Neural2-F @1.0x : 15 clips, 1120 chars, 68.7s -> 16.30 c/s
+ *   hi-IN-Neural2-A @1.0x : 15 clips, 1001 chars, 70.1s -> 14.29 c/s
+ *   en-IN-Neural2-A @1.0x : 15 clips, 1144 chars, 74.1s -> 15.45 c/s   (hinglish)
+ *   ja-JP-Neural2-B @0.9x : 15 clips,  306 chars, 62.3s ->  4.91 c/s
+ *
+ * WHY THESE REPLACED en 14.38 / hi 11.50 / ja 3.82. The originals were pooled over 49 real cached
+ * clips, and those clips were mostly very short — the ja set was 30 clips totalling 169 chars, i.e.
+ * single words. A clip carries ~0.36s of fixed onset and decay regardless of length, so a one-word
+ * clip measures mostly overhead: "cat" alone reads at 4.43 c/s where a full sentence reads at
+ * 16.36. Pooling short clips therefore understates the rate for the sentences that narration slots
+ * actually contain, and the estimate ran long.
+ *
+ * Checked against four real renders whose true durations are known. Predicting from text alone
+ * (measured audio stripped), the old constants over-estimated by +5.2%, +7.3%, +7.3% and +19.6% —
+ * and the +19.6% case was the Hindi project, the one language whose rate was admittedly a guess.
+ *
+ * Japanese is ~3x slower per character because each kana is a full mora where a Latin character is
+ * a fraction of a phoneme. Estimating both at one rate — the obvious mistake — would put a
  * Japanese-heavy video out by a factor of three.
  *
  * These are rates at the reference speaking rate; `charsPerSecond()` scales them linearly, which
  * matches how Google's speakingRate behaves closely enough for planning.
  */
-export const SPEECH_RATES = {
-  en: { charsPerSecond: 14.38, referenceRate: 1.0 },
-  hi: { charsPerSecond: 11.5, referenceRate: 1.0 }, // no measurements yet; Devanagari runs slower than Latin
-  ja: { charsPerSecond: 3.82, referenceRate: 0.9 },
-} as const;
+export const SPEECH_RATES: Record<NarrationLang, { charsPerSecond: number; referenceRate: number }> = {
+  en: { charsPerSecond: 16.3, referenceRate: 1.0 },
+  hi: { charsPerSecond: 14.29, referenceRate: 1.0 },
+  hinglish: { charsPerSecond: 15.45, referenceRate: 1.0 },
+  ja: { charsPerSecond: 4.91, referenceRate: 0.9 },
+};
 
 /** Average characters per English word, for turning a character budget into a word count the
  * model can actually follow. Measured across the existing narration: 767 chars / ~139 words. */

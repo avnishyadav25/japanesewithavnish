@@ -3,7 +3,7 @@ import { getAdminSession } from "@/lib/auth/admin";
 import { sql } from "@/lib/db";
 import { isKnownVoice } from "@/lib/video/voices";
 import { DEFAULT_VOICES } from "@/lib/video/tts";
-import type { NarrationLang } from "@/lib/video/types";
+import { NARRATION_LANGS } from "@/lib/video/types";
 
 /**
  * Theme CRUD.
@@ -51,7 +51,9 @@ function cleanVoices(input: unknown): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   if (!input || typeof input !== "object") return out;
   const src = input as Record<string, unknown>;
-  for (const lang of ["en", "hi", "ja"] as NarrationLang[]) {
+  // NARRATION_LANGS, not a literal: a hardcoded list here silently dropped the voice for any
+  // language added later.
+  for (const lang of NARRATION_LANGS) {
     const name = src[lang];
     if (typeof name === "string" && isKnownVoice(lang, name)) out[lang] = name;
   }

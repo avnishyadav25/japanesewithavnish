@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { AdminCard } from "@/components/admin/AdminCard";
 import { VOICE_CATALOGUE } from "@/lib/video/voices";
-import type { NarrationLang } from "@/lib/video/types";
+import { NARRATION_LANGS } from "@/lib/video/types";
 
 /**
  * Editing for `video_themes`, which previously had none — the page said "edit these in the
@@ -182,8 +182,8 @@ export function ThemeEditor({ initial }: { initial: ThemeRow[] }) {
                     </label>
                   ))}
 
-                  <div className="grid sm:grid-cols-3 gap-3">
-                    {(["en", "hi", "ja"] as NarrationLang[]).map((lang) => (
+                  <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    {NARRATION_LANGS.map((lang) => (
                       <label key={lang} className="block text-sm">
                         <span className="text-charcoal font-medium uppercase text-xs">{lang} voice</span>
                         <select

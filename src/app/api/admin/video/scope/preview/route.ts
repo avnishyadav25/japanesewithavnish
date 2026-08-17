@@ -12,7 +12,8 @@ import {
 } from "@/lib/video/pacing";
 import { buildGenerationRequest } from "@/lib/video/storyboard";
 import { DEFAULT_VOICES } from "@/lib/video/tts";
-import type { PacingConfig, ScopeKind, ScopeRef, VideoFormat } from "@/lib/video/types";
+import type {
+  NarrationLang, PacingConfig, ScopeKind, ScopeRef, VideoFormat } from "@/lib/video/types";
 
 /**
  * Resolves a scope and prices it, without creating anything.
@@ -57,7 +58,7 @@ export async function POST(req: Request) {
       grouping === "single_video" ? snapshot : { ...snapshot, items: snapshot.items.slice(0, 1) };
     const { request, skeleton } = await buildGenerationRequest(perVideoSnapshot, {
       projectId: "preview",
-      narrationLang: (langs[0] ?? "en") as "en" | "hi" | "ja",
+      narrationLang: (langs[0] ?? "en") as NarrationLang,
       themeKey: "washi-light",
       pacing,
     });
