@@ -103,6 +103,42 @@ export const MASCOT_BY_SCENE_TYPE: Record<string, MascotId | null> = {
   listening_prompt: null,
 };
 
+/**
+ * The character for a CONTENT type, for surfaces that have no scene — a social thumbnail.
+ *
+ * Same casting as MASCOT_BY_SCENE_TYPE above, keyed differently: the owl teaches grammar, the
+ * tanuki writes kanji, the fox does vocabulary. Deliberately consistent, so a thumbnail and the
+ * video it advertises show the same character and a viewer builds one association rather than
+ * several.
+ *
+ * A `wave` pose rather than the `point` used in-video: a thumbnail is a greeting, not mid-lesson.
+ */
+const MASCOT_BY_CONTENT_TYPE: Record<string, MascotId> = {
+  vocabulary: "fox-wave",
+  reading: "fox-point",
+  listening: "fox-point",
+  grammar: "owl-point",
+  kanji: "tanuki-write",
+  kana: "tanuki-write",
+  writing: "tanuki-write",
+  sounds: "tanuki-think",
+  conversation: "red-panda-wave",
+  practice_test: "owl-think",
+  study_guide: "owl-point",
+  blog: "fox-wave",
+};
+
+/**
+ * Falls back to the fox rather than to nothing: an image with no character is a missed
+ * opportunity, while a slightly wrong character still reads as the brand. Filtered through
+ * isGenerated() so an id whose PNG has not been produced can never be requested.
+ */
+export function mascotForContentType(contentType?: string | null): MascotId {
+  const picked = contentType ? MASCOT_BY_CONTENT_TYPE[contentType] : undefined;
+  if (picked && isGenerated(picked)) return picked;
+  return "fox-wave";
+}
+
 export function mascotForScene(sceneType: string): MascotId | null {
   return MASCOT_BY_SCENE_TYPE[sceneType] ?? null;
 }

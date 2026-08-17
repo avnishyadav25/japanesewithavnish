@@ -25,6 +25,7 @@ export const DEFAULT_BRANDING: BrandingSettings = {
   handle: BRAND.atHandle,
   socials: SOCIALS.filter((s) => s.inVideoOutro).map((s) => s.platform),
   mascots: true,
+  titleBar: true,
 };
 
 /**
@@ -62,6 +63,45 @@ export function resolveBranding(branding?: Partial<BrandingSettings> | null): Br
 export function showsHashtag(format: VideoFormat, branding: BrandingSettings): boolean {
   if (!branding.hashtag) return false;
   return format === "vertical" || format === "square";
+}
+
+/**
+ * Whether the small top-centre title shows.
+ *
+ * Same format rule as the hashtag, for the same reason: a vertical or square video is watched
+ * without any surrounding page furniture, while a landscape one already has its title above the
+ * YouTube player. Burning a second copy into a 16:9 frame is clutter.
+ */
+export function showsTitleBar(format: VideoFormat, branding: BrandingSettings): boolean {
+  if (!branding.titleBar) return false;
+  return format === "vertical" || format === "square";
+}
+
+/**
+ * Fits a title into the top bar.
+ *
+ * Measured, the real titles run 10 to 54 characters — "N5 grammar" through "Hiragana, Katakana,
+ * and Kanji: What Each Script Is For". A single font size cannot serve both, and wrapping the long
+ * one puts a two-line block over the teaching content.
+ *
+ * So: shrink over 28 characters, and cut at 46 on a word boundary. The scale is returned rather
+ * than applied so the caller keeps it relative to its own layout.
+ */
+export function fitTitleBar(title: string): { text: string; scale: number } {
+  const clean = title.trim().replace(/\s+/g, " ");
+  const MAX = 46;
+
+  let text = clean;
+  if (clean.length > MAX) {
+    const cut = clean.slice(0, MAX);
+    // Prefer a word boundary, but only if one survives reasonably far in — cutting "Hiragana,"
+    // back to "Hiragana" is fine, cutting a 46-character run back to 8 is not.
+    const lastSpace = cut.lastIndexOf(" ");
+    text = `${(lastSpace > MAX * 0.6 ? cut.slice(0, lastSpace) : cut).replace(/[,;:\s]+$/, "")}…`;
+  }
+
+  const scale = clean.length <= 28 ? 1 : clean.length <= 40 ? 0.88 : 0.78;
+  return { text, scale };
 }
 
 /**

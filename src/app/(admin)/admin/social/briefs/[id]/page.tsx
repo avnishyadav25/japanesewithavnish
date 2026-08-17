@@ -43,6 +43,7 @@ export default async function SocialBriefPage({ params }: { params: Promise<{ id
         briefId={brief.id}
         defaultHeadline={brief.title}
         jlptLevel={brief.jlptLevel ?? null}
+        contentType={brief.contentType ?? null}
         hasPost={Boolean(brief.postId)}
       />
 

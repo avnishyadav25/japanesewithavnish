@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AdminCard } from "@/components/admin/AdminCard";
 import { SOCIAL_IMAGE_SIZES, backgroundFit, type ImageSize } from "@/lib/social/imageSizes";
+import { mascotAsset, mascotForContentType } from "@/lib/video/mascots";
 
 /**
  * Thumbnails and feature images for a brief.
@@ -48,11 +49,14 @@ export function ImageStudio({
   briefId,
   defaultHeadline,
   jlptLevel,
+  contentType,
   hasPost,
 }: {
   briefId: string;
   defaultHeadline: string;
   jlptLevel: string | null;
+  /** Casts the mascot, so a thumbnail shows the same character as its video. */
+  contentType: string | null;
   hasPost: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -66,9 +70,13 @@ export function ImageStudio({
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedSizes, setSelectedSizes] = useState<string[]>(SOCIAL_IMAGE_SIZES.map((s) => s.key));
+  const [showMascot, setShowMascot] = useState(true);
+  // Cast by content type, matching MASCOT_BY_CONTENT_TYPE in the video pipeline.
+  const mascotId = mascotForContentType(contentType);
 
   const canvases = useRef<Map<string, HTMLCanvasElement>>(new Map());
   const bgImages = useRef<Map<string, HTMLImageElement>>(new Map());
+  const mascotImg = useRef<HTMLImageElement | null>(null);
 
   /** One request per candidate: a Gemini image measured 8.6s, so three in one call would time out. */
   async function generate(count = 3) {
@@ -184,7 +192,22 @@ export function ImageStudio({
       const lineHeight = Math.round(titleSize * 1.18);
       const eyebrowSize = Math.round(titleSize * 0.34);
       const blockH = lines.length * lineHeight + (eyebrow ? eyebrowSize * 2 : 0);
-      const blockY = isBottom ? H - pad - blockH : Math.round((H - blockH) / 2);
+
+      // The mascot's band is RESERVED before the text is placed, not tested for afterwards.
+      //
+      // The first attempt drew the text first and skipped the mascot if it did not clear — which
+      // skipped it on four of five sizes, because wide formats centre the text vertically and
+      // portrait formats bottom-align it, and the mascot wants the bottom in both cases. Taking
+      // the space out of the available height first means the text simply sits above it.
+      const mascot = mascotImg.current;
+      const mascotReady = showMascot && mascot && mascot.complete && mascot.naturalWidth > 0;
+      const mascotH = mascotReady ? Math.round(H * 0.2) : 0;
+      const mascotGap = mascotReady ? Math.round(titleSize * 0.4) : 0;
+      const usableH = H - mascotH - mascotGap;
+
+      const blockY = isBottom
+        ? usableH - pad - blockH
+        : Math.round((usableH - blockH) / 2);
 
       // Scrim only over the illustration. In panel mode the text already sits on flat paper, and
       // a translucent box on a solid background reads as a rendering bug.
@@ -223,8 +246,21 @@ export function ImageStudio({
         ctx.fillText(l, boxX, y);
         y += lineHeight;
       }
+
+      // The mascot sits at the foot of the TEXT column, with the AI subject in the other — two
+      // characters in opposite thirds reads as a layout, two stacked in one corner reads as a
+      // mistake. Drawn last so nothing overdraws it, in the band reserved above.
+      if (mascotReady && mascot) {
+        const mw = Math.round((mascot.naturalWidth / mascot.naturalHeight) * mascotH);
+        const my = H - pad - mascotH;
+        // Still guarded: a three-line headline on a short frame can reach into the band even
+        // after reserving it, and a mascot over the text is worse than none.
+        if (my > y + mascotGap * 0.5) {
+          ctx.drawImage(mascot, boxX, my, Math.min(mw, boxW), mascotH);
+        }
+      }
     },
-    [headline, eyebrow, textSide]
+    [headline, eyebrow, textSide, showMascot]
   );
 
   // Redraw whenever anything visible changes. Waiting for document.fonts means the first paint is
@@ -235,6 +271,17 @@ export function ImageStudio({
 
     async function run() {
       await document.fonts.ready;
+
+      // crossOrigin for the same reason as the background: without it a canvas that has drawn this
+      // image is tainted and toDataURL throws, so the save would silently be impossible.
+      if (!mascotImg.current) {
+        const m = new Image();
+        m.crossOrigin = "anonymous";
+        m.src = `/${mascotAsset(mascotId)}`;
+        mascotImg.current = m;
+        await m.decode().catch(() => undefined);
+      }
+
       let img: HTMLImageElement | null = null;
       if (bg) {
         img = bgImages.current.get(bg.url) ?? null;
@@ -258,7 +305,7 @@ export function ImageStudio({
     return () => {
       cancelled = true;
     };
-  }, [backgrounds, chosen, draw]);
+  }, [backgrounds, chosen, draw, mascotId]);
 
   async function save() {
     setSaving(true);
@@ -353,6 +400,10 @@ export function ImageStudio({
               {generating > 0 ? `Drawing… ${generating} left` : backgrounds.length > 0 ? "Generate 3 more" : "Generate 3 backgrounds"}
             </button>
             <span className="text-xs text-secondary">~9s each. The model is told never to draw text.</span>
+            <label className="flex items-center gap-2 text-xs text-secondary">
+              <input type="checkbox" checked={showMascot} onChange={(e) => setShowMascot(e.target.checked)} />
+              Mascot ({mascotId})
+            </label>
           </div>
 
           {backgrounds.length > 0 && (

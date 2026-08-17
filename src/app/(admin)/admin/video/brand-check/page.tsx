@@ -80,8 +80,10 @@ export default function BrandCheckPage() {
       <div style={{ marginBottom: 12 }}>
         <h2 className="font-heading text-lg font-bold text-charcoal">Rendered frames</h2>
         <p className="text-sm text-secondary mt-1">
-          The same composition the worker renders, seeked to the frames most likely to be wrong. Vertical and
-          square carry the hashtag; landscape deliberately does not.
+          The same composition the worker renders, seeked to the frames most likely to be wrong.
+          Vertical and square carry the hashtag and the small top-centre title; landscape
+          deliberately carries neither. The title bar is suppressed on the title card, the mascot
+          intro and the outro, which already say it.
         </p>
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", background: "#222", padding: 12, borderRadius: 12 }}>
@@ -89,6 +91,10 @@ export default function BrandCheckPage() {
         <Frame label="vertical-mid" format="vertical" at="mid" />
         <Frame label="vertical-outro" format="vertical" at="outro" />
         <Frame label="landscape-mid" format="landscape" at="mid" />
+        {/* square-mid earns its place: the title bar shows on vertical and square MID scenes only
+            — intro, outro and landscape all suppress it — so without this shot four of five frames
+            could not show the feature at all. */}
+        <Frame label="square-mid" format="square" at="mid" />
         <Frame label="square-outro" format="square" at="outro" />
       </div>
     </div>

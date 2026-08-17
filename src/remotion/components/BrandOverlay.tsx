@@ -19,7 +19,7 @@
 import React from "react";
 import { Img, staticFile, useCurrentFrame } from "remotion";
 import type { BrandingSettings, ResolvedTimeline, Scene } from "@/lib/video/types";
-import { logoAsset } from "@/lib/video/branding";
+import { fitTitleBar, logoAsset } from "@/lib/video/branding";
 import { mascotForScene } from "@/lib/video/mascots";
 import { CornerMascot } from "../scenes/MascotScenes";
 import { useLayout } from "../LayoutContext";
@@ -28,13 +28,26 @@ import { fontStackSans } from "../theme";
 /** Scene types that render their own brand lockup and must not also get the corner watermark. */
 const SUPPRESS_LOGO_ON: ReadonlySet<string> = new Set(["cta_outro"]);
 
+/**
+ * Scenes that already say the title, so the small bar would repeat it.
+ *
+ * `title_card` renders it full size — a miniature copy directly above is noise. `cta_outro`
+ * suppresses the logo for the same reason and gets the same treatment. `mascot_intro` shows the
+ * topic under the greeting, so it is covered too.
+ */
+const SUPPRESS_TITLE_ON: ReadonlySet<string> = new Set(["title_card", "cta_outro", "mascot_intro"]);
+
 export const BrandOverlay: React.FC<{
   branding: BrandingSettings;
   /** Square and vertical carry the hashtag; landscape gets the logo only. */
   showHashtag: boolean;
+  /** Same format rule as the hashtag — see showsTitleBar(). */
+  showTitleBar?: boolean;
+  /** The video's title, for the persistent top-centre label. */
+  title?: string;
   scenes: Scene[];
   timeline: ResolvedTimeline;
-}> = ({ branding, showHashtag, scenes, timeline }) => {
+}> = ({ branding, showHashtag, showTitleBar, title, scenes, timeline }) => {
   const { theme, scale } = useLayout();
   const frame = useCurrentFrame();
 
@@ -52,6 +65,9 @@ export const BrandOverlay: React.FC<{
   const cornerMascot = branding.mascots && currentScene ? mascotForScene(currentScene.sceneType) : null;
   const asset = logoAsset(branding);
   const logoSize = scale.pad * 1.6;
+
+  const suppressTitle = currentScene ? SUPPRESS_TITLE_ON.has(currentScene.sceneType) : false;
+  const titleFit = title ? fitTitleBar(title) : null;
 
   return (
     <>
@@ -71,6 +87,45 @@ export const BrandOverlay: React.FC<{
             pointerEvents: "none",
           }}
         />
+      ) : null}
+
+      {/* Small persistent title, top centre.
+          Capped at 58% of the width so it cannot reach the logo, which sits top-RIGHT with a
+          `pad * 0.6` inset — the same inset used here so the two align optically rather than by
+          eye. Same translucent pill as the hashtag and the captions, for the reason in the file
+          header: a plain dark mark vanishes against the red outro and against bright B-roll. */}
+      {showTitleBar && titleFit && !suppressTitle ? (
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: scale.pad * 0.6,
+            display: "flex",
+            justifyContent: "center",
+            pointerEvents: "none",
+          }}
+        >
+          <div
+            style={{
+              maxWidth: "58%",
+              fontFamily: fontStackSans(theme),
+              fontSize: scale.caption * 0.58 * titleFit.scale,
+              fontWeight: 700,
+              letterSpacing: "0.02em",
+              color: "rgba(255,255,255,0.92)",
+              background: "rgba(12,12,12,0.55)",
+              padding: `${scale.caption * 0.18}px ${scale.caption * 0.48}px`,
+              borderRadius: 999,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              textAlign: "center",
+            }}
+          >
+            {titleFit.text}
+          </div>
+        </div>
       ) : null}
 
       {showHashtag && branding.hashtag ? (

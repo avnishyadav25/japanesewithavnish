@@ -623,6 +623,13 @@ export interface BrandingSettings {
   mascot?: string;
   /** Character art on the intro beat, the bookends and teaching-scene corners. */
   mascots: boolean;
+  /**
+   * Small persistent title at top centre, on vertical and square only.
+   *
+   * A viewer arriving mid-scroll on a Reel has no title anywhere on screen — the opening card is
+   * long gone. Landscape is excluded because YouTube already shows the title above the player.
+   */
+  titleBar: boolean;
 }
 
 export interface Storyboard {
