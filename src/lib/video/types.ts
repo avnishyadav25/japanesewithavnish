@@ -498,11 +498,53 @@ export type VisualSpec =
 // The storyboard document
 // ---------------------------------------------------------------------------
 
+/**
+ * Burned-in caption appearance.
+ *
+ * Everything past `style` was hardcoded until it wasn't: captions rendered at
+ * `scale.caption * 1.05` — 42px in a 1080x1920 frame — across 94% of the width, which on a
+ * vocabulary scene covered the example sentence the narrator was reading out.
+ *
+ * Read at RENDER time from `video_projects.captions`, not from the frozen storyboard copy, so
+ * changing the size is a re-cut rather than a regenerate. TTS is cached by content hash, so that
+ * costs render minutes and no LLM or TTS spend.
+ */
 export interface CaptionSettings {
   enabled: boolean;
   /** Burned into the frame (required for Shorts/Reels) vs. shipped as a sidecar .srt/.vtt. */
   burnIn: boolean;
   style: "bold-center" | "lower-third";
+  /** Multiplier on the per-layout base size. 1.0 was the old hardcoded look. */
+  scale?: number;
+  /** `bottom` sits above the hashtag pill; `top` clears a lower-third graphic. */
+  position?: "bottom" | "lower-third" | "top";
+  /** Background pill opacity, 0-1. 0 renders text with its shadow and no plate. */
+  opacity?: number;
+  /** Percentage of frame width the pill may occupy. */
+  maxWidthPct?: number;
+}
+
+/**
+ * The look every project gets unless it says otherwise.
+ *
+ * `scale: 0.8` rather than 1.0 deliberately: the reported complaint was that subtitles cover the
+ * content, so the default has to change too — a fix that only helps people who find the new
+ * picker is not a fix.
+ */
+export const DEFAULT_CAPTIONS: Required<CaptionSettings> = {
+  enabled: true,
+  burnIn: true,
+  style: "bold-center",
+  scale: 0.8,
+  position: "bottom",
+  opacity: 0.82,
+  maxWidthPct: 86,
+};
+
+/** Fills in fields absent from storyboards written before caption styling existed. Mirrors
+ * `resolveBranding()` — same reason, same shape. */
+export function resolveCaptions(captions?: Partial<CaptionSettings> | null): Required<CaptionSettings> {
+  return { ...DEFAULT_CAPTIONS, ...(captions ?? {}) };
 }
 
 export interface BgmSettings {
@@ -580,7 +622,10 @@ export type ScopeKind =
   | "curriculum_submodule"
   | "curriculum_lesson"
   | "content_batch"
-  | "content_item";
+  | "content_item"
+  /** A theme like "birds in Japanese" — no curriculum node, no single content_type. Resolves
+   * through `postIds`, which the topic builder fills in after you confirm the item list. */
+  | "topic";
 
 export interface ScopeRef {
   levelId?: string;
@@ -593,6 +638,8 @@ export interface ScopeRef {
   tags?: string[];
   limit?: number;
   postIds?: string[];
+  /** `topic` scope only: the free text the video is about, used for the title and the prompt. */
+  topic?: string;
 }
 
 /** Normalised, presentation-ready content handed to the storyboard generator. Built by
@@ -660,6 +707,12 @@ export interface VideoProjectRow {
   includeBroll: boolean;
   pacing: PacingConfig | null;
   voices: VoiceConfig | null;
+  /** Siblings of one video_per_item split share this. NULL for a standalone project. */
+  batchId: string | null;
+  /** Caption style. Read at render time, so changing it is a re-cut rather than a regenerate. */
+  captions: Partial<CaptionSettings> | null;
+  /** Per-project brand overrides. NULL = DEFAULT_BRANDING. */
+  branding: Partial<BrandingSettings> | null;
   status: ProjectStatus;
   currentStoryboardId: string | null;
   errorMessage: string | null;

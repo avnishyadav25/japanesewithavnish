@@ -183,3 +183,25 @@ export async function publicationSummaryForRender(
     url: (r.external_url as string) ?? null,
   }));
 }
+
+/**
+ * Attaches publication summaries to a render list, for the current renders only.
+ *
+ * WHY THIS IS SHARED: the project page did this inline, and the poll endpoint that refreshes the
+ * same list did not. Every poll therefore replaced cards carrying "Posted: instagram, x" with
+ * "Not posted anywhere yet" until a full page refresh — the data was never wrong in the database,
+ * only in the half of the round trip that forgot to load it. Two callers, one implementation.
+ *
+ * Superseded renders are skipped rather than looked up: their cards do not show a status line, so
+ * the query would be paid for and thrown away.
+ */
+export async function attachPublications<T extends { id: string; isCurrent: boolean }>(
+  renders: T[]
+): Promise<(T & { publications?: { platform: PlatformId; status: PostStatus; url: string | null }[] })[]> {
+  const current = renders.filter((r) => r.isCurrent);
+  if (current.length === 0) return renders;
+
+  const summaries = await Promise.all(current.map((r) => publicationSummaryForRender(r.id)));
+  const byRender = new Map(current.map((r, i) => [r.id, summaries[i]]));
+  return renders.map((r) => ({ ...r, publications: byRender.get(r.id) }));
+}

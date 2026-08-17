@@ -3,7 +3,13 @@ import { getAdminSession } from "@/lib/auth/admin";
 import { sql } from "@/lib/db";
 import { insertAiLog } from "@/lib/ai-logs";
 import { resolveScope } from "@/lib/video/scopeResolver";
-import { generateStoryboard, outroSiteUrl } from "@/lib/video/storyboard";
+import {
+  MAX_BATCHES_PER_REQUEST,
+  buildGenerationRequest,
+  generateStoryboard,
+  outroSiteUrl,
+  planGenerationBatches,
+} from "@/lib/video/storyboard";
 import { resolvePacing } from "@/lib/video/pacing";
 import { recordGenerationRun, snapshotStoryboardState } from "@/lib/video/audit";
 import {
@@ -18,9 +24,15 @@ import type { NarrationLang } from "@/lib/video/types";
 /**
  * Generates (or regenerates) the narration script for one narration language.
  *
- * One DeepSeek call per language, which comfortably fits Netlify's ~10s budget — unlike
- * rendering, this genuinely can run in a route. A project with several languages is generated
- * one request at a time by the client so no single invocation stacks multiple LLM round-trips.
+ * A small scope is one DeepSeek call and fits comfortably. A large one is chunked into
+ * scene-aligned batches — and that is where the ceiling bites: chunking makes a whole-level
+ * scope CORRECT (2,820 slots that a single 8,000-token response could never have carried) but
+ * not survivable, at 71 calls against a ~30 s function ceiling. So an oversized scope is refused
+ * before anything is spent, with the alternative named. Timing out halfway would leave the
+ * project stuck in generating_script, which is a state the database already contains once.
+ *
+ * A project with several languages is generated one request at a time by the client so no single
+ * invocation stacks multiple LLM round-trips.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const admin = await getAdminSession();
@@ -40,8 +52,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const toneOverride = typeof body?.tone === "string" && body.tone.trim() ? body.tone.trim() : null;
   const isRegenerate = Boolean(body?.regenerate);
 
-  await setProjectStatus(id, "generating_script");
-
   try {
     const snapshot = await resolveScope(project.scopeKind, project.scopeRef);
     // Pacing is what makes the requested duration binding — see src/lib/video/pacing.ts.
@@ -49,6 +59,42 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       (body?.pacing as Record<string, number> | undefined) ?? project.pacing,
       snapshot.items[0]?.kind
     );
+    // Cost the request before committing to it. buildGenerationRequest is the same builder
+    // generateStoryboard uses, so this counts the batches that would actually run — and it makes
+    // no network call, so refusing here is free.
+    const planned = await buildGenerationRequest(snapshot, {
+      projectId: id,
+      narrationLang: lang,
+      themeKey: project.themeKey,
+      pacing,
+      voices: project.voices,
+      tone: toneOverride ?? project.tone,
+      includeBroll: project.includeBroll,
+      siteName: "JapaneseWithAvnish",
+      siteUrl: outroSiteUrl(),
+    });
+    const batchCount = planGenerationBatches(planned.skeleton.scenes, planned.skeleton.blanks).length;
+
+    if (batchCount > MAX_BATCHES_PER_REQUEST) {
+      return NextResponse.json(
+        {
+          error:
+            `This scope needs ${planned.skeleton.blanks.length} narration slots across ${batchCount} ` +
+            `model calls, which will not finish inside the ~30s request limit. ` +
+            `Generate a smaller scope — a single lesson or submodule rather than a whole ` +
+            `level — or split it into several projects.`,
+          slots: planned.skeleton.blanks.length,
+          batches: batchCount,
+          maxBatches: MAX_BATCHES_PER_REQUEST,
+        },
+        { status: 413 }
+      );
+    }
+
+    // Only now does the project claim to be generating: setting it before the guard left an
+    // oversized project permanently mid-flight after a refusal that cost nothing.
+    await setProjectStatus(id, "generating_script");
+
     const generated = await generateStoryboard(
       snapshot,
       {

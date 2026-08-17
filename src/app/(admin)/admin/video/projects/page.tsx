@@ -4,8 +4,10 @@ import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminCard } from "@/components/admin/AdminCard";
 import { AdminTable } from "@/components/admin/AdminTable";
 import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
+import { FilterPills } from "@/components/admin/FilterPills";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { DeleteProjectButton } from "./DeleteProjectButton";
+import { BatchPanel } from "./BatchPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -19,36 +21,58 @@ type Row = {
   created_by: string | null;
   created_at: string;
   render_count: number;
+  batch_id: string | null;
+  storyboard_count: number;
 };
 
 export default async function VideoProjectsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; batch?: string }>;
 }) {
-  const { status } = await searchParams;
+  const { status, batch } = await searchParams;
   let projects: Row[] = [];
 
   if (sql) {
+    // A batch filter and a status filter compose; batch wins the ordering, oldest first, so the
+    // list reads in the order the items were picked rather than newest-first.
+    const conditions: string[] = [];
+    const values: unknown[] = [];
+    if (status) {
+      values.push(status);
+      conditions.push(`p.status = $${values.length}`);
+    }
+    if (batch) {
+      values.push(batch);
+      conditions.push(`p.batch_id = $${values.length}::uuid`);
+    }
     projects = (await sql.query(
       `SELECT p.id, p.title, p.status, p.scope_kind, p.formats, p.narration_langs, p.created_by,
-              p.created_at::text AS created_at,
-              (SELECT COUNT(*)::int FROM video_renders r WHERE r.project_id = p.id AND r.is_current) AS render_count
+              p.created_at::text AS created_at, p.batch_id,
+              (SELECT COUNT(*)::int FROM video_renders r WHERE r.project_id = p.id AND r.is_current) AS render_count,
+              (SELECT COUNT(*)::int FROM video_storyboards s WHERE s.project_id = p.id) AS storyboard_count
        FROM video_projects p
-       ${status ? "WHERE p.status = $1" : ""}
-       ORDER BY p.created_at DESC
+       ${conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : ""}
+       ORDER BY p.created_at ${batch ? "ASC" : "DESC"}
        LIMIT 200`,
-      status ? [status] : []
+      values
     )) as Row[];
   }
 
+  // draft / render_ready / queued_render / rejected were missing, so a finished project was
+  // only reachable through "All" — and the content plan's status chips link here by status,
+  // which meant clicking "render_ready 3" landed on a filter with no matching pill.
   const filters = [
     { label: "All", value: undefined },
+    { label: "Draft", value: "draft" },
     { label: "Needs script review", value: "script_pending_review" },
     { label: "Ready to render", value: "script_ready" },
+    { label: "Queued", value: "queued_render" },
     { label: "Rendering", value: "rendering" },
     { label: "Needs video review", value: "video_pending_review" },
+    { label: "Done", value: "render_ready" },
     { label: "Failed", value: "failed" },
+    { label: "Rejected", value: "rejected" },
   ];
 
   return (
@@ -63,22 +87,23 @@ export default async function VideoProjectsPage({
         action={{ label: "New video", href: "/admin/video/new" }}
       />
 
-      <div className="flex flex-wrap gap-2 mb-5">
-        {filters.map((filter) => {
-          const active = status === filter.value || (!status && !filter.value);
-          return (
-            <Link
-              key={filter.label}
-              href={filter.value ? `/admin/video/projects?status=${filter.value}` : "/admin/video/projects"}
-              className={`px-3 py-1.5 rounded-button text-sm border transition ${
-                active ? "border-primary bg-red-light text-primary font-semibold" : "border-[var(--divider)] text-secondary hover:border-primary/40"
-              }`}
-            >
-              {filter.label}
-            </Link>
-          );
-        })}
-      </div>
+      {/* A batch replaces the status pills: you arrived here to work through one set, and the
+          useful action is generating all of it, not filtering it further. */}
+      {batch && projects.length > 0 ? (
+        <BatchPanel
+          batchId={batch}
+          projects={projects.map((p) => ({
+            id: p.id,
+            title: p.title,
+            storyboardCount: p.storyboard_count,
+            status: p.status,
+          }))}
+        />
+      ) : (
+        <div className="mb-5">
+          <FilterPills options={filters} active={status} basePath="/admin/video/projects" />
+        </div>
+      )}
 
       {projects.length === 0 ? (
         <AdminEmptyState

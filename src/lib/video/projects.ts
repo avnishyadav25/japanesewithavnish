@@ -9,6 +9,8 @@
 import { sql } from "@/lib/db";
 import type {
   ApprovalMode,
+  BrandingSettings,
+  CaptionSettings,
   NarrationLang,
   PacingConfig,
   VoiceConfig,
@@ -88,6 +90,9 @@ function toProjectRow(row: Record<string, unknown>): VideoProjectRow {
     includeBroll: Boolean(row.include_broll),
     pacing: (row.pacing as PacingConfig | null) ?? null,
     voices: (row.voices as VoiceConfig | null) ?? null,
+    batchId: (row.batch_id as string | null) ?? null,
+    captions: (row.captions as Partial<CaptionSettings> | null) ?? null,
+    branding: (row.branding as Partial<BrandingSettings> | null) ?? null,
     status: row.status as ProjectStatus,
     currentStoryboardId: (row.current_storyboard_id as string | null) ?? null,
     errorMessage: (row.error_message as string | null) ?? null,
@@ -99,6 +104,7 @@ function toProjectRow(row: Record<string, unknown>): VideoProjectRow {
 
 const PROJECT_COLUMNS = `id, title, scope_kind, scope_ref, grouping, theme_key, bgm_track_id,
   narration_langs, formats, target_duration_seconds, tone, include_broll, pacing, voices,
+  captions, branding, batch_id,
   status, current_storyboard_id, error_message, created_by, created_at::text, updated_at::text`;
 
 export interface CreateProjectInput {
@@ -115,6 +121,8 @@ export interface CreateProjectInput {
   includeBroll?: boolean;
   pacing?: PacingConfig | null;
   voices?: VoiceConfig | null;
+  /** Shared by the siblings of one video_per_item split. NULL for a standalone project. */
+  batchId?: string | null;
   createdBy: string;
 }
 
@@ -125,8 +133,8 @@ export async function createProject(input: CreateProjectInput): Promise<VideoPro
   const rows = (await db.query(
     `INSERT INTO video_projects
        (title, scope_kind, scope_ref, grouping, theme_key, bgm_track_id, narration_langs, formats,
-        target_duration_seconds, tone, include_broll, pacing, voices, created_by)
-     VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7::text[], $8::text[], $9, $10, $11, $12::jsonb, $13::jsonb, $14)
+        target_duration_seconds, tone, include_broll, pacing, voices, batch_id, created_by)
+     VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7::text[], $8::text[], $9, $10, $11, $12::jsonb, $13::jsonb, $14::uuid, $15)
      RETURNING ${PROJECT_COLUMNS}`,
     [
       input.title,
@@ -142,6 +150,7 @@ export async function createProject(input: CreateProjectInput): Promise<VideoPro
       input.includeBroll ?? false,
       input.pacing ? JSON.stringify(input.pacing) : null,
       input.voices ? JSON.stringify(input.voices) : null,
+      input.batchId ?? null,
       input.createdBy,
     ]
   )) as Record<string, unknown>[];

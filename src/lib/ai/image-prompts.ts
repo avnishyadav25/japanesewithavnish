@@ -17,6 +17,13 @@ export const MASCOT_CHARACTERS = {
   tanuki: "a cheerful tanuki (Japanese raccoon dog) student wearing a warm brown-and-cream yukata, a satchel over one shoulder",
   owl: "a wise owl professor wearing a charcoal haori jacket and half-moon spectacles",
   redPanda: "a bright-eyed red panda pupil wearing a soft rose-coloured kimono",
+  // Added for the second cast. Each is a culturally-grounded Japanese animal rather than a
+  // generic one, and each wears a distinct colour so two characters never read as the same
+  // silhouette at the 180px the corner slot renders them at.
+  cat: "a poised calico cat (maneki-neko lineage) wearing a moss-green haori with a small bell collar",
+  shiba: "an eager shiba inu wearing a cream happi coat with a red sash, ears perked forward",
+  crane: "an elegant red-crowned crane (tancho) wearing a pale blue kimono, long neck, serene expression",
+  rabbit: "a soft white rabbit (tsuki no usagi) wearing a lilac yukata, long ears, gentle round eyes",
 } as const;
 
 export type MascotCharacter = keyof typeof MASCOT_CHARACTERS;
@@ -27,6 +34,10 @@ export const MASCOT_POSES = {
   think: "seated, one paw resting against its chin, eyes turned upward, thoughtful",
   write: "seated at a low desk seen from the side, holding a calligraphy brush, concentrating",
   celebrate: "both paws raised above its head in celebration, eyes closed happily, mid-hop",
+  // Read at a glance in a 180px corner slot, which is why each is a whole-body silhouette
+  // change rather than a facial expression.
+  bow: "bowing forward from the waist, both paws at its sides, eyes closed respectfully",
+  read: "seated cross-legged holding an open book with both paws, absorbed",
 } as const;
 
 export type MascotPose = keyof typeof MASCOT_POSES;

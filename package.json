@@ -40,7 +40,11 @@
     "db:migrate": "tsx scripts/migrate.ts",
     "review:worker": "tsx scripts/content-review-worker.ts",
     "report:weekly": "tsx scripts/weekly-report.ts",
-    "backup:worker": "tsx scripts/backup-sync-worker.ts"
+    "backup:worker": "tsx scripts/backup-sync-worker.ts",
+    "video:verify-scopes": "tsx scripts/verify-video-scopes.ts",
+    "bgm:import": "tsx scripts/import-bgm-catalogue.ts",
+    "voice:clone": "tsx scripts/clone-voice.ts",
+    "video:mascots": "tsx scripts/generate-mascots.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1000.0",

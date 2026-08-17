@@ -4,38 +4,40 @@ import { AdminCard } from "@/components/admin/AdminCard";
 import { AdminTable } from "@/components/admin/AdminTable";
 import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
 import { BgmLibrary, type BgmTrack } from "./BgmLibrary";
+import { ThemeEditor, type ThemeRow } from "./ThemeEditor";
+import { BrollLibrary } from "./BrollLibrary";
 
 export const dynamic = "force-dynamic";
 
-type BrollRow = {
-  id: string;
-  source_url: string;
-  capture_kind: string;
-  viewport_w: number;
-  viewport_h: number;
-  asset_url: string;
-  captured_at: string;
-  expires_at: string;
-};
-
 export default async function VideoAssetsPage() {
   let tracks: BgmTrack[] = [];
-  let broll: BrollRow[] = [];
-  let themes: { key: string; label: string; description: string | null; sort_order: number }[] = [];
+  let themes: ThemeRow[] = [];
+  let brollEnabled = false;
 
   if (sql) {
-    [tracks, broll, themes] = await Promise.all([
+    // Themes carry their project usage count: disabling a theme a project references breaks that
+    // project's row, since theme_key is a FK with ON UPDATE CASCADE and no ON DELETE.
+    const [trackRows, themeRows, brollProjects] = await Promise.all([
       sql`SELECT id, title, audio_url, duration_seconds, mood, license, attribution, source_url,
                  default_gain_db, is_enabled, created_at::text AS created_at
           FROM video_bgm_tracks ORDER BY created_at DESC` as Promise<BgmTrack[]>,
-      sql`SELECT id, source_url, capture_kind, viewport_w, viewport_h, asset_url,
-                 captured_at::text AS captured_at, expires_at::text AS expires_at
-          FROM video_broll_assets ORDER BY captured_at DESC LIMIT 40` as Promise<BrollRow[]>,
-      sql`SELECT key, label, description, sort_order FROM video_themes
-          WHERE is_enabled ORDER BY sort_order` as Promise<
-        { key: string; label: string; description: string | null; sort_order: number }[]
-      >,
+      sql`SELECT t.key, t.label, t.description, t.tokens, t.default_voices, t.is_enabled,
+                 (SELECT COUNT(*)::int FROM video_projects p WHERE p.theme_key = t.key) AS usage_count
+          FROM video_themes t ORDER BY t.sort_order, t.label` as Promise<Record<string, unknown>[]>,
+      sql`SELECT COUNT(*)::int AS n FROM video_projects WHERE include_broll` as Promise<{ n: number }[]>,
     ]);
+
+    tracks = trackRows;
+    brollEnabled = (brollProjects[0]?.n ?? 0) > 0;
+    themes = themeRows.map((r) => ({
+      key: String(r.key),
+      label: String(r.label),
+      description: (r.description as string | null) ?? null,
+      tokens: (r.tokens as Record<string, unknown>) ?? {},
+      defaultVoices: (r.default_voices as Record<string, unknown>) ?? {},
+      isEnabled: Boolean(r.is_enabled),
+      usageCount: Number(r.usage_count),
+    }));
   }
 
   return (
@@ -62,65 +64,15 @@ export default async function VideoAssetsPage() {
       <section className="mb-10">
         <h2 className="font-heading text-lg font-bold text-charcoal mb-1">Themes</h2>
         <p className="text-sm text-secondary mb-4">
-          Colours and fonts for the scene templates. Edit these in the <code className="bg-base px-1 rounded">video_themes</code>{" "}
-          table; the default mirrors the site palette.
+          Colours, fonts and default voices for the scene templates. Duplicate one before
+          experimenting — every project defaults to these.
         </p>
-        <AdminCard>
-          <AdminTable headers={["Key", "Label", "Description"]}>
-            {themes.map((theme) => (
-              <tr key={theme.key} className="border-b border-[var(--divider)] last:border-0">
-                <td className="py-3 px-2 font-mono text-xs text-charcoal">{theme.key}</td>
-                <td className="py-3 px-2 text-charcoal">{theme.label}</td>
-                <td className="py-3 px-2 text-secondary">{theme.description}</td>
-              </tr>
-            ))}
-          </AdminTable>
-        </AdminCard>
+        <ThemeEditor initial={themes} />
       </section>
 
       <section>
         <h2 className="font-heading text-lg font-bold text-charcoal mb-1">B-roll cache</h2>
-        <p className="text-sm text-secondary mb-4">
-          Screenshots of the live site captured for <code className="bg-base px-1 rounded">broll_page</code> scenes.
-          Entries expire after 14 days so a stale capture never outlives a redesign — an expired row
-          is simply re-captured on the next render.
-        </p>
-        {broll.length === 0 ? (
-          <AdminEmptyState message="Nothing captured yet. Tick “Include a real-page shot” when creating a video, or run npm run video:capture." />
-        ) : (
-          <AdminCard>
-            <AdminTable headers={["Page", "Kind", "Size", "Captured", "Expires", ""]}>
-              {broll.map((row) => {
-                const expired = new Date(row.expires_at).getTime() < Date.now();
-                return (
-                  <tr key={row.id} className="border-b border-[var(--divider)] last:border-0">
-                    <td className="py-3 px-2 text-charcoal break-all max-w-xs">{row.source_url}</td>
-                    <td className="py-3 px-2 text-secondary">{row.capture_kind.replace(/_/g, " ")}</td>
-                    <td className="py-3 px-2 text-secondary whitespace-nowrap">
-                      {row.viewport_w}×{row.viewport_h}
-                    </td>
-                    <td className="py-3 px-2 text-secondary whitespace-nowrap">
-                      {new Date(row.captured_at).toLocaleDateString()}
-                    </td>
-                    <td className={`py-3 px-2 whitespace-nowrap ${expired ? "text-primary" : "text-secondary"}`}>
-                      {expired ? "expired" : new Date(row.expires_at).toLocaleDateString()}
-                    </td>
-                    <td className="py-3 px-2">
-                      <a
-                        href={row.asset_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-primary hover:underline text-xs"
-                      >
-                        View
-                      </a>
-                    </td>
-                  </tr>
-                );
-              })}
-            </AdminTable>
-          </AdminCard>
-        )}
+        <BrollLibrary brollEnabled={brollEnabled} />
       </section>
     </div>
   );

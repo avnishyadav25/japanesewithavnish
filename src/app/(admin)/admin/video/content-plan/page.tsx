@@ -12,6 +12,7 @@ import {
   getUnpostedRenders,
   getVideoCoverageMatrix,
 } from "@/lib/social/contentPlan";
+import { getThemeCoverage } from "@/lib/video/topics";
 import { NextUpButton } from "./NextUpButton";
 
 export const dynamic = "force-dynamic";
@@ -24,11 +25,12 @@ export const dynamic = "force-dynamic";
  * because a month of work gets scheduled off them.
  */
 export default async function ContentPlanPage() {
-  const [matrix, unposted, pipeline, cadence] = await Promise.all([
+  const [matrix, unposted, pipeline, cadence, themes] = await Promise.all([
     getVideoCoverageMatrix(),
     getUnpostedRenders(20),
     getPipelineCounts(),
     getCadenceLoad(),
+    getThemeCoverage(),
   ]);
 
   const byKey = new Map(matrix.map((c) => [`${c.level}:${c.contentType}`, c]));
@@ -120,6 +122,45 @@ export default async function ContentPlanPage() {
               </tr>
             ))}
           </AdminTable>
+        </div>
+      </AdminCard>
+
+      {/* -------- Themes -------- */}
+      <h2 className="font-heading text-lg font-bold text-charcoal mb-3">Themes</h2>
+      <AdminCard className="mb-8">
+        <p className="text-xs text-secondary mb-4">
+          The matrix above is level × type, which cannot see a theme. These count published
+          vocabulary and kanji whose English meaning matches the theme&rsquo;s terms — the same
+          word-boundary matcher the topic wizard uses, so &ldquo;cat&rdquo; does not match
+          &ldquo;category&rdquo;. Click one to start a topic video from it.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {themes.map((t) => {
+            const gap = t.withVideo === 0;
+            const thin = t.available < 12;
+            return (
+              <Link
+                key={t.theme}
+                href={`/admin/video/new?scopeKind=topic&topic=${encodeURIComponent(t.theme)}`}
+                title={
+                  thin
+                    ? `Only ${t.available} published items match — the wizard will offer to write the rest, marked unreviewed`
+                    : `${t.withVideo} of ${t.available} matching items have appeared in a video`
+                }
+                className={`px-3 py-1.5 rounded-bento text-sm border transition ${
+                  gap
+                    ? "border-[var(--divider)] text-primary hover:border-primary"
+                    : "border-[var(--divider)] text-charcoal hover:border-primary"
+                }`}
+              >
+                {t.theme}
+                <span className="ml-1.5 text-xs tabular-nums text-secondary">
+                  {t.withVideo}/{t.available}
+                </span>
+                {thin && <span className="ml-1 text-xs text-amber-600">thin</span>}
+              </Link>
+            );
+          })}
         </div>
       </AdminCard>
 

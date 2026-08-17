@@ -20,7 +20,7 @@ export interface ScopeEstimate {
     breakdown?: { japaneseSeconds: number; narrationSeconds: number; pauseSeconds: number };
   };
   warnings: string[];
-  items: { title: string; kind: string; jlptLevel: string | null; exampleCount: number }[];
+  items: { postId: string | null; title: string; kind: string; url?: string | null; jlptLevel: string | null; exampleCount: number }[];
 }
 
 /**

@@ -8,15 +8,23 @@ import type { NarrationLang, PacingConfig, ScopeKind, ScopeRef, VideoFormat, Voi
 import { formatDuration } from "@/lib/video/pacing";
 import { VOICE_CATALOGUE } from "@/lib/video/voices";
 import { EstimatePanel, type ScopeEstimate } from "./EstimatePanel";
+import { MAX_SPLIT_ITEMS, SPLIT_WARN_ITEMS } from "@/lib/video/splitScope";
+import { ItemPicker, type PickerItem } from "./ItemPicker";
 
 interface Props {
   themes: { key: string; label: string; description: string | null }[];
   bgmTracks: { id: string; title: string; mood: string | null }[];
   levels: { id: string; code: string; name: string | null }[];
   lessons: { id: string; title: string; code: string; level_code: string }[];
+  /** Query-string defaults from the content plan's deep links. Validated here, not trusted. */
+  initial?: { scopeKind?: string; contentType?: string; jlptLevel?: string; topic?: string };
 }
 
 const JLPT_LEVELS = ["N5", "N4", "N3", "N2", "N1"];
+
+/** Scope kinds this wizard can drive. The API accepts more (content_item, module, submodule);
+ * those are reachable only programmatically. */
+const WIZARD_SCOPE_KINDS: ScopeKind[] = ["content_batch", "curriculum_lesson", "curriculum_level", "topic"];
 
 /** These have bespoke scene templates; the rest fall back to a generic title-card layout, which
  * is honest but not what you want for a flagship video. */
@@ -28,17 +36,48 @@ const label = "block text-sm font-semibold text-charcoal mb-1.5";
 const input =
   "w-full border border-[var(--divider)] rounded-button px-3 py-2 text-sm focus:outline-none focus:border-primary";
 
-export function NewVideoWizard({ themes, bgmTracks, levels, lessons }: Props) {
+export function NewVideoWizard({ themes, bgmTracks, levels, lessons, initial }: Props) {
   const router = useRouter();
   const [step, setStep] = useState(0);
 
   // --- step 1: content ---
-  const [scopeKind, setScopeKind] = useState<ScopeKind>("content_batch");
-  const [contentType, setContentType] = useState("vocabulary");
-  const [jlptLevel, setJlptLevel] = useState("N5");
+  // Deep-link defaults are validated against the known lists rather than used raw: these arrive
+  // from a URL, and an unrecognised contentType would put the select into a blank state whose
+  // estimate call then fails with a server error instead of a visible wrong choice.
+  const [scopeKind, setScopeKind] = useState<ScopeKind>(
+    WIZARD_SCOPE_KINDS.includes(initial?.scopeKind as ScopeKind)
+      ? (initial!.scopeKind as ScopeKind)
+      : initial?.topic
+        ? "topic"
+        : "content_batch"
+  );
+  const [contentType, setContentType] = useState(
+    LEARN_CONTENT_TYPES.includes(initial?.contentType as (typeof LEARN_CONTENT_TYPES)[number])
+      ? initial!.contentType!
+      : "vocabulary"
+  );
+  const [jlptLevel, setJlptLevel] = useState(
+    JLPT_LEVELS.includes(initial?.jlptLevel ?? "") ? initial!.jlptLevel! : "N5"
+  );
   const [limit, setLimit] = useState(10);
   const [levelId, setLevelId] = useState(levels[0]?.id ?? "");
   const [lessonId, setLessonId] = useState(lessons[0]?.id ?? "");
+  const [topic, setTopic] = useState(initial?.topic ?? "");
+
+  /**
+   * The confirmed item basket, or null for "whatever the filters pick".
+   *
+   * null and [] mean different things and the difference matters: null leaves the scope as a
+   * query (contentType + level + limit) exactly as before, while [] is an explicit empty
+   * selection that must not silently fall back to picking ten items you did not choose.
+   */
+  const [selectedPostIds, setSelectedPostIds] = useState<string[] | null>(null);
+
+  /** Everything on offer in the picker, and which of it is ticked. */
+  const [pickerItems, setPickerItems] = useState<PickerItem[]>([]);
+  const [pickerSelected, setPickerSelected] = useState<string[]>([]);
+  const [topicBusy, setTopicBusy] = useState(false);
+  const [topicNotice, setTopicNotice] = useState<string | null>(null);
 
   // --- step 2: output ---
   const [grouping, setGrouping] = useState<"single_video" | "video_per_item">("single_video");
@@ -61,12 +100,121 @@ export function NewVideoWizard({ themes, bgmTracks, levels, lessons }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
+  /**
+   * How many projects a split would create, and how long their renders would take.
+   *
+   * Derived from the estimate rather than guessed, so the number on screen is the number the
+   * server will produce. Render time uses the measured ~1.4x realtime and the fact that renders
+   * are serialised by the workflow's concurrency group.
+   */
+  const splitCount = estimate?.itemCount ?? 0;
+  const splitRenderMinutes = useMemo(() => {
+    if (!estimate) return 0;
+    const perVideo = estimate.estimate.perVideoSeconds * 1.4;
+    return Math.max(1, Math.round((perVideo * splitCount * formats.length * narrationLangs.length) / 60));
+  }, [estimate, splitCount, formats.length, narrationLangs.length]);
+
   const scopeRef: ScopeRef = useMemo(() => {
-    if (scopeKind === "content_batch") return { contentType, jlptLevel: jlptLevel || undefined, limit: Number(limit) || 10 };
+    if (scopeKind === "topic") return { topic: topic.trim(), postIds: selectedPostIds ?? [] };
+    if (scopeKind === "content_batch") {
+      return {
+        contentType,
+        jlptLevel: jlptLevel || undefined,
+        limit: Number(limit) || 10,
+        // Only sent once you have touched the picker. Absent means "use the filters", which is
+        // the behaviour every existing project was created with.
+        ...(selectedPostIds ? { postIds: selectedPostIds } : {}),
+      };
+    }
     if (scopeKind === "curriculum_level") return { levelId };
     if (scopeKind === "curriculum_lesson") return { lessonId };
     return {};
-  }, [scopeKind, contentType, jlptLevel, limit, levelId, lessonId]);
+  }, [scopeKind, contentType, jlptLevel, limit, levelId, lessonId, topic, selectedPostIds]);
+
+  // A filter change invalidates a basket picked under the old filters — otherwise switching from
+  // N5 to N4 keeps ten N5 ids selected and the level dropdown quietly does nothing.
+  useEffect(() => {
+    setSelectedPostIds(null);
+  }, [contentType, jlptLevel, limit, scopeKind]);
+
+
+  /**
+   * Seeds the picker from whatever the filters resolved.
+   *
+   * Only for query-driven scopes. A topic's list is built by resolveTopic() and must not be
+   * overwritten when the estimate comes back for the ids it just chose.
+   */
+  useEffect(() => {
+    if (scopeKind === "topic") return;
+    if (!estimate) {
+      setPickerItems([]);
+      setPickerSelected([]);
+      return;
+    }
+    // Only when the user has not curated yet — re-seeding on every estimate would undo a
+    // deselection the moment the estimate refreshed in response to it.
+    if (selectedPostIds !== null) return;
+    const items: PickerItem[] = estimate.items
+      .filter((i) => i.postId)
+      .map((i) => ({
+        postId: i.postId!,
+        contentType: i.kind,
+        title: i.title,
+        jlptLevel: i.jlptLevel ?? undefined,
+        url: i.url ?? undefined,
+        source: "library" as const,
+      }));
+    setPickerItems(items);
+    setPickerSelected(items.map((i) => i.postId!));
+  }, [estimate, scopeKind, selectedPostIds]);
+
+  /** Ticked ids flow back into the scope, which re-prices the estimate. */
+  useEffect(() => {
+    if (pickerItems.length === 0) return;
+    const ids = pickerSelected.filter((k) => !k.startsWith("llm:"));
+    const everything = pickerItems.every((i) => pickerSelected.includes(i.postId ?? `llm:${i.word ?? i.title}`));
+    // Untouched means "leave the scope as a query", which is how every existing project was made.
+    if (everything && scopeKind !== "topic") return;
+    setSelectedPostIds(ids);
+  }, [pickerSelected, pickerItems, scopeKind]);
+
+  /** Topic -> expanded terms -> library matches + newly written words. Saves nothing. */
+  async function resolveTopic() {
+    if (!topic.trim()) return;
+    setTopicBusy(true);
+    setTopicNotice(null);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/video/topics/resolve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic, jlptLevel: jlptLevel || undefined, count: limit }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Could not resolve that topic");
+
+      const items: PickerItem[] = [...(data.library ?? []), ...(data.proposed ?? [])];
+      setPickerItems(items);
+      setPickerSelected(items.map((i) => i.postId ?? `llm:${i.word ?? i.title}`));
+      setTopicNotice(
+        data.notice ??
+          `${data.library?.length ?? 0} from your library` +
+            ((data.proposed?.length ?? 0) > 0 ? `, ${data.proposed.length} newly written` : "") +
+            ` · matched on: ${(data.terms ?? []).slice(0, 8).join(", ")}`
+      );
+      if (data.llmError) setError(`Library search worked; writing new words failed: ${data.llmError}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not resolve that topic");
+    } finally {
+      setTopicBusy(false);
+    }
+  }
+
+  function addPickerItem(item: PickerItem) {
+    const key = item.postId ?? `llm:${item.word ?? item.title}`;
+    setPickerItems((prev) => (prev.some((i) => (i.postId ?? `llm:${i.word ?? i.title}`) === key) ? prev : [...prev, item]));
+    setPickerSelected((prev) => (prev.includes(key) ? prev : [...prev, key]));
+  }
 
   /**
    * Re-prices on every change, debounced.
@@ -136,13 +284,43 @@ export function NewVideoWizard({ themes, bgmTracks, levels, lessons }: Props) {
     setCreating(true);
     setError(null);
     try {
+      // LLM-written words become draft posts FIRST, because a topic scope resolves through
+      // postIds and a word with no post cannot be in one. Committing here rather than at search
+      // time means only the words you actually kept are written — searching four topics and
+      // using one does not leave three topics' worth of drafts behind.
+      let effectivePostIds = selectedPostIds;
+      if (scopeKind === "topic") {
+        const keptProposals = pickerItems
+          .filter((i) => !i.postId && pickerSelected.includes(`llm:${i.word ?? i.title}`))
+          .map((i) => i.proposal)
+          .filter(Boolean);
+
+        const libraryIds = pickerSelected.filter((k) => !k.startsWith("llm:"));
+        if (keptProposals.length > 0) {
+          const res = await fetch("/api/admin/video/topics/commit", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ topic, words: keptProposals }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error ?? "Could not save the new words");
+          effectivePostIds = [...libraryIds, ...(data.postIds ?? [])];
+        } else {
+          effectivePostIds = libraryIds;
+        }
+
+        if (effectivePostIds.length === 0) {
+          throw new Error("Pick at least one item for this topic.");
+        }
+      }
+
       const res = await fetch("/api/admin/video/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: title.trim() || undefined,
           scopeKind,
-          scopeRef,
+          scopeRef: scopeKind === "topic" ? { topic: topic.trim(), postIds: effectivePostIds ?? [] } : scopeRef,
           grouping,
           formats,
           narrationLangs,
@@ -156,6 +334,13 @@ export function NewVideoWizard({ themes, bgmTracks, levels, lessons }: Props) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not create the project");
+
+      // A split lands on the batch, not on one of its ten children — the useful next action is
+      // "generate all of these", which is a property of the set.
+      if (data.batchId) {
+        router.push(`/admin/video/projects?batch=${data.batchId}`);
+        return;
+      }
       router.push(`/admin/video/projects/${data.project.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create the project");
@@ -207,10 +392,11 @@ export function NewVideoWizard({ themes, bgmTracks, levels, lessons }: Props) {
         {/* ---- step 1 ---- */}
         {step === 0 && (
           <section className="space-y-5">
-            <div className="grid sm:grid-cols-3 gap-3">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {(
                 [
                   ["content_batch", "A batch of items", "e.g. 10 N5 vocabulary words"],
+                  ["topic", "A topic", "e.g. birds, numbers, family"],
                   ["curriculum_lesson", "One lesson", "A full curriculum lesson, block by block"],
                   ["curriculum_level", "A whole level", "Every lesson in N5, N4, …"],
                 ] as [ScopeKind, string, string][]
@@ -274,24 +460,72 @@ export function NewVideoWizard({ themes, bgmTracks, levels, lessons }: Props) {
               </div>
             )}
 
-            {estimate && estimate.items.length > 0 && (
-              <div className="border border-[var(--divider)] rounded-card p-3 max-h-56 overflow-y-auto">
-                <div className="text-xs uppercase tracking-wider text-secondary mb-2">
-                  {estimate.itemCount} item{estimate.itemCount === 1 ? "" : "s"} — “{estimate.title}”
+            {scopeKind === "topic" && (
+              <div className="space-y-3">
+                <div className="grid sm:grid-cols-[1fr_auto_auto] gap-3 items-end">
+                  <div>
+                    <label className={label} htmlFor="topic">Topic</label>
+                    <input
+                      id="topic"
+                      type="text"
+                      className={input}
+                      value={topic}
+                      placeholder="birds in Japanese"
+                      onChange={(e) => setTopic(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), resolveTopic())}
+                    />
+                  </div>
+                  <div>
+                    <label className={label} htmlFor="topicLevel">Level</label>
+                    <select id="topicLevel" className={input} value={jlptLevel} onChange={(e) => setJlptLevel(e.target.value)}>
+                      <option value="">Any</option>
+                      {JLPT_LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}
+                    </select>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={resolveTopic}
+                    disabled={!topic.trim() || topicBusy}
+                    className="btn-primary text-sm disabled:opacity-50 h-[38px]"
+                  >
+                    {topicBusy ? "Looking…" : "Find items"}
+                  </button>
                 </div>
-                <ul className="text-sm space-y-1">
-                  {estimate.items.map((item, i) => (
-                    <li key={i} className="flex justify-between gap-3">
-                      <span className="text-charcoal">{item.title}</span>
-                      <span className="text-xs text-secondary shrink-0">
-                        {item.jlptLevel ?? "—"} · {item.exampleCount} example{item.exampleCount === 1 ? "" : "s"}
-                      </span>
-                    </li>
-                  ))}
-                  {estimate.itemCount > estimate.items.length && (
-                    <li className="text-xs italic text-secondary">…and {estimate.itemCount - estimate.items.length} more</li>
-                  )}
-                </ul>
+
+                {topicNotice && <p className="text-xs text-secondary">{topicNotice}</p>}
+
+                {/* Said plainly rather than hidden: the model's Japanese has been read by nobody,
+                    and a wrong reading burned into a video is the failure worth preventing. */}
+                {pickerItems.some((i) => i.source === "llm") && (
+                  <p className="text-xs text-amber-700">
+                    Items marked <strong>unreviewed</strong> were written just now. Keeping them saves each
+                    one as a draft post so it goes through Content Review — check them before publishing
+                    the pages.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* One picker for both scopes. A batch arrives pre-ticked with exactly what the query
+                chose, so leaving it alone behaves as it always did. */}
+            {pickerItems.length > 0 && (
+              <div>
+                <div className="text-xs uppercase tracking-wider text-secondary mb-2">
+                  Items in this video{estimate ? ` — “${estimate.title}”` : ""}
+                </div>
+                <ItemPicker
+                  items={pickerItems}
+                  selectedIds={pickerSelected}
+                  onChange={setPickerSelected}
+                  onAdd={addPickerItem}
+                  onRemoveProposed={(key) => {
+                    setPickerItems((prev) => prev.filter((i) => (i.postId ?? `llm:${i.word ?? i.title}`) !== key));
+                    setPickerSelected((prev) => prev.filter((k) => k !== key));
+                  }}
+                  contentType={scopeKind === "content_batch" ? contentType : undefined}
+                  jlptLevel={jlptLevel || undefined}
+                  busy={topicBusy}
+                />
               </div>
             )}
           </section>
@@ -303,15 +537,43 @@ export function NewVideoWizard({ themes, bgmTracks, levels, lessons }: Props) {
             <div>
               <span className={label}>Grouping</span>
               <div className="space-y-2">
-                {([["single_video", "One video covering everything"], ["video_per_item", "A separate video per item"]] as const).map(
-                  ([value, text]) => (
-                    <label key={value} className="flex items-center gap-2 text-sm text-charcoal">
-                      <input type="radio" name="grouping" checked={grouping === value} onChange={() => setGrouping(value)} />
-                      {text}
-                    </label>
-                  )
-                )}
+                {(
+                  [
+                    ["single_video", "One video covering everything"],
+                    ["video_per_item", "A separate video per item"],
+                  ] as const
+                ).map(([value, text]) => (
+                  <label key={value} className="flex items-center gap-2 text-sm text-charcoal">
+                    <input type="radio" name="grouping" checked={grouping === value} onChange={() => setGrouping(value)} />
+                    {text}
+                  </label>
+                ))}
               </div>
+
+              {/* Splitting creates one project per item, each with its own script and render. The
+                  numbers are shown because they are what makes the choice, and because this option
+                  used to promise N videos and quietly make one. */}
+              {grouping === "video_per_item" && splitCount > 0 && (
+                <div className="mt-3 text-xs space-y-1">
+                  <p className="text-secondary">
+                    Creates <strong className="text-charcoal">{splitCount} separate projects</strong>, one per item,
+                    each with its own script, render and social post. Good for daily Shorts.
+                  </p>
+                  {splitCount > MAX_SPLIT_ITEMS ? (
+                    <p className="text-primary">
+                      Too many to split — the limit is {MAX_SPLIT_ITEMS}. Reduce the item count, or choose one
+                      video covering everything.
+                    </p>
+                  ) : (
+                    splitCount > SPLIT_WARN_ITEMS && (
+                      <p className="text-amber-700">
+                        {splitCount * formats.length * narrationLangs.length} renders, and renders run one at a
+                        time — roughly {splitRenderMinutes} minutes of queue.
+                      </p>
+                    )
+                  )}
+                </div>
+              )}
             </div>
 
             <div>
@@ -485,7 +747,10 @@ export function NewVideoWizard({ themes, bgmTracks, levels, lessons }: Props) {
             <div className="card-content">
               <h3 className="font-heading text-lg font-bold text-charcoal mb-3">{title.trim() || estimate.title}</h3>
               <p className="text-sm text-secondary leading-relaxed">
-                {grouping === "single_video" ? "One video" : `${estimate.plannedVideos} separate videos`} covering{" "}
+                {grouping === "single_video"
+                  ? "One video"
+                  : `${splitCount} separate projects, one video each,`}{" "}
+                covering{" "}
                 <strong className="text-charcoal">{estimate.itemCount} {estimate.contentKind ?? "item"}
                 {estimate.itemCount === 1 ? "" : "s"}</strong>
                 {estimate.jlptLevel ? ` at ${estimate.jlptLevel}` : ""}, about{" "}
@@ -538,7 +803,15 @@ export function NewVideoWizard({ themes, bgmTracks, levels, lessons }: Props) {
               Next →
             </button>
           ) : (
-            <button type="button" onClick={create} disabled={creating || !estimate} className="btn-primary disabled:opacity-50">
+            <button
+              type="button"
+              onClick={create}
+              // Blocked in the UI as well as the API: the server refuses an oversized split with a
+              // 413, and letting the button through only to show that error is worse than not
+              // offering it.
+              disabled={creating || !estimate || (grouping === "video_per_item" && splitCount > MAX_SPLIT_ITEMS)}
+              className="btn-primary disabled:opacity-50"
+            >
               {creating ? "Creating…" : "Create project"}
             </button>
           )}

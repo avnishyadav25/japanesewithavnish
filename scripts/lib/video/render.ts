@@ -12,7 +12,13 @@ import { spawn } from "child_process";
 import { bundle } from "@remotion/bundler";
 import { renderMedia, renderStill, selectComposition } from "@remotion/renderer";
 import { webpackOverride } from "../../../remotion/webpackOverride";
-import { FORMAT_SPECS, type Storyboard, type VideoFormat, type VideoThemeTokens } from "../../../src/lib/video/types";
+import {
+  FORMAT_SPECS,
+  type CaptionSettings,
+  type Storyboard,
+  type VideoFormat,
+  type VideoThemeTokens,
+} from "../../../src/lib/video/types";
 
 const COMPOSITION_IDS: Record<VideoFormat, string> = {
   vertical: "Video-Vertical",
@@ -52,6 +58,8 @@ export interface RenderOptions {
   format: VideoFormat;
   themeTokens?: Partial<VideoThemeTokens> | null;
   bgmUrl?: string | null;
+  /** Live caption style from the project row, overriding the storyboard's frozen copy. */
+  captionSettings?: Partial<CaptionSettings> | null;
   outDir: string;
   /** 0..1, called as frames complete. */
   onProgress?: (progress: number) => void;
@@ -70,6 +78,7 @@ export async function renderStoryboard(options: RenderOptions): Promise<RenderRe
     layout: spec.layout,
     themeTokens: options.themeTokens ?? null,
     bgmUrl: options.bgmUrl ?? null,
+    captionSettings: options.captionSettings ?? null,
     preview: false,
   };
 

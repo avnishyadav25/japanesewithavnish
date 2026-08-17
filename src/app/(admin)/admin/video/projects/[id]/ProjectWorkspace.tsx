@@ -7,6 +7,7 @@ import { AdminCard } from "@/components/admin/AdminCard";
 import { FORMAT_SPECS, NARRATION_LANG_LABELS } from "@/lib/video/types";
 import { arrayMove } from "@dnd-kit/sortable";
 import type {
+  CaptionSettings,
   NarrationLang,
   Scene,
   Storyboard,
@@ -19,6 +20,7 @@ import type { RenderRow, StoryboardRow } from "@/lib/video/projects";
 import { StoryboardPlayer, type PlayerHandle } from "./StoryboardPlayer";
 import { Timeline, usePlayerTime } from "./Timeline";
 import { PromptPanel, type GenerateOverrides } from "./PromptPanel";
+import { CaptionControls } from "./CaptionControls";
 
 interface Props {
   project: VideoProjectRow;
@@ -32,6 +34,14 @@ interface Props {
 
 const ACTIVE_JOB_STATUSES = new Set(["queued", "claimed", "running"]);
 
+/** One content page a render can be embedded on, as returned by GET .../renders/[id]/link. */
+interface LinkTarget {
+  postId: string;
+  title: string;
+  slug?: string;
+  kind?: string;
+}
+
 export function ProjectWorkspace({
   project,
   storyboards,
@@ -43,7 +53,16 @@ export function ProjectWorkspace({
 }: Props) {
   const router = useRouter();
 
-  const [lang, setLang] = useState<NarrationLang>(project.narrationLangs[0] ?? "en");
+  // Open on a language that actually HAS a script, not blindly on narrationLangs[0].
+  //
+  // The old default meant a fully rendered project whose storyboard sat under its second language
+  // opened on the empty first one — and since the Generate-script card is gated purely on
+  // "is there a storyboard for the selected language", it showed a Generate button on finished
+  // work. Neither the project status nor the render list was consulted.
+  const [lang, setLang] = useState<NarrationLang>(() => {
+    const withScript = project.narrationLangs.find((l) => storyboards.some((s) => s.narrationLang === l));
+    return withScript ?? project.narrationLangs[0] ?? "en";
+  });
   const [previewFormat, setPreviewFormat] = useState<VideoFormat>(project.formats[0] ?? "vertical");
   const [jobs, setJobs] = useState(initialJobs);
   const [renders, setRenders] = useState(initialRenders);
@@ -52,8 +71,15 @@ export function ProjectWorkspace({
   const [notice, setNotice] = useState<string | null>(null);
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
   const [previewBgm, setPreviewBgm] = useState(false);
+  // Live caption style. Seeded from the project so the preview matches what a render would
+  // produce, and updated as the sliders move so the effect is visible before saving.
+  const [captions, setCaptions] = useState<Partial<CaptionSettings> | null>(project.captions);
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
   const [restoredDraft, setRestoredDraft] = useState(false);
+  /** Open when a render covers more than one page and you have to say which ones. */
+  const [linkPicker, setLinkPicker] = useState<{ renderId: string; targets: LinkTarget[]; chosen: string[] } | null>(
+    null
+  );
   const playerRef = useRef<PlayerHandle | null>(null);
   const playheadSeconds = usePlayerTime(playerRef, FORMAT_SPECS[previewFormat].fps);
 
@@ -65,6 +91,25 @@ export function ProjectWorkspace({
   );
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const selected = langStoryboards.find((s) => s.id === selectedVersionId) ?? langStoryboards[0] ?? null;
+
+  /** A language other than the selected one that does have a script — so "no script here" can say
+   * where the script actually is instead of implying the project is empty. */
+  const otherLangWithScript = useMemo(
+    () => project.narrationLangs.find((l) => l !== lang && storyboards.some((s) => s.narrationLang === l)) ?? null,
+    [project.narrationLangs, storyboards, lang]
+  );
+
+  /**
+   * The project claims to be mid-flight, but nothing is actually running and no script was saved.
+   *
+   * `generating_script` is written before the DeepSeek call and only overwritten on success, so a
+   * timeout leaves the row stuck in it permanently. There is one such project in the database
+   * right now. Checking live jobs too, so a genuinely running render is never mislabelled stuck.
+   */
+  const stalled = useMemo(() => {
+    const inFlight = jobs.some((j) => ACTIVE_JOB_STATUSES.has(j.status));
+    return !inFlight && ["generating_script", "queued_render", "rendering", "failed"].includes(project.status);
+  }, [jobs, project.status]);
 
   // Local edit buffer. Keyed by storyboard id so switching versions or languages discards
   // rather than silently carrying edits across.
@@ -231,7 +276,11 @@ export function ProjectWorkspace({
     }
   }
 
-  async function renderAction(renderId: string, action: "approve" | "reject" | "link" | "unlink") {
+  async function renderAction(
+    renderId: string,
+    action: "approve" | "reject" | "link" | "unlink",
+    extra?: Record<string, unknown>
+  ) {
     setBusy(`${action}:${renderId}`);
     setError(null);
     setNotice(null);
@@ -242,16 +291,92 @@ export function ProjectWorkspace({
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(isApproval ? { decision: action } : { action }),
+          body: JSON.stringify(isApproval ? { decision: action } : { action, ...extra }),
         }
       );
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Request failed");
+      if (!res.ok) {
+        // A multi-page video comes back 400 carrying its candidate list. Opening the picker is
+        // the useful response to that, not printing "This video covers 10 pages" and stopping.
+        if (Array.isArray(data.targets) && data.targets.length > 0) {
+          setLinkPicker({ renderId, targets: data.targets, chosen: data.targets.map((t: LinkTarget) => t.postId) });
+          return;
+        }
+        throw new Error(data.error || "Request failed");
+      }
       setNotice(data.message ?? (action === "approve" ? "Video approved." : "Done."));
+      setLinkPicker(null);
       await refresh();
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Request failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  /**
+   * Re-renders the formats this project already has, so a caption change reaches finished videos.
+   *
+   * Uses the existing "recut to formats" path rather than a new mode: enqueueRenderJobs only
+   * refuses a format with a job already queued or running, so asking for a format that is merely
+   * *finished* legitimately produces a fresh render which supersedes it. The storyboard is
+   * untouched, so no DeepSeek call — and every narration segment keeps its cached audio url, so
+   * no TTS either.
+   */
+  async function restyleRenders() {
+    if (!selected) return;
+    const formats = Array.from(new Set(renders.filter((r) => r.isCurrent).map((r) => r.format)));
+    if (formats.length === 0) return;
+
+    setBusy("restyle");
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/admin/video/renders/${renders.find((r) => r.isCurrent)!.id}/recut`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "formats", formats }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not queue the re-render");
+      setNotice(data.message ?? "Queued.");
+      await refresh();
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not queue the re-render");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  /**
+   * Asks which pages before publishing, when there is more than one answer.
+   *
+   * A single-page video skips the dialog entirely and links immediately — that was the only
+   * case that ever worked, and making it slower to fix the multi-page case would be a poor trade.
+   */
+  async function openLinkPicker(renderId: string) {
+    setBusy(`link:${renderId}`);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/video/renders/${renderId}/link`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not load the pages for this video");
+
+      const targets: LinkTarget[] = data.targets ?? [];
+      const linked: string[] = data.linked ?? [];
+      if (targets.length <= 1) {
+        setBusy(null);
+        await renderAction(renderId, "link");
+        return;
+      }
+      // Pages it is already on start ticked, so the dialog shows current state rather than
+      // implying nothing is published.
+      const preselected = linked.length > 0 ? linked : targets.map((t) => t.postId);
+      setLinkPicker({ renderId, targets, chosen: preselected });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load the pages for this video");
     } finally {
       setBusy(null);
     }
@@ -434,12 +559,52 @@ export function ProjectWorkspace({
       )}
 
       {!selected ? (
-        <PromptPanel
-          projectId={project.id}
-          narrationLang={lang}
-          disabled={busy !== null}
-          onGenerate={(overrides) => generate(false, overrides)}
-        />
+        <>
+          {/*
+            Why there is no script, said out loud.
+            A bare "Generate script" card is only the truth for an untouched draft. On a project
+            stranded mid-generation, or one whose script lives under another language, the same
+            card reads as "this project is empty" — which is how a finished video came to look
+            like it had never been started.
+          */}
+          {otherLangWithScript && (
+            <AdminCard className="border-l-4 border-amber-400">
+              <p className="text-sm text-charcoal">
+                No {NARRATION_LANG_LABELS[lang]} script yet — this project&rsquo;s script is under{" "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLang(otherLangWithScript);
+                    setSelectedVersionId(null);
+                  }}
+                  className="text-primary font-semibold hover:underline"
+                >
+                  {NARRATION_LANG_LABELS[otherLangWithScript]}
+                </button>
+                . Generating below adds a {NARRATION_LANG_LABELS[lang]} version alongside it.
+              </p>
+            </AdminCard>
+          )}
+
+          {stalled && (
+            <AdminCard className="border-l-4 border-amber-400">
+              <p className="text-sm font-semibold text-charcoal mb-1">
+                Status says &ldquo;{project.status.replace(/_/g, " ")}&rdquo;, but no script was saved
+              </p>
+              <p className="text-sm text-secondary">
+                Generation started and did not finish — usually a DeepSeek timeout or an error partway
+                through. Nothing is running now. Generating again is safe and costs one fresh call.
+              </p>
+            </AdminCard>
+          )}
+
+          <PromptPanel
+            projectId={project.id}
+            narrationLang={lang}
+            disabled={busy !== null}
+            onGenerate={(overrides) => generate(false, overrides)}
+          />
+        </>
       ) : (
         <div className="grid lg:grid-cols-[minmax(0,380px)_1fr] gap-6 items-start">
           {/* -------- Preview -------- */}
@@ -469,6 +634,7 @@ export function ProjectWorkspace({
                   playerRef={playerRef}
                   bgmUrl={bgmUrl}
                   previewBgm={previewBgm}
+                  captionSettings={captions}
                 />
               )}
               <p className="text-xs text-secondary mt-2">
@@ -485,6 +651,15 @@ export function ProjectWorkspace({
                 </label>
               )}
             </AdminCard>
+
+            <CaptionControls
+              projectId={project.id}
+              value={captions}
+              onChange={setCaptions}
+              hasRenders={renders.some((r) => r.isCurrent)}
+              recutting={busy === "restyle"}
+              onRecut={restyleRenders}
+            />
 
             <AdminCard>
               <div className="flex items-center justify-between mb-3">
@@ -742,7 +917,7 @@ export function ProjectWorkspace({
                       <>
                         <button
                           type="button"
-                          onClick={() => renderAction(render.id, "link")}
+                          onClick={() => openLinkPicker(render.id)}
                           disabled={busy !== null}
                           title="Embeds this video on the content page it was generated from, with VideoObject schema"
                           className="text-primary hover:underline disabled:opacity-50"
@@ -805,6 +980,105 @@ export function ProjectWorkspace({
             ))}
           </div>
         </AdminCard>
+      )}
+
+      {/* -------- Which pages to publish on -------- */}
+      {linkPicker && (
+        <div
+          className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center p-4 sm:p-10 overflow-y-auto"
+          onClick={() => setLinkPicker(null)}
+        >
+          <div className="card-content max-w-[560px] w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-4 mb-1">
+              <h3 className="font-heading text-lg font-bold text-charcoal">Publish to which pages?</h3>
+              <button
+                type="button"
+                onClick={() => setLinkPicker(null)}
+                className="text-secondary hover:text-charcoal text-xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+            <p className="text-xs text-secondary mb-4">
+              This video teaches {linkPicker.targets.length} items, so it can be embedded on any of their
+              pages. Already-published pages are ticked.
+            </p>
+
+            <div className="flex gap-3 mb-3 text-xs">
+              <button
+                type="button"
+                className="text-primary hover:underline"
+                onClick={() =>
+                  setLinkPicker((p) => (p ? { ...p, chosen: p.targets.map((t) => t.postId) } : p))
+                }
+              >
+                Select all
+              </button>
+              <button
+                type="button"
+                className="text-secondary hover:underline"
+                onClick={() => setLinkPicker((p) => (p ? { ...p, chosen: [] } : p))}
+              >
+                Clear
+              </button>
+            </div>
+
+            <div className="max-h-72 overflow-y-auto border border-[var(--divider)] rounded-card divide-y divide-[var(--divider)] mb-4">
+              {linkPicker.targets.map((t) => {
+                const on = linkPicker.chosen.includes(t.postId);
+                return (
+                  <label key={t.postId} className="flex items-center gap-3 px-3 py-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={on}
+                      onChange={() =>
+                        setLinkPicker((p) =>
+                          p
+                            ? {
+                                ...p,
+                                chosen: on ? p.chosen.filter((x) => x !== t.postId) : [...p.chosen, t.postId],
+                              }
+                            : p
+                        )
+                      }
+                    />
+                    <span className="text-charcoal flex-1 truncate">{t.title}</span>
+                    {t.slug && t.kind && (
+                      <a
+                        href={`/learn/${t.kind}/${t.slug}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-xs text-primary hover:underline shrink-0"
+                      >
+                        view
+                      </a>
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                disabled={linkPicker.chosen.length === 0 || busy !== null}
+                onClick={() => renderAction(linkPicker.renderId, "link", { postIds: linkPicker.chosen })}
+                className="btn-primary text-sm disabled:opacity-50"
+              >
+                Publish to {linkPicker.chosen.length} page{linkPicker.chosen.length === 1 ? "" : "s"}
+              </button>
+              <button
+                type="button"
+                disabled={busy !== null}
+                onClick={() => renderAction(linkPicker.renderId, "unlink")}
+                className="text-sm text-secondary hover:text-charcoal disabled:opacity-50"
+              >
+                Remove from all pages
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

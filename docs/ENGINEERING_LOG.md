@@ -275,3 +275,74 @@ reconstruction. Where a period is thin, that reflects the record, not the effort
 - **`site_settings.progression_rules` contains the literal string `"[object Object]"`** in the
   primary. Something stringified an object instead of serialising it. Replication copies it
   faithfully; it is an app bug.
+
+
+---
+
+## 2026-08-16 — Video Studio round 2
+
+Seven tracks on `feat/video-studio-round-2`. What matters later is the traps, not the features.
+
+### Gotchas found
+
+**`npm run db:migrate` had never worked against Neon.** `getDriverFor("neon")` returned the
+`neon()` HTTP function cast `as unknown as PgDriver`. That function's `.transaction()` takes an
+**array of queries**; `PgDriver` declares it callback-style. The cast typechecked and threw
+`transaction() expects an array of queries` the first time anything called it — which was
+migration 147, because no app code had ever used `sql.transaction()`. Ordinary queries still go
+over HTTP; only the transaction path now checks out a `pg.Pool`, preferring `DATABASE_URL_DIRECT`.
+
+**Chunking a large generation makes the timeout WORSE, not better.** Splitting whole-scope
+generation into scene-aligned batches is correct — a level is 2,820 slots that no single
+8,000-token response could carry — but it turns one slow call into 71. Measured against the live
+API: a 4-item topic is 1 call / 3.2 s; a 3-lesson submodule is 3 calls (one retry) / **31.4 s**,
+already past the ~30 s ceiling. `MAX_BATCHES_PER_REQUEST = 2` is that measurement, not a guess.
+Oversized scopes are refused before spending, and `generating_script` is only set *after* the
+guard — setting it first is how a project gets stranded in that status forever.
+
+**Ordering by the JLPT level string puts N1 first.** `ORDER BY jlpt_level` is alphabetical, so a
+thematic search on a beginner-focused site returned 鳩 鶏 鶴 鷹 — every one N1. Any query ranking
+content for learners needs an explicit `CASE WHEN 'N5' THEN 1 …`.
+
+**`ILIKE '%term%'` is unusable for meaning search.** Measured: `cat` 96 rows (category, indicate,
+educate), `one` 240 (money, phone, alone), `hand` 32. Word boundaries (`~* '\yterm\y'`) cut those
+to 2, 114 and 15. What boundaries cannot fix is semantics — an expanded bird set still matches
+俯瞰 "bird's-eye view" — so a human confirm step is structural, not polish.
+
+**`ON CONFLICT` must restate a partial index's predicate.** `idx_video_bgm_external` is
+`UNIQUE (source, external_id) WHERE external_id IS NOT NULL`. `ON CONFLICT (source, external_id)`
+alone fails with "no unique or exclusion constraint matching"; the `WHERE` clause has to be
+repeated in the conflict target.
+
+**grep silently skips `src/lib/video/tts.ts`.** It contains Japanese characters, so `file` reports
+it as `data` and grep treats it as binary — returning *nothing*, not an error. Several "that
+function doesn't exist" conclusions were false negatives. Use `grep -a` on any file with CJK.
+
+**Jamendo's `license_cc=commercial` is not a commercial-use filter.** It surfaces tracks you may
+*buy* a licence for, whose CC url is still NonCommercial. Of 20 popular results for one query, 19
+were `by-nc-*` and one was usable. Verify `license_ccurl` itself, and order by downloads rather
+than popularity — the most popular tracks are overwhelmingly NC, so popularity spends the page on
+results that get rejected.
+
+### Still needs a human
+
+See [VIDEO_MANUAL_STEPS.md](VIDEO_MANUAL_STEPS.md). Two gated steps: mascot artwork (generator
+verified working 2026-08-16; 8 of 16 ids have art) and cloned voice (needs ~60 s reference audio
+per language and an hourly GPU — an M1/8 GB is below Chatterbox's floor).
+
+### Architecture changes
+
+- **Migration 147**: `video_projects.captions` / `.branding` JSONB, `scope_kind` widened with
+  `topic`, partial unique indexes on `video_content_links`.
+- **Caption style is read at RENDER time from the project**, not from the storyboard's frozen
+  copy — the opposite of branding, deliberately. Branding is frozen so a re-render reproduces what
+  was approved; caption size is changed *because* the approved render was wrong. Restyling is
+  therefore a re-cut with no LLM or TTS spend.
+- **`video-render.yml` now passes `DEEPSEEK_API_KEY`**, which it never did. Every CI render logged
+  "Social copy: skipped" while the same worker on a Mac generated it fine.
+- **TTS has a provider registry** (`src/lib/video/ttsProvider.ts`). Nothing is registered by
+  default, so Google is unchanged. Cloned voices are resolved from the voice *name*
+  (`cloned:avnish-en`), because a project will mix a cloned English narrator with Google's native
+  ja-JP — a voice cloned from English audio reading Japanese is confident mispronunciation.
+  Generation happens off-box (`npm run voice:clone` against a GPU) and writes into the existing
+  content-hash cache, so the CPU-only runner never loads a model.

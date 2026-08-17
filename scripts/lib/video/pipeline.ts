@@ -167,6 +167,7 @@ export async function runJob(job: ClaimedJob, options: PipelineOptions): Promise
       format: job.format,
       themeTokens: loaded.themeTokens,
       bgmUrl: loaded.bgmUrl,
+      captionSettings: loaded.projectCaptions,
       outDir,
       concurrency: options.concurrency,
       onProgress: (progress) => {
