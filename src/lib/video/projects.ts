@@ -460,6 +460,8 @@ export interface RenderRow {
   videoUrl: string;
   posterUrl: string | null;
   srtUrl: string | null;
+  /** FCPXML editing timeline, written beside the render. */
+  bundleUrl: string | null;
   durationSeconds: number | null;
   width: number | null;
   height: number | null;
@@ -490,7 +492,7 @@ export async function listRenders(filters: { projectId?: string; limit?: number 
   values.push(filters.limit ?? 50);
   const rows = (await db.query(
     `SELECT id, project_id, storyboard_id, format, narration_lang, video_url, poster_url, srt_url,
-            duration_seconds, width, height, file_size_bytes, render_seconds, approval_status,
+            bundle_url, duration_seconds, width, height, file_size_bytes, render_seconds, approval_status,
             is_current, created_at::text
      FROM video_renders ${where} ORDER BY created_at DESC LIMIT $${values.length}`,
     values
@@ -505,6 +507,7 @@ export async function listRenders(filters: { projectId?: string; limit?: number 
     videoUrl: String(row.video_url),
     posterUrl: (row.poster_url as string | null) ?? null,
     srtUrl: (row.srt_url as string | null) ?? null,
+    bundleUrl: (row.bundle_url as string | null) ?? null,
     durationSeconds: row.duration_seconds === null ? null : Number(row.duration_seconds),
     width: (row.width as number | null) ?? null,
     height: (row.height as number | null) ?? null,

@@ -15,6 +15,7 @@ import fs from "fs/promises";
 import path from "path";
 import { resolveNarrationAudio } from "../../../src/lib/video/tts";
 import { buildTimeline, toSrt, toVtt } from "../../../src/lib/video/timeline";
+import { buildChapters, buildFcpxml } from "../../../src/lib/video/fcpxml";
 import { uploadToR2 } from "../../../src/lib/r2";
 import {
   FORMAT_SPECS,
@@ -31,11 +32,13 @@ import {
   isCancelled,
   loadStoryboard,
   logEvent,
+  recordArtifacts,
   recordRender,
   resolveApprovalMode,
   saveStoryboardDoc,
   setProjectStatus,
   setStage,
+  type ArtifactRow,
   type ClaimedJob,
 } from "./db";
 import { makeTempDir, renderStoryboard } from "./render";
@@ -79,6 +82,7 @@ export async function runJob(job: ClaimedJob, options: PipelineOptions): Promise
     if (!options.dryRun) await setStage(job.id, "tts", 5);
 
     let synthesized = 0;
+    const freshlySynthesized = new Set<string>();
     let ttsCostUsd = 0;
     const scenes = [];
     for (const scene of loaded.doc.scenes) {
@@ -88,9 +92,12 @@ export async function runJob(job: ClaimedJob, options: PipelineOptions): Promise
         // recognised language keys are ever read by voiceForSegment().
         voices: { ...(loaded.themeVoices ?? {}), ...(loaded.projectVoices ?? {}) },
         cache: options.dryRun ? undefined : (await import("./db")).ttsCache,
-        onSynthesized: ({ charCount, costUsd }) => {
+        onSynthesized: ({ segmentId, charCount, costUsd }) => {
           synthesized += 1;
           ttsCostUsd += costUsd;
+          // Recorded rather than discarded: it is what makes from_cache on the artifact rows
+          // true, and therefore what makes per-render TTS spend auditable instead of inferred.
+          freshlySynthesized.add(segmentId);
           void charCount;
         },
       });
@@ -214,12 +221,32 @@ export async function runJob(job: ClaimedJob, options: PipelineOptions): Promise
     await setStage(job.id, "upload", 88);
 
     const keyBase = `video/renders/${job.projectId}/${job.storyboardId}/${job.format}`;
-    const [videoUrl, posterUrl, srtUrl, vttUrl] = await Promise.all([
+
+    // The editing timeline, written beside the render rather than zipped with it.
+    //
+    // The column comment in migration 134 imagined a zip of per-scene MP4s and WAVs. Measured,
+    // that is ~48MB per render duplicating a video already in R2 — a poor trade for a file that
+    // is opened rarely. Instead the FCPXML references `<format>.mp4` by RELATIVE path, so
+    // downloading the video and the timeline into one folder is all Final Cut or Resolve needs.
+    // Narration stems are the only thing lost, and their absence degrades to "no separate audio
+    // tracks" rather than to a broken project.
+    const fcpxml = buildFcpxml({
+      storyboard: { ...resolvedDoc, resolved: timeline },
+      timeline,
+      format: job.format,
+      videoHref: `${job.format}.mp4`,
+      projectTitle: loaded.projectTitle,
+    });
+    const chapters = buildChapters(resolvedDoc, timeline);
+
+    const [videoUrl, posterUrl, srtUrl, vttUrl, bundleUrl] = await Promise.all([
       uploadToR2(`${keyBase}.mp4`, await fs.readFile(result.videoPath), "video/mp4"),
       uploadToR2(`${keyBase}-poster.jpg`, await fs.readFile(result.posterPath), "image/jpeg"),
       uploadToR2(`${keyBase}.srt`, await fs.readFile(srtPath), "text/plain; charset=utf-8"),
       uploadToR2(`${keyBase}.vtt`, await fs.readFile(vttPath), "text/vtt; charset=utf-8"),
+      uploadToR2(`${keyBase}.fcpxml`, Buffer.from(fcpxml, "utf8"), "application/xml; charset=utf-8"),
     ]);
+    await uploadToR2(`${keyBase}-chapters.txt`, Buffer.from(chapters, "utf8"), "text/plain; charset=utf-8");
 
     // The approval policy decides whether a human has to watch this before it can go out.
     const meta = await getProjectMeta(job.projectId);
@@ -241,6 +268,7 @@ export async function runJob(job: ClaimedJob, options: PipelineOptions): Promise
       posterUrl,
       srtUrl,
       vttUrl,
+      bundleUrl,
       durationSeconds: result.durationSeconds,
       width: result.width,
       height: result.height,
@@ -249,6 +277,56 @@ export async function runJob(job: ClaimedJob, options: PipelineOptions): Promise
       renderSeconds: result.renderSeconds,
       approvalStatus,
     });
+
+    // ---- Artifacts ---------------------------------------------------------
+    //
+    // Every file this render is made of, in one table. video_render_artifacts has existed since
+    // migration 141 and nothing ever wrote to it, so "which narration clips does this render use"
+    // could only be answered by re-reading the storyboard and hoping it had not been edited since.
+    // The export bundle needs exactly that list.
+    //
+    // Non-fatal on purpose: a finished, uploaded render must not be failed by a bookkeeping
+    // insert. The video is already safe in R2 and recorded in video_renders.
+    try {
+      const artifacts: ArtifactRow[] = [
+        { kind: "video", url: videoUrl, durationSeconds: result.durationSeconds, bytes: result.fileSizeBytes },
+        { kind: "poster", url: posterUrl },
+        { kind: "captions", url: srtUrl },
+        { kind: "captions", url: vttUrl },
+      ];
+      if (loaded.bgmUrl) artifacts.push({ kind: "bgm", url: loaded.bgmUrl });
+
+      for (const scene of scenes) {
+        for (const segment of scene.narration) {
+          if (!segment.audio?.url) continue;
+          artifacts.push({
+            kind: "tts",
+            url: segment.audio.url,
+            sceneId: scene.id,
+            segmentId: segment.id,
+            assetId: segment.audio.ttsAssetId,
+            durationSeconds: segment.audio.durationSeconds,
+            fromCache: !freshlySynthesized.has(segment.id),
+          });
+        }
+        const brollAsset = (scene.visual as { asset?: { url?: string; brollAssetId?: string; durationSeconds?: number } })
+          .asset;
+        if (scene.sceneType === "broll_page" && brollAsset?.url) {
+          artifacts.push({
+            kind: "broll",
+            url: brollAsset.url,
+            sceneId: scene.id,
+            assetId: brollAsset.brollAssetId ?? null,
+            durationSeconds: brollAsset.durationSeconds ?? null,
+          });
+        }
+      }
+
+      const written = await recordArtifacts(renderId, job.id, artifacts);
+      await log(`Recorded ${written} artifact(s)`);
+    } catch (err) {
+      await log(`Artifacts not recorded: ${err instanceof Error ? err.message : String(err)}`);
+    }
 
     await completeJob(job.id);
     await setProjectStatus(job.projectId, approvalStatus === "pending_review" ? "video_pending_review" : "render_ready");

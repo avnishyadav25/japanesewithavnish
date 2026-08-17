@@ -997,6 +997,18 @@ export function ProjectWorkspace({
                         Captions
                       </a>
                     )}
+                    {/* The FCPXML references the video by RELATIVE path, so both files have to
+                        land in the same folder for Final Cut to resolve the media. */}
+                    {render.bundleUrl && (
+                      <a
+                        href={render.bundleUrl}
+                        download
+                        title="Final Cut / DaVinci Resolve timeline, one clip per scene. Download it into the same folder as the video."
+                        className="text-primary hover:underline"
+                      >
+                        Timeline
+                      </a>
+                    )}
                     {render.approvalStatus === "pending_review" && (
                       <>
                         <button
