@@ -1,0 +1,59 @@
+# Narration script generation for scopes too large for a web request.
+#
+# The admin route refuses anything over MAX_BATCHES_PER_REQUEST with a 413: Netlify's real function
+# ceiling is ~30s and a whole JLPT level plans 2,820 narration slots across 71 DeepSeek calls.
+# Chunking made that scope correct — no single response could carry it — but not survivable in a
+# request. A runner has no ceiling, so the cap is lifted and the same generator runs here.
+#
+# No Chromium, no ffmpeg, no fonts: this writes text. It is a small, fast job compared with
+# video-render.yml, which is why it is a separate workflow rather than another mode of that one.
+name: video-script
+
+on:
+  # Fired by the admin when you choose to generate a large scope on CI.
+  # See triggerWorkflow() in src/lib/video/dispatch.ts.
+  repository_dispatch:
+    types: [video-script]
+  workflow_dispatch:
+    inputs:
+      project_id:
+        description: "Project uuid to generate. Leave empty to drain projects stuck in generating_script."
+        required: false
+        default: ""
+
+# Serialised for the same reason as renders: DeepSeek load stays predictable, and two runs
+# generating the same project would race to insert storyboard versions.
+concurrency:
+  group: video-script
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    # A whole level is ~71 sequential DeepSeek calls. Generous, but far short of the render
+    # workflow's 90 — if this is still running after half an hour something is wrong.
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Generate
+        run: |
+          if [ -n "${{ github.event.client_payload.projectId }}" ]; then
+            npm run video:script -- --project=${{ github.event.client_payload.projectId }}
+          elif [ -n "${{ github.event.inputs.project_id }}" ]; then
+            npm run video:script -- --project=${{ github.event.inputs.project_id }}
+          else
+            npm run video:script -- --pending --max=3
+          fi
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}

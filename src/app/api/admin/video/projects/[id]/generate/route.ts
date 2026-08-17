@@ -12,6 +12,7 @@ import {
 } from "@/lib/video/storyboard";
 import { resolvePacing } from "@/lib/video/pacing";
 import { recordGenerationRun, snapshotStoryboardState } from "@/lib/video/audit";
+import { triggerWorkflow } from "@/lib/video/dispatch";
 import {
   getProject,
   insertStoryboardVersion,
@@ -78,16 +79,38 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const batchCount = planGenerationBatches(planned.skeleton.scenes, planned.skeleton.blanks).length;
 
     if (batchCount > MAX_BATCHES_PER_REQUEST) {
+      // Too big for a request, but not too big full stop — a runner has no function ceiling.
+      // `onCi: true` asks for it to be generated there instead of refusing outright.
+      if (body?.onCi === true) {
+        await setProjectStatus(id, "generating_script");
+        const dispatch = await triggerWorkflow("video-script", { projectId: id, narrationLang: lang });
+        await logEvent({
+          projectId: id,
+          actor: admin.email,
+          eventType: "script_dispatched_ci",
+          payload: { slots: planned.skeleton.blanks.length, batches: batchCount, dispatch },
+        });
+        return NextResponse.json({
+          dispatched: true,
+          slots: planned.skeleton.blanks.length,
+          batches: batchCount,
+          dispatch,
+          message: dispatch.ok
+            ? `Generating ${planned.skeleton.blanks.length} lines on GitHub Actions — this page updates when it finishes.`
+            : `Could not reach GitHub: ${dispatch.detail}`,
+        });
+      }
+
       return NextResponse.json(
         {
           error:
             `This scope needs ${planned.skeleton.blanks.length} narration slots across ${batchCount} ` +
-            `model calls, which will not finish inside the ~30s request limit. ` +
-            `Generate a smaller scope — a single lesson or submodule rather than a whole ` +
-            `level — or split it into several projects.`,
+            `model calls, which will not finish inside the ~30s request limit.`,
           slots: planned.skeleton.blanks.length,
           batches: batchCount,
           maxBatches: MAX_BATCHES_PER_REQUEST,
+          // The client offers this as a button rather than telling you to shrink the scope.
+          canGenerateOnCi: true,
         },
         { status: 413 }
       );

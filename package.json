@@ -45,7 +45,8 @@
     "bgm:import": "tsx scripts/import-bgm-catalogue.ts",
     "voice:clone": "tsx scripts/clone-voice.ts",
     "video:mascots": "tsx scripts/generate-mascots.ts",
-    "video:measure-rates": "tsx scripts/measure-speech-rates.ts"
+    "video:measure-rates": "tsx scripts/measure-speech-rates.ts",
+    "video:script": "tsx scripts/video-script-worker.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1000.0",

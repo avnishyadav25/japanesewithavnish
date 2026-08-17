@@ -224,23 +224,66 @@ export function ProjectWorkspace({
     }
   }
 
-  async function generate(regenerate: boolean, overrides?: GenerateOverrides) {
+  /**
+   * Generates the script, offering CI when the scope is too large for a request.
+   *
+   * Its own fetch rather than call(), because call() throws away the response body on a failure
+   * and the 413 carries the thing that matters: whether this can be generated on a runner
+   * instead. Refusing outright when a perfectly good path exists would be the wrong answer.
+   */
+  async function generate(regenerate: boolean, overrides?: GenerateOverrides, onCi = false) {
     const tone = regenerate ? window.prompt("Any steer for this rewrite? (tone, length, audience)") : null;
     if (regenerate && tone === null) return;
-    const data = await call(regenerate ? "regenerate" : "generate", `/api/admin/video/projects/${project.id}/generate`, {
-      narrationLang: lang,
-      regenerate,
-      tone: tone || undefined,
-      systemPrompt: overrides?.systemPrompt,
-      slotOverrides: overrides?.slotOverrides,
-    });
-    if (data) {
+
+    setBusy(regenerate ? "regenerate" : "generate");
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/admin/video/projects/${project.id}/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          narrationLang: lang,
+          regenerate,
+          tone: tone || undefined,
+          systemPrompt: overrides?.systemPrompt,
+          slotOverrides: overrides?.slotOverrides,
+          onCi,
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        if (data.canGenerateOnCi) {
+          const go = window.confirm(
+            `${data.error}\n\n${data.slots} lines across ${data.batches} model calls. ` +
+              `Generate it on GitHub Actions instead? It runs in the background and this page ` +
+              `updates when it finishes.`
+          );
+          if (go) {
+            setBusy(null);
+            return generate(regenerate, overrides, true);
+          }
+        }
+        throw new Error(data.error || "Request failed");
+      }
+
+      if (data.dispatched) {
+        setNotice(data.message);
+        router.refresh();
+        return;
+      }
+
       setNotice(
         data.approvalMode === "auto"
           ? "Script generated and auto-approved by policy — ready to render."
           : "Script generated. Read it through, then approve it to unlock rendering."
       );
       router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Request failed");
+    } finally {
+      setBusy(null);
     }
   }
 

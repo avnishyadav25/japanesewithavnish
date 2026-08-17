@@ -18,11 +18,17 @@ export interface DispatchResult {
   detail: string;
 }
 
-export async function triggerRemoteWorker(payload: {
-  projectId: string;
-  storyboardId: string;
-  formats: string[];
-}): Promise<DispatchResult> {
+/**
+ * Fires a workflow by `repository_dispatch`.
+ *
+ * `eventType` is a parameter because there are now two workflows: renders, and script generation
+ * for scopes too large to finish inside a serverless request. Both are woken the same way and both
+ * re-derive their work from the database — the payload is a breadcrumb for debugging, not input.
+ */
+export async function triggerWorkflow(
+  eventType: "video-render" | "video-script",
+  payload: Record<string, unknown>
+): Promise<DispatchResult> {
   const token = process.env.GITHUB_DISPATCH_TOKEN;
   const repo = process.env.GITHUB_DISPATCH_REPO;
 
@@ -31,11 +37,10 @@ export async function triggerRemoteWorker(payload: {
       attempted: false,
       ok: false,
       detail:
-        "No GitHub dispatch configured — a running local worker will pick this up within seconds, otherwise it waits for the scheduled run.",
+        eventType === "video-script"
+          ? "No GitHub dispatch configured — run `npm run video:script -- --project=<id>` locally instead."
+          : "No GitHub dispatch configured — a running local worker will pick this up within seconds, otherwise it waits for the scheduled run.",
     };
-  }
-  if (payload.formats.length === 0) {
-    return { attempted: false, ok: true, detail: "Nothing newly queued; no dispatch needed." };
   }
 
   try {
@@ -48,7 +53,7 @@ export async function triggerRemoteWorker(payload: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        event_type: "video-render",
+        event_type: eventType,
         client_payload: payload,
       }),
       // Netlify functions have roughly ten seconds total; never let a slow GitHub API call
@@ -69,4 +74,21 @@ export async function triggerRemoteWorker(payload: {
       detail: `GitHub dispatch failed (${err instanceof Error ? err.message : "unknown"}). The job is queued and will still be picked up.`,
     };
   }
+}
+
+/**
+ * Wakes the render worker. Thin wrapper kept so the three existing call sites are unchanged.
+ *
+ * The empty-formats guard lives here rather than in triggerWorkflow: "nothing was newly queued"
+ * is a render-specific concept, and a script dispatch has no equivalent.
+ */
+export async function triggerRemoteWorker(payload: {
+  projectId: string;
+  storyboardId: string;
+  formats: string[];
+}): Promise<DispatchResult> {
+  if (payload.formats.length === 0) {
+    return { attempted: false, ok: true, detail: "Nothing newly queued; no dispatch needed." };
+  }
+  return triggerWorkflow("video-render", payload);
 }
