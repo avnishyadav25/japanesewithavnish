@@ -1314,6 +1314,105 @@ function leadMascotFor(branding: BrandingSettings, pose: string): MascotId {
   return pose === "celebrate" ? "fox-celebrate" : "fox-wave";
 }
 
+/**
+ * Rewrites the narration of ONE scene, leaving everything else byte-identical.
+ *
+ * WHY IT REBUILDS THE SKELETON. The slot ids, hints and word budgets for a scene are produced by
+ * buildSkeleton over the whole snapshot — there is no per-scene entry point, and inventing one
+ * would mean a second implementation of the budgeting that could drift from the real one. So the
+ * skeleton is rebuilt, the target scene's slots are picked out of it, and only those are filled.
+ * The cost is one cheap CPU pass; the benefit is that a regenerated scene is budgeted exactly as
+ * it would have been in a full generation.
+ *
+ * VISUALS ARE NEVER TOUCHED. What is on screen comes from the database and only the spoken
+ * explanation is written by the model — the rule the whole pipeline is built on. This returns the
+ * existing document with one scene's `narration[].text` replaced, so scene ids, ordering, timing
+ * mode and every visual field survive untouched.
+ *
+ * AUDIO IS DROPPED for the segments whose text changed, so the render re-synthesises exactly
+ * those and reuses the cache for the rest.
+ */
+export async function regenerateScene(params: {
+  storyboard: Storyboard;
+  snapshot: ContentSnapshot;
+  config: GenerateStoryboardConfig;
+  sceneId: string;
+  /** Free-text steer for this scene alone, e.g. "shorter", "less formal". */
+  hint?: string;
+}): Promise<{
+  storyboard: Storyboard;
+  usage: { promptTokens: number; completionTokens: number };
+  estimatedCostUsd: number;
+  model: string;
+  promptKey: string;
+  request: GenerationRequest;
+  rawResponse: string;
+  durationMs: number;
+  changedSegments: string[];
+}> {
+  const { storyboard, snapshot, config, sceneId, hint } = params;
+  const startedAt = Date.now();
+
+  const target = storyboard.scenes.find((s) => s.id === sceneId);
+  if (!target) throw new Error(`Scene ${sceneId} is not in this storyboard`);
+
+  const { request, skeleton } = await buildGenerationRequest(snapshot, config);
+
+  // Match by SEGMENT id, not by scene id: a hand-inserted scene has an id the skeleton has never
+  // seen, and an edited storyboard may have been reordered since it was generated.
+  const wanted = new Set(target.narration.map((n) => n.id));
+  const slots = skeleton.blanks
+    .filter((b) => wanted.has(b.id))
+    .map((b) => (hint ? { ...b, hint: `${b.hint} — ${hint}` } : b));
+
+  if (slots.length === 0) {
+    throw new Error(
+      "This scene has no narration the model can write — either every line is fixed Japanese, or " +
+        "it was added by hand and has no slot. Type the narration directly instead."
+    );
+  }
+
+  const filled = await fillSlots({
+    snapshot,
+    config,
+    // Only the target scene, so planGenerationBatches produces exactly one batch.
+    scenes: [target],
+    slots,
+    systemPrompt: request.systemPrompt,
+  });
+
+  const changed: string[] = [];
+  const scenes = storyboard.scenes.map((scene) => {
+    if (scene.id !== sceneId) return scene;
+    return {
+      ...scene,
+      narration: scene.narration.map((segment) => {
+        const written = filled.map[segment.id];
+        if (!written) return segment;
+        const text = sanitizeNarration(written);
+        if (!text || text === segment.text) return segment;
+        changed.push(segment.id);
+        // ssml and audio are derived from the text; keeping them would render the old line.
+        const { ssml: _ssml, audio: _audio, ...rest } = segment;
+        return { ...rest, text };
+      }),
+    };
+  });
+
+  return {
+    storyboard: { ...storyboard, scenes, resolved: undefined },
+    usage: { promptTokens: filled.promptTokens, completionTokens: filled.completionTokens },
+    estimatedCostUsd:
+      filled.promptTokens * PROMPT_COST_PER_TOKEN + filled.completionTokens * COMPLETION_COST_PER_TOKEN,
+    model: CHAT_MODEL,
+    promptKey: request.promptKey,
+    request: { ...request, slots },
+    rawResponse: filled.text,
+    durationMs: Date.now() - startedAt,
+    changedSegments: changed,
+  };
+}
+
 /** Stable id for a scene added by hand in the editor. */
 export function newSceneId(): string {
   return `sc-${randomUUID().slice(0, 8)}`;

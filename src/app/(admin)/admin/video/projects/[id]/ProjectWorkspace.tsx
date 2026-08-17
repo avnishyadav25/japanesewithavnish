@@ -21,6 +21,7 @@ import { StoryboardPlayer, type PlayerHandle } from "./StoryboardPlayer";
 import { Timeline, usePlayerTime } from "./Timeline";
 import { PromptPanel, type GenerateOverrides } from "./PromptPanel";
 import { CaptionControls } from "./CaptionControls";
+import { INSERTABLE_SCENE_LABELS, INSERTABLE_SCENE_TYPES } from "@/lib/video/blankScene";
 
 interface Props {
   project: VideoProjectRow;
@@ -350,6 +351,58 @@ export function ProjectWorkspace({
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not queue the re-render");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  /**
+   * Rewrites one scene's narration, leaving its visuals alone.
+   *
+   * Applies to the local draft rather than saving: autosave picks it up, and you can undo by
+   * reloading before saving a version. Same reasoning as every other edit in this editor.
+   */
+  async function regenerateOneScene(sceneId: string) {
+    if (!selected || !draft) return;
+    const hint = window.prompt("Any steer for this scene? (shorter, more casual, mention the particle…)") ?? undefined;
+    setBusy(`scene:${sceneId}`);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/admin/video/storyboards/${selected.id}/scenes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "regenerate", sceneId, hint, doc: draft }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not regenerate");
+      setDraft(data.doc);
+      setNotice(data.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not regenerate");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  /** Inserts a blank scene after `index`. Only commentary types are offered — see blankScene.ts. */
+  async function insertScene(index: number, sceneType: string) {
+    if (!selected || !draft) return;
+    setBusy("insert");
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/video/storyboards/${selected.id}/scenes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "insert", sceneType, at: index + 1, doc: draft }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not insert");
+      setDraft(data.doc);
+      setSelectedSceneId(data.sceneId);
+      setNotice(data.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not insert");
     } finally {
       setBusy(null);
     }
@@ -792,6 +845,9 @@ export function ProjectWorkspace({
                 onChangeSegment={(segmentId, text) => updateSegment(index, segmentId, text)}
                 onMove={(dir) => moveScene(index, dir)}
                 onDelete={() => deleteScene(index)}
+                onRegenerate={() => regenerateOneScene(scene.id)}
+                onInsertAfter={(type) => insertScene(index, type)}
+                busy={busy !== null}
               />
             ))}
           </div>
@@ -1099,6 +1155,9 @@ function SceneEditor({
   onChangeSegment,
   onMove,
   onDelete,
+  onRegenerate,
+  onInsertAfter,
+  busy,
 }: {
   scene: Scene;
   index: number;
@@ -1107,6 +1166,9 @@ function SceneEditor({
   onSelect: () => void;
   onUnpin: () => void;
   onChangeSegment: (segmentId: string, text: string) => void;
+  onRegenerate: () => void;
+  onInsertAfter: (sceneType: string) => void;
+  busy: boolean;
   onMove: (direction: -1 | 1) => void;
   onDelete: () => void;
 }) {
@@ -1148,6 +1210,18 @@ function SceneEditor({
           )}
         </div>
         <div className="flex gap-1 shrink-0">
+          {/* Rewrites this scene's narration only. Visuals come from the database and are never
+              touched by a regenerate — see regenerateScene() in storyboard.ts. */}
+          <button
+            type="button"
+            onClick={onRegenerate}
+            disabled={busy}
+            title="Rewrite just this scene's narration. The visuals stay exactly as they are."
+            aria-label="Regenerate this scene"
+            className="w-7 h-7 rounded-button border border-[var(--divider)] text-secondary hover:border-primary hover:text-primary disabled:opacity-30"
+          >
+            ↻
+          </button>
           <button
             type="button"
             onClick={() => onMove(-1)}
@@ -1177,6 +1251,30 @@ function SceneEditor({
           </button>
         </div>
       </div>
+
+      {/* Insert after this scene. A <select> rather than a menu because the list is short, fixed,
+          and each option needs a sentence of explanation. Only commentary scene types appear —
+          anything whose visual comes from the content database is excluded in blankScene.ts. */}
+      {selected && (
+        <div className="mb-3">
+          <select
+            value=""
+            disabled={busy}
+            onChange={(e) => {
+              if (e.target.value) onInsertAfter(e.target.value);
+              e.target.value = "";
+            }}
+            className="text-xs border border-[var(--divider)] rounded-button px-2 py-1 text-secondary bg-transparent"
+          >
+            <option value="">+ Insert a scene after this one…</option>
+            {INSERTABLE_SCENE_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {INSERTABLE_SCENE_LABELS[t]}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <div className="space-y-2">
         {scene.narration.map((segment) =>
