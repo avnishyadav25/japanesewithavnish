@@ -8,6 +8,7 @@ import type { NarrationLang, PacingConfig, ScopeKind, ScopeRef, VideoFormat, Voi
 import { formatDuration } from "@/lib/video/pacing";
 import { VOICE_CATALOGUE } from "@/lib/video/voices";
 import { EstimatePanel, type ScopeEstimate } from "./EstimatePanel";
+import { MAX_SPLIT_ITEMS, SPLIT_WARN_ITEMS } from "@/lib/video/splitScope";
 import { ItemPicker, type PickerItem } from "./ItemPicker";
 
 interface Props {
@@ -98,6 +99,20 @@ export function NewVideoWizard({ themes, bgmTracks, levels, lessons, initial }: 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+
+  /**
+   * How many projects a split would create, and how long their renders would take.
+   *
+   * Derived from the estimate rather than guessed, so the number on screen is the number the
+   * server will produce. Render time uses the measured ~1.4x realtime and the fact that renders
+   * are serialised by the workflow's concurrency group.
+   */
+  const splitCount = estimate?.itemCount ?? 0;
+  const splitRenderMinutes = useMemo(() => {
+    if (!estimate) return 0;
+    const perVideo = estimate.estimate.perVideoSeconds * 1.4;
+    return Math.max(1, Math.round((perVideo * splitCount * formats.length * narrationLangs.length) / 60));
+  }, [estimate, splitCount, formats.length, narrationLangs.length]);
 
   const scopeRef: ScopeRef = useMemo(() => {
     if (scopeKind === "topic") return { topic: topic.trim(), postIds: selectedPostIds ?? [] };
@@ -319,6 +334,13 @@ export function NewVideoWizard({ themes, bgmTracks, levels, lessons, initial }: 
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not create the project");
+
+      // A split lands on the batch, not on one of its ten children — the useful next action is
+      // "generate all of these", which is a property of the set.
+      if (data.batchId) {
+        router.push(`/admin/video/projects?batch=${data.batchId}`);
+        return;
+      }
       router.push(`/admin/video/projects/${data.project.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create the project");
@@ -515,15 +537,43 @@ export function NewVideoWizard({ themes, bgmTracks, levels, lessons, initial }: 
             <div>
               <span className={label}>Grouping</span>
               <div className="space-y-2">
-                {([["single_video", "One video covering everything"], ["video_per_item", "A separate video per item"]] as const).map(
-                  ([value, text]) => (
-                    <label key={value} className="flex items-center gap-2 text-sm text-charcoal">
-                      <input type="radio" name="grouping" checked={grouping === value} onChange={() => setGrouping(value)} />
-                      {text}
-                    </label>
-                  )
-                )}
+                {(
+                  [
+                    ["single_video", "One video covering everything"],
+                    ["video_per_item", "A separate video per item"],
+                  ] as const
+                ).map(([value, text]) => (
+                  <label key={value} className="flex items-center gap-2 text-sm text-charcoal">
+                    <input type="radio" name="grouping" checked={grouping === value} onChange={() => setGrouping(value)} />
+                    {text}
+                  </label>
+                ))}
               </div>
+
+              {/* Splitting creates one project per item, each with its own script and render. The
+                  numbers are shown because they are what makes the choice, and because this option
+                  used to promise N videos and quietly make one. */}
+              {grouping === "video_per_item" && splitCount > 0 && (
+                <div className="mt-3 text-xs space-y-1">
+                  <p className="text-secondary">
+                    Creates <strong className="text-charcoal">{splitCount} separate projects</strong>, one per item,
+                    each with its own script, render and social post. Good for daily Shorts.
+                  </p>
+                  {splitCount > MAX_SPLIT_ITEMS ? (
+                    <p className="text-primary">
+                      Too many to split — the limit is {MAX_SPLIT_ITEMS}. Reduce the item count, or choose one
+                      video covering everything.
+                    </p>
+                  ) : (
+                    splitCount > SPLIT_WARN_ITEMS && (
+                      <p className="text-amber-700">
+                        {splitCount * formats.length * narrationLangs.length} renders, and renders run one at a
+                        time — roughly {splitRenderMinutes} minutes of queue.
+                      </p>
+                    )
+                  )}
+                </div>
+              )}
             </div>
 
             <div>
@@ -697,7 +747,10 @@ export function NewVideoWizard({ themes, bgmTracks, levels, lessons, initial }: 
             <div className="card-content">
               <h3 className="font-heading text-lg font-bold text-charcoal mb-3">{title.trim() || estimate.title}</h3>
               <p className="text-sm text-secondary leading-relaxed">
-                {grouping === "single_video" ? "One video" : `${estimate.plannedVideos} separate videos`} covering{" "}
+                {grouping === "single_video"
+                  ? "One video"
+                  : `${splitCount} separate projects, one video each,`}{" "}
+                covering{" "}
                 <strong className="text-charcoal">{estimate.itemCount} {estimate.contentKind ?? "item"}
                 {estimate.itemCount === 1 ? "" : "s"}</strong>
                 {estimate.jlptLevel ? ` at ${estimate.jlptLevel}` : ""}, about{" "}
@@ -750,7 +803,15 @@ export function NewVideoWizard({ themes, bgmTracks, levels, lessons, initial }: 
               Next →
             </button>
           ) : (
-            <button type="button" onClick={create} disabled={creating || !estimate} className="btn-primary disabled:opacity-50">
+            <button
+              type="button"
+              onClick={create}
+              // Blocked in the UI as well as the API: the server refuses an oversized split with a
+              // 413, and letting the button through only to show that error is worse than not
+              // offering it.
+              disabled={creating || !estimate || (grouping === "video_per_item" && splitCount > MAX_SPLIT_ITEMS)}
+              className="btn-primary disabled:opacity-50"
+            >
               {creating ? "Creating…" : "Create project"}
             </button>
           )}

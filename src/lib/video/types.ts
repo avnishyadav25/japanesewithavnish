@@ -707,6 +707,8 @@ export interface VideoProjectRow {
   includeBroll: boolean;
   pacing: PacingConfig | null;
   voices: VoiceConfig | null;
+  /** Siblings of one video_per_item split share this. NULL for a standalone project. */
+  batchId: string | null;
   /** Caption style. Read at render time, so changing it is a re-cut rather than a regenerate. */
   captions: Partial<CaptionSettings> | null;
   /** Per-project brand overrides. NULL = DEFAULT_BRANDING. */
