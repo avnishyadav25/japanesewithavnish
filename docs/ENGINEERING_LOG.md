@@ -346,3 +346,54 @@ per language and an hourly GPU — an M1/8 GB is below Chatterbox's floor).
   ja-JP — a voice cloned from English audio reading Japanese is confident mispronunciation.
   Generation happens off-box (`npm run voice:clone` against a GPU) and writes into the existing
   content-hash cache, so the CPU-only runner never loads a model.
+
+---
+
+## 2026-08-17 — Video Studio round 3
+
+Backlog cleared. Full write-up in [VIDEO_PIPELINE_PLAYBOOK.md](VIDEO_PIPELINE_PLAYBOOK.md); the
+traps are here.
+
+### Gotchas
+
+**Measure speech rates on SENTENCES, not on cached clips.** A TTS clip carries ~0.36s of fixed
+onset and decay whatever its length, so `"cat"` alone reads at 4.43 c/s where a sentence reads at
+16.36. The original constants were pooled over real cached clips — the Japanese set was 30 clips
+totalling 169 characters, i.e. single words — so they measured mostly overhead and every duration
+estimate ran long. Re-measured on 15 sentences per language, prediction error against four real
+renders fell from 19.6% to 7.4%. `npm run video:measure-rates` reproduces it.
+
+**Chunking a large generation makes the timeout worse, not better.** It converts one slow call into
+many. Measured: a 2-batch submodule takes 31.4s against a ~30s ceiling. The request path caps at 2
+batches and dispatches anything larger to `video-script.yml`.
+
+**A client component importing one constant can drag `pg` into the browser bundle.** `blankScene.ts`
+imported `newSceneId` from `storyboard.ts`, which reaches `src/lib/db` through `load-prompts`. The
+production build failed with "Can't resolve 'fs'" — and `tsc` and `next lint` both passed first.
+Run `npm run build` before committing anything a client imports.
+
+**FCPXML time values must be exact rationals.** `300/30s`, never `10.0s`; a decimal is rejected or
+silently rounded and the error accumulates into audio drift. All formats are 30fps, so every value
+is `frames/30s` computed in integer frames.
+
+**`ON CONFLICT` cannot infer a partial index without its predicate.** `idx_video_bgm_external` is
+`UNIQUE (source, external_id) WHERE external_id IS NOT NULL`; the `WHERE` has to be restated in the
+conflict target or Postgres rejects the statement.
+
+**Postgres `unnest` into a uuid column needs a per-row cast.** Passing a `text[]` for `asset_id`
+fails with "column is of type uuid but expression is of type text"; `a::uuid` inside the SELECT
+keeps NULLs working where an array-level cast would not.
+
+### Changes
+
+- Migration 150: `narration_lang` CHECK widened for `hinglish` on storyboards and renders.
+- **Hinglish** is a fourth narration language — romanised, `en-IN-Neural2-A`, emitted publicly as
+  `hi-Latn` because `hinglish` is not a BCP-47 tag and it reaches `<track srcLang>` and schema.org
+  `inLanguage`.
+- `video-script.yml` generates scripts for scopes too large for a request. No Chromium, no ffmpeg —
+  it writes text.
+- `video_render_artifacts` is populated for the first time, with a real `from_cache` flag.
+- Renders now write an `.fcpxml` timeline and a chapters file beside the video. Deliberately not a
+  zip: a media bundle measured ~48MB per render duplicating a video already in R2.
+- Scene-level regenerate and insert; Shorts cut from long videos, reusing cached narration.
+- Regenerating a script no longer drops a project out of `render_ready`.
