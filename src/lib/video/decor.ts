@@ -104,7 +104,13 @@ export function pickDecor(params: {
     // Alternated rather than fixed, so a run of beats does not build a stack in one corner. The
     // logo sits top-right and captions sit bottom-centre, so both corners used here are low-left
     // and low-right, away from each.
-    corner: params.index % 2 === 0 ? "left" : "right",
+    // Derived from the SLUG, not the scene index.
+    //
+    // Index-alternating made the same sticker hop corners between beats of one word — three beats
+    // teaching いぬ all pick akita-loyal, and the dog jumped left/right/left across the cuts, which
+    // reads as a glitch rather than decoration. Keyed on the slug, one sticker always sits in the
+    // same place, and different stickers still spread across both corners.
+    corner: chosen.slug.split("").reduce((n, c) => n + c.charCodeAt(0), 0) % 2 === 0 ? "left" : "right",
   };
 }
 

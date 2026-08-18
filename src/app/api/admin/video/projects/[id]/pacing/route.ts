@@ -62,6 +62,20 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     ? ((await sql`SELECT id FROM video_projects WHERE batch_id = ${project.batchId}::uuid`) as { id: string }[]).map((r) => r.id)
     : [id];
 
+  // Recorded now, not inferred later. "Repeat 2 → 3" is a fact at this moment; afterwards it is a
+  // guess from two documents that also differ for other reasons.
+  const changes: string[] = [];
+  if (pacing.repeatJapanese !== current.repeatJapanese) {
+    changes.push(`Repeat ${current.repeatJapanese}\u00d7 \u2192 ${pacing.repeatJapanese}\u00d7`);
+  }
+  if (pacing.pauseAfterJapaneseSeconds !== current.pauseAfterJapaneseSeconds) {
+    changes.push(`Pause ${current.pauseAfterJapaneseSeconds}s \u2192 ${pacing.pauseAfterJapaneseSeconds}s`);
+  }
+  if (pacing.scenePaddingSeconds !== current.scenePaddingSeconds) {
+    changes.push(`Padding ${current.scenePaddingSeconds}s \u2192 ${pacing.scenePaddingSeconds}s`);
+  }
+  const changeSummary = `Re-cut: ${changes.join(", ") || "no change"}`;
+
   const applied: { projectId: string; storyboardId: string; queued: string[] }[] = [];
   const skipped: string[] = [];
 
@@ -89,6 +103,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       // narration would be a rubber stamp that trains you to click through gates.
       approvalStatus: storyboard.approvalStatus === "approved" ? "approved" : "draft",
       createdBy: admin.email,
+      changeSummary,
     });
 
     const { queued } = await enqueueRenderJobs({

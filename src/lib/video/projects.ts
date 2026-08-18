@@ -225,10 +225,20 @@ export interface StoryboardRow {
   estimatedCostUsd: number | null;
   createdBy: string | null;
   createdAt: string;
+  /** The version this one was derived from, so the UI can diff against the right predecessor. */
+  parentStoryboardId: string | null;
+  /** What changed, recorded at the moment of the change. Null on versions made before it existed;
+   *  the UI computes a diff for those instead. */
+  changeSummary: string | null;
 }
 
+// parent_storyboard_id and change_summary are BOTH new to this list. The column existing on the
+// table is not enough — style_preset was in its migration, its insert, its type and its mapper but
+// not here, so every read silently fell back to a default and the feature was inert. Same shape of
+// bug, so both are added here in the same edit that adds them to the row type.
 const STORYBOARD_COLUMNS = `id, project_id, version, narration_lang, source, doc, approval_status,
-  approved_by, approved_at::text, llm_model, estimated_cost_usd, created_by, created_at::text`;
+  approved_by, approved_at::text, llm_model, estimated_cost_usd, created_by, created_at::text,
+  parent_storyboard_id, change_summary`;
 
 function toStoryboardRow(row: Record<string, unknown>): StoryboardRow {
   return {
@@ -245,6 +255,8 @@ function toStoryboardRow(row: Record<string, unknown>): StoryboardRow {
     estimatedCostUsd: row.estimated_cost_usd === null ? null : Number(row.estimated_cost_usd),
     createdBy: (row.created_by as string | null) ?? null,
     createdAt: String(row.created_at),
+    parentStoryboardId: (row.parent_storyboard_id as string | null) ?? null,
+    changeSummary: (row.change_summary as string | null) ?? null,
   };
 }
 
@@ -281,6 +293,8 @@ export interface InsertStoryboardInput {
   completionTokens?: number | null;
   estimatedCostUsd?: number | null;
   createdBy: string;
+  /** One line saying what changed and why, shown in the version list. */
+  changeSummary?: string | null;
 }
 
 /**
@@ -295,11 +309,11 @@ export async function insertStoryboardVersion(input: InsertStoryboardInput): Pro
     `INSERT INTO video_storyboards
        (project_id, version, narration_lang, parent_storyboard_id, source, doc, content_snapshot,
         content_checksum, approval_status, llm_model, prompt_key, prompt_tokens, completion_tokens,
-        estimated_cost_usd, created_by)
+        estimated_cost_usd, created_by, change_summary)
      VALUES ($1::uuid,
              (SELECT COALESCE(MAX(version), 0) + 1 FROM video_storyboards
                WHERE project_id = $1::uuid AND narration_lang = $2),
-             $2, $3, $4, $5::jsonb, $6::jsonb, $7, $8, $9, $10, $11, $12, $13, $14)
+             $2, $3, $4, $5::jsonb, $6::jsonb, $7, $8, $9, $10, $11, $12, $13, $14, $15)
      RETURNING ${STORYBOARD_COLUMNS}`,
     [
       input.projectId,
@@ -316,6 +330,7 @@ export async function insertStoryboardVersion(input: InsertStoryboardInput): Pro
       input.completionTokens ?? null,
       input.estimatedCostUsd ?? null,
       input.createdBy,
+      input.changeSummary ?? null,
     ]
   )) as Record<string, unknown>[];
 

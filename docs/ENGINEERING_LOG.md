@@ -555,3 +555,60 @@ red doctor trains you to skip its output.
 - 46 assets: 16 food, 14 object, 6 animal, 6 character, 4 texture. Textures and characters are
   excluded from scene decoration — a texture is a full-bleed background, and a second character
   competes with the corner mascot.
+
+
+---
+
+## 2026-08-18 (later still) — The Shorts preset never reached generation
+
+**Nine of nine Shorts projects had lesson-shaped scripts.** Zero Shorts storyboards existed and no
+sticker had ever been placed, while the admin badged the projects "SHORTS" and the wizard priced
+them as Shorts.
+
+**Cause.** `generateStoryboard` in the admin's generate route was never passed `stylePreset` or
+`decorAssets`. I added them with a scripted edit that matched the `buildGenerationRequest` call
+above it and did not match the real generation call, which is formatted differently. So **the cost
+estimate was calculated for a Short and the video was built as a lesson.** The CLI worker did pass
+them, which is why my smoke test through `npm run video:script` produced a correct Shorts storyboard
+and I concluded the feature worked.
+
+### Gotchas
+
+**An optional config field with a legitimate default fails silently.** `stylePreset?:` meant a
+caller that forgot it compiled and got `lesson` — a real value, not undefined. Making it
+**required** turned the omission into a build error, and doing so immediately surfaced a *second*
+call site (the generate preview) that had the same bug, so previews were lesson-priced too.
+
+**Scoping the scripts typecheck left a hole exactly where it mattered.** `tsconfig.scripts.json`
+did not include `video-script-worker.ts`, so when I tested that the new required field would fail
+the build, it did not — and the same gap had already let two undefined functions ship: the worker
+called `listDecorAssets` and `beatGridForTrack` with no import, because that file uses dynamic
+imports inside `main()` and my top-level import line never matched. **The worker was broken at
+runtime and the repair plan depended on it.** A partial typecheck is most dangerous where you
+assume it is complete.
+
+**Verify the artefact, not the estimate.** The generate route returned a correct Shorts cost while
+producing a lesson. A test asserting the response would have passed.
+
+**Decoration keyed on scene index makes one sticker hop.** Three beats teaching いぬ all match
+`akita-loyal`, and alternating corners by index made the dog jump left/right/left across the cuts.
+Keyed on the slug instead, a sticker keeps one corner.
+
+### Version history
+
+`video_storyboards.change_summary` (migration 153) records what changed at the moment of the
+change, because `source` is too coarse — a re-cut, a rewrite and a preset switch are all
+"human_edited" or "regenerated". `src/lib/video/storyboardDiff.ts` computes a diff for versions
+predating the column; verified against a real four-version history, it reports the re-cut as
+"3 → 4 Japanese clips" and the rewrites as word-count changes.
+
+`STORYBOARD_COLUMNS` needed `parent_storyboard_id` **and** `change_summary` adding — the same
+"column exists on the table but not in the SELECT list" failure that made `style_preset` read as
+`lesson` everywhere. Adding a column touches the migration, the insert, the placeholder list, the
+values array, the row type, the mapper and the SELECT list. Miss any one and it fails differently.
+
+### Result
+
+`npm run video:fix-shorts` regenerates any Shorts project whose script was built as a lesson, by
+calling the worker rather than reimplementing generation, and refuses to report success on a project
+that is still wrong. All nine now render as 6-scene Shorts with three stickers each.

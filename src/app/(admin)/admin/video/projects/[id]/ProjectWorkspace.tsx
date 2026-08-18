@@ -22,6 +22,7 @@ import { Timeline, usePlayerTime } from "./Timeline";
 import { PromptPanel, type GenerateOverrides } from "./PromptPanel";
 import { CaptionControls } from "./CaptionControls";
 import { PacingControls } from "./PacingControls";
+import { VersionHistory } from "./VersionHistory";
 import { resolvePacing } from "@/lib/video/pacing";
 import { INSERTABLE_SCENE_LABELS, INSERTABLE_SCENE_TYPES } from "@/lib/video/blankScene";
 
@@ -58,6 +59,7 @@ export function ProjectWorkspace({
   bgmTitle,
 }: Props) {
   const router = useRouter();
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   // Open on a language that actually HAS a script, not blindly on narrationLangs[0].
   //
@@ -785,19 +787,38 @@ export function ProjectWorkspace({
                   </span>
                 </div>
                 {langStoryboards.length > 1 && (
-                  <select
-                    className="text-xs border border-[var(--divider)] rounded-button px-2 py-1"
-                    value={selected.id}
-                    onChange={(e) => setSelectedVersionId(e.target.value)}
+                  <button
+                    type="button"
+                    onClick={() => setHistoryOpen((v) => !v)}
+                    className="text-xs text-primary hover:underline"
                   >
-                    {langStoryboards.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        v{s.version} · {s.source.replace(/_/g, " ")}
-                      </option>
-                    ))}
-                  </select>
+                    {historyOpen ? "Hide history" : `History (${langStoryboards.length})`}
+                  </button>
                 )}
               </div>
+
+              {/* A list rather than a <select>: the picker showed "v3 · regenerated" for every
+                  version, which named the mechanism and never the change. */}
+              {historyOpen && langStoryboards.length > 1 && (
+                <div className="mb-3 border-t border-[var(--divider)] pt-2">
+                  <VersionHistory
+                    versions={langStoryboards.map((s) => ({
+                      id: s.id,
+                      version: s.version,
+                      source: s.source,
+                      approvalStatus: s.approvalStatus,
+                      createdAt: s.createdAt,
+                      createdBy: s.createdBy,
+                      estimatedCostUsd: s.estimatedCostUsd,
+                      changeSummary: s.changeSummary,
+                      parentStoryboardId: s.parentStoryboardId,
+                      doc: s.doc,
+                    }))}
+                    selectedId={selected.id}
+                    onSelect={setSelectedVersionId}
+                  />
+                </div>
+              )}
 
               <div className="flex flex-wrap gap-2">
                 {selected.approvalStatus !== "approved" && (

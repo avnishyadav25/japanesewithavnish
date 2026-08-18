@@ -33,9 +33,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   try {
     const snapshot = await resolveScope(project.scopeKind, project.scopeRef);
     const kind = snapshot.items[0]?.kind;
+    // Same bug family as the generate route: this preview resolved pacing without the preset, so
+    // it previewed a lesson for a Shorts project — wrong scene count, wrong length, wrong budget.
+    const stylePreset = project.stylePreset ?? "lesson";
     const pacing = resolvePacing(
       (body?.pacing as Partial<PacingConfig> | undefined) ?? project.pacing,
-      kind
+      kind,
+      stylePreset
     );
 
     const { request, skeleton } = await buildGenerationRequest(snapshot, {
@@ -43,6 +47,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       narrationLang: lang,
       themeKey: project.themeKey,
       pacing,
+      stylePreset,
       voices: project.voices,
       tone: typeof body?.tone === "string" ? body.tone : project.tone,
       includeBroll: project.includeBroll,

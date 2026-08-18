@@ -148,6 +148,25 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // oversized project permanently mid-flight after a refusal that cost nothing.
     await setProjectStatus(id, "generating_script");
 
+    // What this regeneration actually changed, from the values in hand rather than a later diff.
+    const priorPacing = resolvePacing(project.pacing, snapshot.items[0]?.kind, project.stylePreset ?? "lesson");
+    const summaryParts: string[] = [];
+    if (requestedPreset && requestedPreset !== project.stylePreset) {
+      summaryParts.push(`Switched to ${requestedPreset === "shorts" ? "Shorts" : "lesson"} pacing`);
+    }
+    if (pacing.secondsPerItem !== priorPacing.secondsPerItem) {
+      summaryParts.push(`Seconds per item ${priorPacing.secondsPerItem} \u2192 ${pacing.secondsPerItem}`);
+    }
+    if ((pacing.examplesPerItem ?? 1) !== (priorPacing.examplesPerItem ?? 1)) {
+      summaryParts.push(`Examples ${priorPacing.examplesPerItem ?? 1} \u2192 ${pacing.examplesPerItem ?? 1}`);
+    }
+    if (toneOverride) summaryParts.push(`Tone: ${toneOverride}`);
+    const changeSummary = summaryParts.length > 0
+      ? summaryParts.join(", ")
+      : isRegenerate
+        ? "Regenerated with the same settings \u2014 wording will differ"
+        : "First script";
+
     const generated = await generateStoryboard(
       snapshot,
       {
@@ -155,6 +174,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         narrationLang: lang,
         themeKey: project.themeKey,
         pacing,
+        // THE BUG. These two were added to the cost-estimate call above and not to this one, so
+        // every video generated from the admin UI was built as a lesson while the estimate beside
+        // it was priced as a Short. Nine projects, every version. stylePreset is now required on
+        // the config, so omitting it here is a build failure rather than a silently wrong video.
+        stylePreset,
+        decorAssets,
         voices: project.voices,
         tone: toneOverride ?? project.tone,
         bgm: bgmSettings,
@@ -190,6 +215,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       completionTokens: generated.usage.completionTokens,
       estimatedCostUsd: generated.estimatedCostUsd,
       createdBy: admin.email,
+      changeSummary,
+      // Lineage, so the version list can diff against the right predecessor rather than assuming
+      // the numerically previous version is the parent.
+      parentStoryboardId: project.currentStoryboardId,
     });
 
     // Verbatim record of what was sent and what came back, so a good run can be reproduced

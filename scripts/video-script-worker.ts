@@ -46,6 +46,11 @@ async function main() {
   const { resolvePacing } = await import("../src/lib/video/pacing");
   const { generateStoryboard, outroSiteUrl } = await import("../src/lib/video/storyboard");
   const { recordGenerationRun } = await import("../src/lib/video/audit");
+  // Dynamic, like every other import in this file — the module graph is loaded after dotenv so
+  // DATABASE_URL is set before anything reads it. Added as top-level imports first, which this
+  // file has none of, so they never applied and both functions were simply undefined at runtime.
+  const { beatGridForTrack } = await import("../src/lib/video/bgmCatalogue");
+  const { listDecorAssets } = await import("../src/lib/video/decor");
 
   let ids: string[];
   if (projectId) {
@@ -141,6 +146,11 @@ async function main() {
           completionTokens: generated.usage.completionTokens,
           estimatedCostUsd: generated.estimatedCostUsd,
           createdBy: "github-actions",
+          // So a version generated here is not a blank row in the history list. The preset is the
+          // fact worth recording: it is what determines whether this is a Short or a lesson, and
+          // it is exactly what was silently wrong on every version before this.
+          changeSummary: `Generated as ${stylePreset === "shorts" ? "Shorts" : "lesson"} pacing`,
+          parentStoryboardId: project.currentStoryboardId,
         });
 
         await recordGenerationRun({

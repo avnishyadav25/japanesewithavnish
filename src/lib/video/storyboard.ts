@@ -76,10 +76,15 @@ export interface GenerateStoryboardConfig {
    */
   includeBroll?: boolean;
   /**
-   * `shorts` splits each item into several short beats and shortens every budget. Absent means
-   * `lesson`, which is what every skeleton did before this existed.
+   * `shorts` splits each item into several short beats and shortens every budget.
+   *
+   * REQUIRED, deliberately. It was optional, and a caller that forgot it compiled fine and got
+   * `lesson` — a real, legitimate value — so the admin's generate route silently produced
+   * lesson-shaped scripts for nine Shorts projects while the cost estimate beside it said
+   * otherwise. Nothing failed: not tsc, not lint, not the build, not either test suite. Required,
+   * that omission is a compile error.
    */
-  stylePreset?: VideoStylePreset;
+  stylePreset: VideoStylePreset;
   /**
    * The enabled sticker library, fetched by the caller. Empty or absent means no decoration, which
    * is what every lesson gets and what a Short gets before anything has been promoted to R2.
