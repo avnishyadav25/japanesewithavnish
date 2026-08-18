@@ -8,25 +8,37 @@
  */
 import React from "react";
 import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
-import { useLayout } from "../LayoutContext";
+import { useLayout, useSceneMotion } from "../LayoutContext";
+import { cameraScaleAt } from "@/lib/video/motion";
 import { nearestJaWeight } from "../fonts";
 import { fontStackJa, fontStackSans } from "../theme";
 
-/** Fade + rise, the default entrance for any block of content. */
+/**
+ * Fade + rise, the default entrance for any block of content.
+ *
+ * `distance` is a per-call override; left unset it comes from the motion preset, so tuning how far
+ * everything travels is one constant rather than an edit to every caller. `delay` is scaled by the
+ * preset's stagger: scene files pass literal frame numbers (8, 14, 20, 26) chosen for a 16-second
+ * lesson scene, and those same numbers would still be arriving as a 2.5-second Shorts beat ends.
+ */
 export const FadeUp: React.FC<{
   delay?: number;
   distance?: number;
   children: React.ReactNode;
   style?: React.CSSProperties;
-}> = ({ delay = 0, distance = 28, children, style }) => {
+}> = ({ delay = 0, distance, children, style }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const progress = spring({ frame: frame - delay, fps, config: { damping: 200, mass: 0.6 } });
+  const { motion } = useLayout();
+  const travel = distance ?? motion.enterDistance;
+  const progress = spring({ frame: frame - delay * motion.staggerScale, fps, config: motion.enter });
   return (
     <div
       style={{
-        opacity: progress,
-        transform: `translateY(${interpolate(progress, [0, 1], [distance, 0])}px)`,
+        // Clamped because an overshooting spring returns values above 1, and an opacity of 1.04
+        // is a console warning in Chrome on every frame of a 30-second render.
+        opacity: Math.min(1, Math.max(0, progress)),
+        transform: `translateY(${interpolate(progress, [0, 1], [travel, 0])}px)`,
         ...style,
       }}
     >
@@ -43,12 +55,13 @@ export const PopIn: React.FC<{ delay?: number; children: React.ReactNode; style?
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const progress = spring({ frame: frame - delay, fps, config: { damping: 14, mass: 0.5, stiffness: 120 } });
+  const { motion } = useLayout();
+  const progress = spring({ frame: frame - delay * motion.staggerScale, fps, config: motion.hero });
   return (
     <div
       style={{
         opacity: interpolate(progress, [0, 0.4], [0, 1], { extrapolateRight: "clamp" }),
-        transform: `scale(${interpolate(progress, [0, 1], [0.82, 1])})`,
+        transform: `scale(${interpolate(progress, [0, 1], [motion.heroFrom, 1])})`,
         ...style,
       }}
     >
@@ -162,17 +175,35 @@ export const Surface: React.FC<{ children: React.ReactNode; style?: React.CSSPro
   );
 };
 
-/** Common scene chrome: background, centred column, consistent padding. */
+/**
+ * Common scene chrome: background, centred column, consistent padding — and the camera.
+ *
+ * THE CAMERA IS THE POINT. Every scene in the app renders through this component, so a move
+ * applied here reaches all twenty of them without touching one. Measured before it existed: a
+ * 16-second vocabulary scene completed every entrance by frame 40 and then held a literally
+ * identical frame for 14.7 seconds, which is what made the videos feel like a slide deck.
+ *
+ * It is applied to the content layer only, never to the background — scaling the background would
+ * expose the frame edge on a solid colour and crop a B-roll still. Lesson renders pass
+ * `cameraPush: 0` and `cameraPunch: 0`, so `cameraScaleAt` returns exactly 1 and the transform is
+ * an identity: existing videos are unchanged frame for frame.
+ */
 export const SceneFrame: React.FC<{
   children: React.ReactNode;
   justify?: React.CSSProperties["justifyContent"];
   background?: string;
 }> = ({ children, justify = "center", background }) => {
-  const { theme, scale } = useLayout();
+  const { theme, scale, motion } = useLayout();
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const { beatFrames, durationInFrames } = useSceneMotion();
+  const camera = cameraScaleAt(frame, durationInFrames, beatFrames, motion, fps);
   return (
     <AbsoluteFill style={{ background: background ?? theme.bg }}>
       <AbsoluteFill
         style={{
+          transform: camera === 1 ? undefined : `scale(${camera})`,
+          transformOrigin: "center center",
           padding: scale.pad,
           display: "flex",
           flexDirection: "column",

@@ -87,7 +87,8 @@ async function main() {
 
       for (const lang of langs) {
         const startedAt = Date.now();
-        const pacing = resolvePacing(project.pacing, snapshot.items[0]?.kind);
+        const stylePreset = project.stylePreset ?? "lesson";
+        const pacing = resolvePacing(project.pacing, snapshot.items[0]?.kind, stylePreset);
 
         // No batch cap: that limit belongs to the request path, not here.
         const generated = await generateStoryboard(snapshot, {
@@ -95,6 +96,7 @@ async function main() {
           narrationLang: lang as never,
           themeKey: project.themeKey,
           pacing,
+          stylePreset,
           voices: project.voices,
           tone: project.tone,
           bgm: project.bgmTrackId ? { trackId: project.bgmTrackId, gainDb: -18, duckDb: -12 } : undefined,

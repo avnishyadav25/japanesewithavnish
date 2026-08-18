@@ -19,6 +19,33 @@ import type { SocialPlatform } from "../brand";
 
 export type VideoFormat = "vertical" | "landscape" | "square" | "embed";
 
+/**
+ * Which set of pacing and motion rules a project renders under.
+ *
+ * `lesson` is everything the app did before this existed and is unchanged by design — a five
+ * minute grammar explainer is a teaching artefact and cutting it every two seconds makes it worse.
+ * `shorts` is the Reel/TikTok register: an item is split into several short beats, the camera
+ * never stops moving, captions highlight the spoken word, and the opening hook is spoken rather
+ * than mimed.
+ *
+ * Frozen into the storyboard alongside branding, for the same reason: a re-render must reproduce
+ * what was approved rather than whatever the constants say today.
+ */
+export type VideoStylePreset = "lesson" | "shorts";
+
+export const DEFAULT_STYLE_PRESET: VideoStylePreset = "lesson";
+
+/**
+ * A project is a Short when vertical is the ONLY output.
+ *
+ * Asking for a landscape cut as well means the same storyboard has to serve YouTube, where the
+ * beat split reads as chopped up. Mixed formats therefore stay on lesson pacing; render a
+ * separate vertical-only project when you want the Short.
+ */
+export function stylePresetForFormats(formats: readonly string[]): VideoStylePreset {
+  return formats.length === 1 && formats[0] === "vertical" ? "shorts" : "lesson";
+}
+
 export const VIDEO_FORMATS: VideoFormat[] = ["vertical", "landscape", "square", "embed"];
 
 export interface FormatSpec {
@@ -75,6 +102,12 @@ export function publicLanguageTag(lang: NarrationLang | string): string {
   return lang === "hinglish" ? "hi-Latn" : lang;
 }
 
+/** One word and the second it is spoken at, relative to the start of its own clip. */
+export interface WordTiming {
+  text: string;
+  start: number;
+}
+
 export interface NarrationSegment {
   /** Stable across edits. Caption cues and per-segment audio are keyed off this. */
   id: string;
@@ -110,6 +143,14 @@ export interface NarrationSegment {
     url: string;
     durationSeconds: number;
     ttsAssetId: string;
+    /**
+     * When each word starts, for word-by-word captions.
+     *
+     * Measured, not guessed: Google returns these for SSML `<mark>` timepoints on the voices that
+     * accept SSML at all. Chirp3-HD rejects markup, so those clips have no timings and the caption
+     * layer estimates instead — see `estimateWordTimings` in ./captions.ts.
+     */
+    words?: WordTiming[];
   };
 }
 
@@ -329,6 +370,15 @@ export interface VocabCardVisual {
   index?: number;
   total?: number;
   showFurigana: boolean;
+  /**
+   * How much of the card is on screen, so one word can be split across beats.
+   *
+   * `word` shows the Japanese and its reading and withholds the meaning; `all` (the default, and
+   * what every existing storyboard means) shows everything. The withheld beat is not only pacing —
+   * a viewer who guesses before the answer lands remembers it better than one who reads both at
+   * once.
+   */
+  reveal?: "word" | "all";
 }
 
 export interface VocabListVisual {
@@ -550,6 +600,12 @@ export interface CaptionSettings {
   opacity?: number;
   /** Percentage of frame width the pill may occupy. */
   maxWidthPct?: number;
+  /**
+   * `line` shows the whole cue at once, which is what every video did before this field existed.
+   * `word` additionally highlights the word being spoken — the karaoke effect a Short is expected
+   * to have, and the reason a muted viewer keeps watching.
+   */
+  mode?: "line" | "word";
 }
 
 /**
@@ -567,6 +623,7 @@ export const DEFAULT_CAPTIONS: Required<CaptionSettings> = {
   position: "bottom",
   opacity: 0.82,
   maxWidthPct: 86,
+  mode: "line",
 };
 
 /** Fills in fields absent from storyboards written before caption styling existed. Mirrors
@@ -593,7 +650,7 @@ export interface ResolvedTimeline {
   /** Parallel to `scenes`: [startFrame, endFrameExclusive] per scene. */
   sceneFrameSpans: [number, number][];
   /** Flat caption cue list in seconds, for the .srt/.vtt writer and burned-in captions. */
-  cues: { start: number; end: number; text: string; lang: NarrationLang }[];
+  cues: { start: number; end: number; text: string; lang: NarrationLang; words?: WordTiming[] }[];
   resolvedAt: string;
 }
 
@@ -640,6 +697,9 @@ export interface Storyboard {
   themeKey: string;
   bgm?: BgmSettings;
   captions: CaptionSettings;
+  /** Optional so storyboards written before the Shorts preset existed still parse; absent means
+   * `lesson`, which is exactly how they were rendered. */
+  stylePreset?: VideoStylePreset;
   /** Optional so every storyboard authored before branding existed still parses. Consumers
    * resolve it through `resolveBranding()`, which fills in the defaults. */
   branding?: BrandingSettings;
@@ -744,6 +804,8 @@ export interface VideoProjectRow {
   voices: VoiceConfig | null;
   /** Siblings of one video_per_item split share this. NULL for a standalone project. */
   batchId: string | null;
+  /** Which pacing and motion rules this project generates and renders under. */
+  stylePreset: VideoStylePreset;
   /** Caption style. Read at render time, so changing it is a re-cut rather than a regenerate. */
   captions: Partial<CaptionSettings> | null;
   /** Per-project brand overrides. NULL = DEFAULT_BRANDING. */

@@ -58,9 +58,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   try {
     const snapshot = await resolveScope(project.scopeKind, project.scopeRef);
     // Pacing is what makes the requested duration binding — see src/lib/video/pacing.ts.
+    const stylePreset = project.stylePreset ?? "lesson";
     const pacing = resolvePacing(
       (body?.pacing as Record<string, number> | undefined) ?? project.pacing,
-      snapshot.items[0]?.kind
+      snapshot.items[0]?.kind,
+      stylePreset
     );
     // Cost the request before committing to it. buildGenerationRequest is the same builder
     // generateStoryboard uses, so this counts the batches that would actually run — and it makes
@@ -70,6 +72,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       narrationLang: lang,
       themeKey: project.themeKey,
       pacing,
+      stylePreset,
       voices: project.voices,
       tone: toneOverride ?? project.tone,
       includeBroll: project.includeBroll,

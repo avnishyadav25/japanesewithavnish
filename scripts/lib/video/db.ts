@@ -19,6 +19,7 @@ import type {
   Storyboard,
   VideoFormat,
   VideoThemeTokens,
+  WordTiming,
 } from "../../../src/lib/video/types";
 
 if (!process.env.DATABASE_URL) {
@@ -212,14 +213,22 @@ export async function setProjectStatus(projectId: string, status: string): Promi
 export const ttsCache = {
   async get(textHash: string) {
     const rows = (await sql`
-      SELECT id, audio_url, duration_seconds FROM video_tts_assets WHERE text_hash = ${textHash}
-    `) as { id: string; audio_url: string; duration_seconds: string }[];
+      SELECT id, audio_url, duration_seconds, word_timings
+      FROM video_tts_assets WHERE text_hash = ${textHash}
+    `) as { id: string; audio_url: string; duration_seconds: string; word_timings: WordTiming[] | null }[];
     const row = rows[0];
     if (!row) return null;
     // Touch last_used_at so the admin cache browser can show what is actually in play, and a
     // future pruning job has something to sort on.
     await sql`UPDATE video_tts_assets SET last_used_at = NOW() WHERE id = ${row.id}::uuid`;
-    return { id: row.id, audioUrl: row.audio_url, durationSeconds: Number(row.duration_seconds) };
+    return {
+      id: row.id,
+      audioUrl: row.audio_url,
+      durationSeconds: Number(row.duration_seconds),
+      // Null for every clip cached before word timings existed. That is not an error and not
+      // worth re-synthesising for: the caption layer estimates instead.
+      words: row.word_timings ?? null,
+    };
   },
 
   async put(entry: {
@@ -233,21 +242,32 @@ export const ttsCache = {
     durationSeconds: number;
     charCount: number;
     estimatedCostUsd: number;
+    words?: WordTiming[];
   }) {
     // ON CONFLICT rather than a plain INSERT: two formats of the same storyboard can render
     // concurrently on two runners and race to cache the identical segment.
     const rows = (await sql`
       INSERT INTO video_tts_assets
         (text_hash, lang_code, voice_name, speaking_rate, pitch, text_preview, audio_url,
-         duration_seconds, char_count, estimated_cost_usd)
+         duration_seconds, char_count, estimated_cost_usd, word_timings)
       VALUES (${entry.textHash}, ${entry.langCode}, ${entry.voiceName}, ${entry.speakingRate},
               ${entry.pitch}, ${entry.textPreview}, ${entry.audioUrl}, ${entry.durationSeconds},
-              ${entry.charCount}, ${entry.estimatedCostUsd})
-      ON CONFLICT (text_hash) DO UPDATE SET last_used_at = NOW()
-      RETURNING id, audio_url, duration_seconds
-    `) as { id: string; audio_url: string; duration_seconds: string }[];
+              ${entry.charCount}, ${entry.estimatedCostUsd},
+              ${entry.words ? JSON.stringify(entry.words) : null}::jsonb)
+      -- Backfills timings onto a row cached before they existed, without re-synthesising: COALESCE
+      -- keeps whatever is already stored, so a concurrent runner that got none cannot erase them.
+      ON CONFLICT (text_hash) DO UPDATE
+        SET last_used_at = NOW(),
+            word_timings = COALESCE(video_tts_assets.word_timings, EXCLUDED.word_timings)
+      RETURNING id, audio_url, duration_seconds, word_timings
+    `) as { id: string; audio_url: string; duration_seconds: string; word_timings: WordTiming[] | null }[];
     const row = rows[0];
-    return { id: row.id, audioUrl: row.audio_url, durationSeconds: Number(row.duration_seconds) };
+    return {
+      id: row.id,
+      audioUrl: row.audio_url,
+      durationSeconds: Number(row.duration_seconds),
+      words: row.word_timings ?? null,
+    };
   },
 };
 

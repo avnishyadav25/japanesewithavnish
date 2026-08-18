@@ -75,7 +75,8 @@ export function buildTimeline(storyboard: Storyboard, options: BuildTimelineOpti
   const tailPadding = options.tailPaddingSeconds ?? DEFAULT_TAIL_PADDING_SECONDS;
 
   const sceneFrameSpans: [number, number][] = [];
-  const cues: { start: number; end: number; text: string; lang: NarrationLang }[] = [];
+  // Typed off ResolvedTimeline rather than restated, so the two cannot drift apart again.
+  const cues: ResolvedTimeline["cues"] = [];
 
   let frameCursor = 0;
   for (const scene of storyboard.scenes) {
@@ -98,6 +99,10 @@ export function buildTimeline(storyboard: Storyboard, options: BuildTimelineOpti
         end: sceneStartSeconds + offsets[i] + duration,
         text: segment.text.trim(),
         lang: segment.lang,
+        // Measured per-word starts when the TTS layer got them. Relative to the clip, so the
+        // caption renderer offsets by cue.start rather than storing absolute times that would
+        // have to be rewritten every time a scene above this one changed length.
+        words: segment.audio?.words,
       });
     });
 

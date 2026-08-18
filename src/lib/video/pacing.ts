@@ -14,7 +14,7 @@
  *
  * No `next/*` imports — the worker uses this too.
  */
-import type { ContentSnapshot, NarrationLang, PacingConfig, Scene } from "./types";
+import type { ContentSnapshot, NarrationLang, PacingConfig, Scene, VideoStylePreset } from "./types";
 
 /**
  * Characters per second of finished audio, per language.
@@ -110,19 +110,54 @@ export const SECONDS_PER_ITEM_BY_KIND: Record<string, number> = {
   lesson: 45,
 };
 
-export function defaultPacingFor(kind: string | undefined): PacingConfig {
+/**
+ * The same table for Shorts, roughly 55% of the lesson budget.
+ *
+ * Not a free choice — it is bounded on both sides. Below it, `minimumSecondsPerItem()` already
+ * refuses budgets that cannot fit the Japanese plus its shadowing pauses, so cutting further would
+ * be silently clamped rather than honoured. Above it, an item split across three beats at lesson
+ * budget produces a 45-second "Short", and committing instantly is the format's whole advantage.
+ *
+ * Vocabulary at 9s across three beats puts each beat near 3s, which is the pace the reference
+ * Reels cut at.
+ */
+export const SHORTS_SECONDS_PER_ITEM_BY_KIND: Record<string, number> = {
+  vocabulary: 9,
+  kanji: 13,
+  grammar: 16,
+  sounds: 8,
+  writing: 15,
+  reading: 20,
+  listening: 18,
+  conversation: 16,
+  study_guide: 20,
+  practice_test: 15,
+  lesson: 20,
+};
+
+export function defaultPacingFor(kind: string | undefined, preset: VideoStylePreset = "lesson"): PacingConfig {
+  const shorts = preset === "shorts";
+  const table = shorts ? SHORTS_SECONDS_PER_ITEM_BY_KIND : SECONDS_PER_ITEM_BY_KIND;
   return {
     ...DEFAULT_PACING,
-    secondsPerItem: SECONDS_PER_ITEM_BY_KIND[kind ?? ""] ?? DEFAULT_PACING.secondsPerItem,
+    secondsPerItem: table[kind ?? ""] ?? (shorts ? 7 : DEFAULT_PACING.secondsPerItem),
     // Repeating a whole sentence twice is tedious; repeating a single word twice is how it sticks.
+    // Kept for Shorts too: hearing the word twice is the highest-value second in the video, so the
+    // shadowing pause shortens instead.
     repeatJapanese: kind === "vocabulary" || kind === "kanji" ? 2 : 1,
+    pauseAfterJapaneseSeconds: shorts ? 0.6 : DEFAULT_PACING.pauseAfterJapaneseSeconds,
+    scenePaddingSeconds: shorts ? 0.25 : DEFAULT_PACING.scenePaddingSeconds,
   };
 }
 
 /** Fills gaps in a partial config from the per-kind defaults, so a project saved before a field
  * existed still resolves. */
-export function resolvePacing(stored: Partial<PacingConfig> | null | undefined, kind?: string): PacingConfig {
-  return { ...defaultPacingFor(kind), ...(stored ?? {}) };
+export function resolvePacing(
+  stored: Partial<PacingConfig> | null | undefined,
+  kind?: string,
+  preset: VideoStylePreset = "lesson"
+): PacingConfig {
+  return { ...defaultPacingFor(kind, preset), ...(stored ?? {}) };
 }
 
 // ---------------------------------------------------------------------------

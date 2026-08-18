@@ -42,6 +42,7 @@ import type {
   PacingConfig,
   Scene,
   Storyboard,
+  VideoStylePreset,
   VocabItem,
   VoiceConfig,
 } from "./types";
@@ -73,6 +74,11 @@ export interface GenerateStoryboardConfig {
    * short usually has no room for it.
    */
   includeBroll?: boolean;
+  /**
+   * `shorts` splits each item into several short beats and shortens every budget. Absent means
+   * `lesson`, which is what every skeleton did before this existed.
+   */
+  stylePreset?: VideoStylePreset;
 }
 
 export interface GeneratedStoryboard {
@@ -275,6 +281,7 @@ function budgetItemSlots(
 function vocabularySkeleton(snapshot: ContentSnapshot, config: GenerateStoryboardConfig): Skeleton {
   const lang = config.narrationLang;
   const pacing = config.pacing;
+  const shorts = config.stylePreset === "shorts";
   const scenes: Scene[] = [];
   const blanks: BlankSlot[] = [];
   const items = snapshot.items.map(toVocabItem);
@@ -310,23 +317,69 @@ function vocabularySkeleton(snapshot: ContentSnapshot, config: GenerateStoryboar
 
     blanks.push(...budgetItemSlots(slots, japanese, config));
 
+    const sourceRef = snapshot.items[i].postId
+      ? ({ kind: "post", id: snapshot.items[i].postId!, url: snapshot.items[i].url } as const)
+      : undefined;
+    const showFurigana = Boolean(item.reading && item.reading !== item.word);
+
+    if (shorts) {
+      // THREE BEATS INSTEAD OF ONE CARD.
+      //
+      // The lesson version puts everything — lead-in, the word twice, the example — on a single
+      // card held for ~16 seconds, during which the picture does not change once. Splitting at
+      // the narration boundaries that already exist turns that into three real cuts, and the
+      // narration does not have to be rewritten: each beat takes the segments it owns.
+      //
+      // Withholding the meaning on beat one is a teaching decision as much as a pacing one. A
+      // viewer who guesses before the answer lands remembers it; a viewer shown both at once
+      // reads rather than recalls.
+      const jaSegments = narration.filter((n) => n.id.startsWith(`${base}-ja`));
+      const exSegments = narration.filter((n) => n.id.startsWith(`${base}-ex`));
+      const leadSegments = narration.filter((n) => n.id === leadId);
+
+      scenes.push({
+        id: `${base}a`,
+        sceneType: "vocab_card",
+        sourceRef,
+        durationMode: "auto",
+        durationSeconds: pacing.secondsPerItem * 0.35,
+        transitionIn: { kind: "slide", durationSeconds: 0.18 },
+        narration: jaSegments,
+        visual: { sceneType: "vocab_card", item, index: i + 1, total: items.length, showFurigana, reveal: "word" },
+      });
+      scenes.push({
+        id: `${base}b`,
+        sceneType: "vocab_card",
+        sourceRef,
+        durationMode: "auto",
+        durationSeconds: pacing.secondsPerItem * 0.3,
+        transitionIn: { kind: "wipe", durationSeconds: 0.18 },
+        narration: leadSegments,
+        visual: { sceneType: "vocab_card", item, index: i + 1, total: items.length, showFurigana, reveal: "all" },
+      });
+      if (item.example && exSegments.length > 0) {
+        scenes.push({
+          id: `${base}c`,
+          sceneType: "example_sentence",
+          durationMode: "auto",
+          durationSeconds: pacing.secondsPerItem * 0.35,
+          transitionIn: { kind: "slide", durationSeconds: 0.18 },
+          narration: exSegments,
+          visual: { sceneType: "example_sentence", sentences: [item.example], highlight: [item.word] },
+        });
+      }
+      return;
+    }
+
     scenes.push({
       id: base,
       sceneType: "vocab_card",
-      sourceRef: snapshot.items[i].postId
-        ? { kind: "post", id: snapshot.items[i].postId!, url: snapshot.items[i].url }
-        : undefined,
+      sourceRef,
       durationMode: "auto",
       durationSeconds: pacing.secondsPerItem,
       transitionIn: { kind: "slide", durationSeconds: 0.3 },
       narration,
-      visual: {
-        sceneType: "vocab_card",
-        item,
-        index: i + 1,
-        total: items.length,
-        showFurigana: Boolean(item.reading && item.reading !== item.word),
-      },
+      visual: { sceneType: "vocab_card", item, index: i + 1, total: items.length, showFurigana },
     });
   });
 
@@ -358,6 +411,7 @@ function vocabularySkeleton(snapshot: ContentSnapshot, config: GenerateStoryboar
 function kanjiSkeleton(snapshot: ContentSnapshot, config: GenerateStoryboardConfig): Skeleton {
   const lang = config.narrationLang;
   const pacing = config.pacing;
+  const shorts = config.stylePreset === "shorts";
   const scenes: Scene[] = [];
   const blanks: BlankSlot[] = [];
 
@@ -417,26 +471,64 @@ function kanjiSkeleton(snapshot: ContentSnapshot, config: GenerateStoryboardConf
       });
     }
 
-    scenes.push({
-      id: base,
+    const kanjiVisual = {
       sceneType: "kanji_stroke",
-      sourceRef: item.postId ? { kind: "post", id: item.postId, url: item.url } : undefined,
-      durationMode: "auto",
-      durationSeconds: pacing.secondsPerItem,
-      transitionIn: { kind: "fade", durationSeconds: 0.4 },
-      narration,
-      visual: {
+      character,
+      meaning,
+      meaningExtended: str(d.meaning_extended),
+      onyomi,
+      kunyomi,
+      strokeCount: typeof d.stroke_count === "number" ? d.stroke_count : undefined,
+      strokePaths,
+      exampleWords,
+    } as const;
+
+    if (shorts) {
+      // Beat one is the character being written — the stroke animation is the most watchable thing
+      // in the whole library and it was previously sharing a scene with everything else, so it
+      // finished while the voice was still on the readings. Beat two carries the readings and the
+      // real words, re-entering on its own cut.
+      const readingIds = new Set([`${base}-on`, `${base}-kun`]);
+      const strokeNarration = narration.filter((n) => n.id === leadId);
+      const detailNarration = narration.filter((n) => n.id !== leadId);
+      scenes.push({
+        id: `${base}a`,
         sceneType: "kanji_stroke",
-        character,
-        meaning,
-        meaningExtended: str(d.meaning_extended),
-        onyomi,
-        kunyomi,
-        strokeCount: typeof d.stroke_count === "number" ? d.stroke_count : undefined,
-        strokePaths,
-        exampleWords,
-      },
-    });
+        sourceRef: item.postId ? { kind: "post", id: item.postId, url: item.url } : undefined,
+        durationMode: "auto",
+        durationSeconds: pacing.secondsPerItem * 0.4,
+        transitionIn: { kind: "wipe", durationSeconds: 0.18 },
+        narration: strokeNarration,
+        visual: kanjiVisual,
+      });
+      if (detailNarration.length > 0) {
+        scenes.push({
+          id: `${base}b`,
+          sceneType: "kanji_stroke",
+          durationMode: "auto",
+          durationSeconds: pacing.secondsPerItem * 0.45,
+          transitionIn: { kind: "slide", durationSeconds: 0.18 },
+          narration: detailNarration,
+          // Same visual, but the strokes are already drawn by the time this beat starts, so what
+          // is on screen is the finished character beside its readings — a different picture in
+          // practice even though the component is the same. Splitting it into a distinct scene
+          // type would need a visual that carries on/kun, and KanjiDetailVisual does not.
+          visual: kanjiVisual,
+        });
+      }
+      void readingIds;
+    } else {
+      scenes.push({
+        id: base,
+        sceneType: "kanji_stroke",
+        sourceRef: item.postId ? { kind: "post", id: item.postId, url: item.url } : undefined,
+        durationMode: "auto",
+        durationSeconds: pacing.secondsPerItem,
+        transitionIn: { kind: "fade", durationSeconds: 0.4 },
+        narration,
+        visual: kanjiVisual,
+      });
+    }
 
     item.examples.slice(0, 2).forEach((example, ei) => {
       const exBase = `${base}-ex${ei + 1}`;
@@ -467,6 +559,7 @@ function kanjiSkeleton(snapshot: ContentSnapshot, config: GenerateStoryboardConf
 function grammarSkeleton(snapshot: ContentSnapshot, config: GenerateStoryboardConfig): Skeleton {
   const lang = config.narrationLang;
   const pacing = config.pacing;
+  const shorts = config.stylePreset === "shorts";
   const scenes: Scene[] = [];
   const blanks: BlankSlot[] = [];
 
@@ -507,24 +600,57 @@ function grammarSkeleton(snapshot: ContentSnapshot, config: GenerateStoryboardCo
       weight: 3,
     });
 
-    scenes.push({
-      id: base,
+    const patternVisual = {
       sceneType: "grammar_pattern",
-      sourceRef: item.postId ? { kind: "post", id: item.postId, url: item.url } : undefined,
-      durationMode: "auto",
-      durationSeconds: pacing.secondsPerItem,
-      transitionIn: { kind: "fade", durationSeconds: 0.4 },
-      narration,
-      visual: {
+      pattern,
+      reading: str(d.pattern_romaji),
+      meaning,
+      structure: str(d.structure),
+      level: str(d.level) ?? item.jlptLevel,
+      whenToUse: str(d.when_to_use),
+    } as const;
+
+    if (shorts) {
+      // The pattern lands, then WHEN TO USE IT gets its own frame. In lesson mode both share one
+      // scene, which means the "when to use" explanation — the longest slot in the whole item at
+      // weight 3 — plays over a card the viewer finished reading ten seconds earlier.
+      scenes.push({
+        id: `${base}a`,
         sceneType: "grammar_pattern",
-        pattern,
-        reading: str(d.pattern_romaji),
-        meaning,
-        structure: str(d.structure),
-        level: str(d.level) ?? item.jlptLevel,
-        whenToUse: str(d.when_to_use),
-      },
-    });
+        sourceRef: item.postId ? { kind: "post", id: item.postId, url: item.url } : undefined,
+        durationMode: "auto",
+        durationSeconds: pacing.secondsPerItem * 0.4,
+        transitionIn: { kind: "wipe", durationSeconds: 0.18 },
+        narration: narration.filter((n) => n.id !== useId),
+        visual: patternVisual,
+      });
+      scenes.push({
+        id: `${base}b`,
+        sceneType: "tip_callout",
+        durationMode: "auto",
+        durationSeconds: pacing.secondsPerItem * 0.3,
+        transitionIn: { kind: "slide", durationSeconds: 0.18 },
+        narration: narration.filter((n) => n.id === useId),
+        visual: {
+          sceneType: "tip_callout",
+          heading: "When to use it",
+          // The card shows the source note when the data has one; otherwise the pattern itself,
+          // so the frame is never an empty box waiting on narration.
+          body: str(d.when_to_use) ?? pattern,
+        },
+      });
+    } else {
+      scenes.push({
+        id: base,
+        sceneType: "grammar_pattern",
+        sourceRef: item.postId ? { kind: "post", id: item.postId, url: item.url } : undefined,
+        durationMode: "auto",
+        durationSeconds: pacing.secondsPerItem,
+        transitionIn: { kind: "fade", durationSeconds: 0.4 },
+        narration,
+        visual: patternVisual,
+      });
+    }
 
     item.examples.slice(0, 3).forEach((example, ei) => {
       const exBase = `${base}-ex${ei + 1}`;
@@ -650,19 +776,26 @@ function withIntroOutro(
   }
 
   const branding = resolveBranding(config.branding);
+  const shorts = config.stylePreset === "shorts";
 
-  // The mascot beat, when branding asks for it. Fixed duration and NO narration slot: its whole
-  // job is the first second of a Reel, and adding a spoken line would both lengthen it and
-  // compete with the greeting already on screen.
+  // The mascot beat, when branding asks for it.
+  //
+  // In lesson mode this is a fixed, SILENT 2.5 seconds — its own comment used to argue that a
+  // spoken line would compete with the greeting on screen. That reasoning holds for a lesson and
+  // is exactly backwards for a Short: 2.5 silent seconds at the very front is the most expensive
+  // place in the video to say nothing, and the hook the model already writes was being held back
+  // for the title card behind it. So Shorts speak the hook here, over ~1 second of mascot, and
+  // switch to `auto` so the beat lasts as long as the line takes rather than an arbitrary 2.5s.
   const mascotIntro: Scene[] = branding.mascots
     ? [
         {
           id: "sc-mascot",
           sceneType: "mascot_intro",
-          durationMode: "fixed",
-          durationSeconds: MASCOT_INTRO_SECONDS,
-          transitionIn: { kind: "fade", durationSeconds: 0.3 },
-          narration: [],
+          durationMode: shorts ? "auto" : "fixed",
+          durationSeconds: shorts ? 1.0 : MASCOT_INTRO_SECONDS,
+          minDurationSeconds: shorts ? 1.0 : undefined,
+          transitionIn: { kind: "fade", durationSeconds: shorts ? 0.15 : 0.3 },
+          narration: shorts ? [blankSegment(introId, lang, pacing)] : [],
           visual: {
             sceneType: "mascot_intro",
             // branding.mascot is the project's lead character. It has existed on the type since
@@ -682,9 +815,13 @@ function withIntroOutro(
     id: "sc-intro",
     sceneType: "title_card",
     durationMode: "auto",
-    durationSeconds: 3,
-    transitionIn: { kind: "fade", durationSeconds: 0.4 },
-    narration: [blankSegment(introId, lang, pacing)],
+    durationSeconds: shorts ? 1.4 : 3,
+    minDurationSeconds: shorts ? 1.0 : undefined,
+    transitionIn: { kind: "fade", durationSeconds: shorts ? 0.15 : 0.4 },
+    // In shorts mode the hook has already been spoken over the mascot beat, so this card is a
+    // silent, fast title flash rather than a second narrated intro. Two spoken intros back to back
+    // is the single most common way a Short loses a viewer.
+    narration: shorts ? [] : [blankSegment(introId, lang, pacing)],
     visual: {
       sceneType: "title_card",
       eyebrow: snapshot.jlptLevel ? `JLPT ${snapshot.jlptLevel}` : undefined,
@@ -717,10 +854,22 @@ function withIntroOutro(
     },
   };
 
+  // With mascots off there is no mascot beat to carry the hook, so the title card keeps it —
+  // otherwise the slot would be written by the model, budgeted, and then silently dropped.
+  if (shorts && mascotIntro.length === 0) {
+    intro.narration = [blankSegment(introId, lang, pacing)];
+  }
+
   return {
     scenes: [...mascotIntro, intro, ...scenes, ...brollScenes, outro],
     blanks: [
-      { id: introId, hint: `Hook for a video about ${titleText}. Make someone stop scrolling.`, maxWords: 22 },
+      {
+        id: introId,
+        hint: shorts
+          ? `Hook for a SHORT about ${titleText}. One punchy line, spoken in under three seconds. Ask a question or make a claim — no greeting, no "in this video", no throat-clearing. Make someone stop scrolling.`
+          : `Hook for a video about ${titleText}. Make someone stop scrolling.`,
+        maxWords: shorts ? 10 : 22,
+      },
       ...blanks,
       ...brollBlanks,
       { id: outroId, hint: "A short closing call to action.", maxWords: 16 },
@@ -1279,10 +1428,22 @@ export async function generateStoryboard(
     narrationLang: config.narrationLang,
     themeKey: config.themeKey,
     bgm: config.bgm,
-    captions: { enabled: true, burnIn: config.burnInCaptions ?? true, style: "bold-center" },
+    captions: {
+      enabled: true,
+      burnIn: config.burnInCaptions ?? true,
+      style: "bold-center",
+      // Word-by-word on Shorts by default. Shipping it behind a switch nobody flips would mean
+      // the most recognisable feature of the format never actually appears; a lesson keeps whole
+      // lines, where a moving highlight competes with the teaching content.
+      mode: config.stylePreset === "shorts" ? "word" : "line",
+    },
     // Frozen into the document, so re-rendering this version a year from now reproduces the
-    // branding it was approved with rather than picking up whatever the constants say then.
+    // branding it was approved with rather than picking up whatever the constants say then. The
+    // style preset is frozen for the same reason and additionally because the scenes below were
+    // SPLIT according to it — a storyboard whose beats were built for Shorts but which renders
+    // under lesson motion would hold a 3-second beat perfectly still.
     branding: resolveBranding(config.branding),
+    stylePreset: config.stylePreset ?? "lesson",
     scenes: filled,
   };
 
