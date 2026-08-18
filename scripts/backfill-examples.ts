@@ -141,17 +141,44 @@ function userMessage(t: Target): string {
  * The sentence must contain what it claims to demonstrate.
  *
  * Checked rather than trusted: a model asked for a sentence using a pattern will occasionally
- * return a sentence ABOUT the pattern, and for kanji specifically it will substitute the kana
- * reading. Both are useless on a card that highlights the target, and both are invisible unless
- * asserted — which is precisely the kind of thing that otherwise reaches 826 live pages.
+ * return a sentence ABOUT the pattern, and for kanji it will substitute a commoner character for a
+ * rare one. Both are useless on a card that highlights the target, and both are invisible unless
+ * asserted — exactly the kind of thing that otherwise reaches hundreds of live pages.
+ *
+ * BUT A LITERAL SUBSTRING TEST IS WRONG FOR GRAMMAR, and the first version of this function was.
+ * It rejected 23 items that were all correct, for two distinct reasons found by reading them:
+ *
+ *   1. CONJUGATION. `〜てくださる` is demonstrated by 「教えてくださいました」, which does not contain
+ *      「てくださる」 anywhere. Patterns inflect; the citation form rarely survives into a sentence.
+ *   2. THE "PATTERN" IS OFTEN A DESCRIPTION, not a string. 「い-adjective (past, negative)」 is a
+ *      lesson heading — the only Japanese run in it is 「い」, and 「昨日は寒くなかったです。」 is a
+ *      textbook-perfect example that happens not to contain that character at all. Likewise
+ *      「Special case: いい → よい」 and 「やゆよ + small ゃゅょ」.
+ *
+ * So: descriptive headings skip the check entirely (review catches them, and they are flagged
+ * either way), and literal patterns are matched on a PREFIX of their longest Japanese run, which
+ * survives inflection because Japanese conjugates at the tail.
+ *
+ * Kanji stays exact. A character either appears or it does not, and substitution is a real failure.
  */
+const JAPANESE_RUN = /[\u3040-\u30ff\u4e00-\u9fff]+/g;
+
+/** A heading rather than a pattern: an arrow, a plus, a bracket, or Latin prose in the title. */
+function isDescriptive(title: string): boolean {
+  return /[→+()（）]|[A-Za-z]{3,}/.test(title);
+}
+
 function containsTarget(t: Target, ja: string): boolean {
   if (t.kind === "kanji") return ja.includes(t.title);
-  // A grammar pattern is often mixed notation ("Verb volitional + と思います"), so only the
-  // Japanese run is checkable. If there is none, accept and let review catch it.
-  const japanesePart = t.title.match(/[぀-ヿ一-龯]+/g);
-  if (!japanesePart?.length) return true;
-  return japanesePart.some((part) => ja.includes(part));
+  if (isDescriptive(t.title)) return true;
+
+  const runs = t.title.replace(/[〜~]/g, "").match(JAPANESE_RUN);
+  if (!runs?.length) return true;
+  const longest = runs.reduce((a, b) => (b.length > a.length ? b : a));
+  // 60% of the citation form, floored at two characters. Long enough that an unrelated sentence
+  // will not match by accident, short enough to survive the inflected tail.
+  const prefix = longest.slice(0, Math.max(2, Math.ceil(longest.length * 0.6)));
+  return ja.includes(prefix);
 }
 
 async function main() {

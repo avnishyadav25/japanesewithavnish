@@ -458,9 +458,30 @@ of a field, not just writers.
 
 ### Content and cost
 
-`npm run content:backfill-examples` generates the missing examples, rejects any sentence that does
-not actually contain its target (models return sentences *about* a pattern, and substitute kana for
-kanji), writes the row live and flips the parent post to `needs_human_review`. ~$0.05 total.
+`npm run content:backfill-examples` wrote **817 of 822** missing examples for $0.043. Grammar
+coverage went 366/548 → 547/548; the kanji gap went 644 → 4.
+
+**The containment guard was wrong on its first version, and the failures looked like bad data.**
+It required the sentence to contain the pattern as a literal substring, which rejected 23 items
+that were all correct. Two distinct causes, only visible by reading the rejected output:
+
+- **Conjugation.** `〜てくださる` is demonstrated by 「教えてくださいました」, which does not contain
+  「てくださる」 anywhere. Patterns inflect; the citation form rarely survives into a sentence.
+- **The "pattern" is often a lesson heading, not a string.** 「い-adjective (past, negative)」 has
+  exactly one Japanese character in it — 「い」 — and 「昨日は寒くなかったです。」 is a textbook-perfect
+  example that happens not to contain it. Same for 「Special case: いい → よい」 and
+  「やゆよ + small ゃゅょ」.
+
+Fixed by skipping the check for descriptive headings and matching literal patterns on a **60%
+prefix** of their longest Japanese run, which survives inflection because Japanese conjugates at
+the tail. Ten assertions cover both directions, including two sentences that must still be
+rejected. **I nearly recorded this as a data-quality problem; it was my check.**
+
+The 5 that remain need a human and will not resolve by retrying: four are rare kanji (膚, 准, 斥,
+錮) where the model substitutes a common alternative every time — 肌 for 膚, 準 for 准 — and
+rejecting that is correct, since a sentence without the character teaches nothing. The fifth is
+`Vさせてもらう`, where the causative attaches per verb class (休む → 休**ま**せて, not 休**さ**せて) so
+no fixed prefix of the citation form can match.
 
 **Not automated on purpose:** `npm run video:assets` needs a human to look at the contact sheet
 before `--promote`, because chroma-keyed AI art picks up edge fringing that is only visible over a
