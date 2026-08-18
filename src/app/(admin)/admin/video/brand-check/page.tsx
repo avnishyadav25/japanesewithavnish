@@ -18,19 +18,37 @@
  * version landed one frame into a scene, where every entrance spring is still at zero, and the
  * corner mascot looked missing when it was merely mid-animation.
  */
+import { useMemo } from "react";
 import dynamic from "next/dynamic";
 import { VideoRoot } from "@/remotion/VideoRoot";
 import { SAMPLE_STORYBOARD } from "@/remotion/sampleStoryboard";
 import { buildTimeline } from "@/lib/video/timeline";
-import { FORMAT_SPECS, type VideoFormat } from "@/lib/video/types";
+import { FORMAT_SPECS, type VideoFormat, type VideoStylePreset } from "@/lib/video/types";
 import { BrandAssets } from "./BrandAssets";
 
 const Player = dynamic(() => import("@remotion/player").then((m) => m.Player), { ssr: false });
 
-function Frame({ label, format, at }: { label: string; format: VideoFormat; at: "mid" | "outro" | "intro" }) {
+function Frame({
+  label,
+  format,
+  at,
+  preset = "lesson",
+}: {
+  label: string;
+  format: VideoFormat;
+  at: "mid" | "outro" | "intro";
+  /** Which motion register to render in. Both are shown so the difference is visible side by
+   *  side rather than described — the whole point of the Shorts preset is a feel, and a feel
+   *  cannot be asserted in a test. */
+  preset?: VideoStylePreset;
+}) {
   const spec = FORMAT_SPECS[format];
   const layout = spec.layout;
-  const timeline = buildTimeline(SAMPLE_STORYBOARD, { format });
+  const storyboard = useMemo(
+    () => ({ ...SAMPLE_STORYBOARD, stylePreset: preset, captions: { ...SAMPLE_STORYBOARD.captions, mode: preset === "shorts" ? ("word" as const) : ("line" as const) } }),
+    [preset]
+  );
+  const timeline = buildTimeline(storyboard, { format });
   const total = timeline.totalFrames;
   const spans = timeline.sceneFrameSpans;
   // Land WELL INSIDE a scene. Picking a percentage of the whole video put the first shot one
@@ -50,7 +68,7 @@ function Frame({ label, format, at }: { label: string; format: VideoFormat; at: 
       <div style={{ width: format === "landscape" ? 480 : 270 }} data-testid={`shot-${label}`}>
         <Player
           component={VideoRoot as never}
-          inputProps={{ storyboard: SAMPLE_STORYBOARD, layout, themeTokens: null, preview: true }}
+          inputProps={{ storyboard, layout, themeTokens: null, preview: true }}
           durationInFrames={total}
           fps={spec.fps}
           compositionWidth={spec.width}
@@ -96,6 +114,13 @@ export default function BrandCheckPage() {
             could not show the feature at all. */}
         <Frame label="square-mid" format="square" at="mid" />
         <Frame label="square-outro" format="square" at="outro" />
+
+        {/* The Shorts register. Same storyboard, same scene, different preset — so any difference
+            you see here is the preset and nothing else. Seek the player: lesson motion completes
+            in the first 1.3s and then holds; shorts keeps moving for the whole beat. */}
+        <Frame label="shorts-vertical-mid" format="vertical" at="mid" preset="shorts" />
+        <Frame label="shorts-vertical-intro" format="vertical" at="intro" preset="shorts" />
+        <Frame label="shorts-square-mid" format="square" at="mid" preset="shorts" />
       </div>
     </div>
   );

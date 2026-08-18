@@ -22,11 +22,15 @@ import { uploadToR2 } from "../r2";
 import { languageCodeFromVoice, supportsSsml } from "./voices";
 // Relative for the same reason as ../r2 above: the worker imports this module by path.
 import { providerForVoice } from "./ttsProvider";
-import type { NarrationLang, NarrationSegment } from "./types";
+import type { NarrationLang, NarrationSegment, WordTiming } from "./types";
 
 const TTS_SCOPE = "https://www.googleapis.com/auth/cloud-platform";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
-const SYNTHESIZE_URL = "https://texttospeech.googleapis.com/v1/text:synthesize";
+// v1beta1, not v1, for ONE reason: `enableTimePointing` exists only on the beta endpoint, and v1
+// ignores the field silently rather than erroring — so a v1 request looks like it worked and
+// simply returns no timepoints. Everything else about the two endpoints is identical for our
+// usage, and the response shape for `audioContent` is unchanged.
+const SYNTHESIZE_URL = "https://texttospeech.googleapis.com/v1beta1/text:synthesize";
 
 /** Google caps a single synthesize request at 5000 bytes of input, markup included. We chunk
  * well under it so SSML wrapper tags can never push a chunk over. */
@@ -138,6 +142,40 @@ export function buildSsml(segment: Pick<NarrationSegment, "text" | "spokenAs" | 
     ? `<break time="${Math.round(segment.leadInSeconds * 1000)}ms"/>`
     : "";
   return `<speak>${lead}${spoken}</speak>`;
+}
+
+/**
+ * Wraps every word in a zero-duration `<mark>` so Google reports when it is spoken.
+ *
+ * CRITICAL: the result of this function must NEVER reach `ttsHash`. The cache key is
+ * sha256(ssml + voice + rate + pitch), so marking the SSML would change the key for every clip
+ * already cached and re-bill the entire library on the next render. Marks change no audio sample;
+ * they are a request-time decoration only.
+ *
+ * Returns `null` when marking is not worth doing, and the caller then sends the plain SSML:
+ *   - Japanese has no whitespace, so splitting on it yields one "word" and no useful timing. The
+ *     caption for a Japanese segment is a single phrase anyway.
+ *   - A single-word segment gains nothing from a highlight that covers the whole line.
+ */
+function markedSsml(ssml: string, lang: NarrationLang): { ssml: string; words: string[] } | null {
+  if (lang === "ja") return null;
+  const open = ssml.indexOf("<speak>");
+  const close = ssml.lastIndexOf("</speak>");
+  if (open !== 0 || close < 0) return null;
+  const inner = ssml.slice(7, close);
+
+  // Preserve a leading <break/> exactly as-is — it is what produces leadInSeconds, and marking
+  // inside it would corrupt the tag.
+  const breakMatch = /^<break time="\d+ms"\/>/.exec(inner);
+  const lead = breakMatch ? breakMatch[0] : "";
+  const body = inner.slice(lead.length);
+  if (body.includes("<")) return null; // any other markup: not worth the risk of malforming it
+
+  const words = body.split(/\s+/).filter(Boolean);
+  if (words.length < 2) return null;
+
+  const marked = words.map((w, i) => `<mark name="w${i}"/>${w}`).join(" ");
+  return { ssml: `<speak>${lead}${marked}</speak>`, words };
 }
 
 function priceTierFromVoice(voiceName: string): number {
@@ -280,6 +318,8 @@ export function silentWav(seconds: number, sampleRate = SAMPLE_RATE, channels = 
 export interface SynthesisRequest {
   ssml: string;
   voiceName: string;
+  /** Only used to decide whether word marks are worth inserting; never part of the cache key. */
+  lang?: NarrationLang;
   speakingRate: number;
   pitch: number;
 }
@@ -289,6 +329,7 @@ export interface SynthesizedAudio {
   durationSeconds: number;
   charCount: number;
   estimatedCostUsd: number;
+  words?: WordTiming[];
 }
 
 /** Content hash for the cache. Everything that would change a single output sample is in it. */
@@ -298,7 +339,11 @@ export function ttsHash(req: SynthesisRequest): string {
     .digest("hex");
 }
 
-async function synthesizeChunk(ssml: string, req: SynthesisRequest): Promise<Buffer> {
+async function synthesizeChunk(
+  ssml: string,
+  req: SynthesisRequest,
+  wantTimepoints = false
+): Promise<{ buffer: Buffer; timepoints: { markName: string; timeSeconds: number }[] }> {
   const token = await getAccessToken();
 
   // Chirp 3: HD voices reject SSML — they take plain text only. Sending markup to one gets the
@@ -313,6 +358,7 @@ async function synthesizeChunk(ssml: string, req: SynthesisRequest): Promise<Buf
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       input,
+      ...(wantTimepoints ? { enableTimePointing: ["SSML_MARK"] } : {}),
       voice: { languageCode: languageCodeFromVoice(req.voiceName), name: req.voiceName },
       audioConfig: {
         audioEncoding: "LINEAR16",
@@ -325,9 +371,18 @@ async function synthesizeChunk(ssml: string, req: SynthesisRequest): Promise<Buf
   if (!res.ok) {
     throw new Error(`Google TTS synthesize failed: ${res.status} ${(await res.text()).slice(0, 400)}`);
   }
-  const data = (await res.json()) as { audioContent?: string };
+  const data = (await res.json()) as {
+    audioContent?: string;
+    timepoints?: { markName?: string; timeSeconds?: number }[];
+  };
   if (!data.audioContent) throw new Error("Google TTS returned no audioContent");
-  return Buffer.from(data.audioContent, "base64");
+  return {
+    buffer: Buffer.from(data.audioContent, "base64"),
+    timepoints: (data.timepoints ?? [])
+      .filter((t): t is { markName: string; timeSeconds: number } =>
+        typeof t.markName === "string" && typeof t.timeSeconds === "number")
+      .map((t) => ({ markName: t.markName, timeSeconds: t.timeSeconds })),
+  };
 }
 
 /**
@@ -353,12 +408,29 @@ export async function synthesize(req: SynthesisRequest): Promise<SynthesizedAudi
   const inner = req.ssml.replace(/^<speak>/, "").replace(/<\/speak>$/, "");
   const needsChunking = Buffer.byteLength(req.ssml, "utf8") > MAX_INPUT_BYTES;
 
+  // Marks are only sent when the voice accepts SSML at all — Chirp3-HD gets its markup stripped to
+  // plain text by synthesizeChunk, and sending marks there would put the literal tags into the
+  // spoken line.
+  const marks = req.lang && supportsSsml(req.voiceName) ? markedSsml(req.ssml, req.lang) : null;
+
   const buffers: Buffer[] = [];
+  const words: WordTiming[] = [];
   if (!needsChunking) {
-    buffers.push(await synthesizeChunk(req.ssml, req));
+    const out = await synthesizeChunk(marks?.ssml ?? req.ssml, req, Boolean(marks));
+    buffers.push(out.buffer);
+    if (marks) {
+      for (const tp of out.timepoints) {
+        const i = Number(tp.markName.slice(1));
+        if (Number.isInteger(i) && marks.words[i]) words.push({ text: marks.words[i], start: tp.timeSeconds });
+      }
+    }
   } else {
+    // Chunked requests get no word timings. Each chunk is a separate synthesis whose timepoints
+    // restart at zero, and the marks would have to be re-indexed against a split this function
+    // performs on plain text rather than on the marked string. A cue that long is a lesson
+    // paragraph, not a Shorts beat, so the estimator covers it.
     for (const chunk of chunkText(inner)) {
-      buffers.push(await synthesizeChunk(`<speak>${chunk}</speak>`, req));
+      buffers.push((await synthesizeChunk(`<speak>${chunk}</speak>`, req)).buffer);
       // Google's per-project QPS is generous but not unlimited; the existing practice-test
       // chunker paces at 150ms and has never been rate-limited.
       await new Promise((resolve) => setTimeout(resolve, 150));
@@ -372,6 +444,7 @@ export async function synthesize(req: SynthesisRequest): Promise<SynthesizedAudi
     durationSeconds: wavDurationSeconds(buffer),
     charCount,
     estimatedCostUsd: (charCount / 1_000_000) * priceTierFromVoice(req.voiceName),
+    words: words.length > 0 ? words.sort((a, b) => a.start - b.start) : undefined,
   };
 }
 
@@ -383,6 +456,9 @@ export interface CachedTts {
   id: string;
   audioUrl: string;
   durationSeconds: number;
+  /** Null on rows cached before word timings existed, and on voices/languages that cannot produce
+   * them. Callers fall back to estimation rather than treating this as an error. */
+  words?: WordTiming[] | null;
 }
 
 /** Injected by the caller so this module stays free of a DB dependency. */
@@ -399,6 +475,7 @@ export interface TtsCache {
     durationSeconds: number;
     charCount: number;
     estimatedCostUsd: number;
+    words?: WordTiming[];
   }): Promise<CachedTts>;
 }
 
@@ -435,9 +512,13 @@ export async function resolveNarrationAudio(
     const req: SynthesisRequest = {
       ssml,
       voiceName,
+      lang: segment.lang,
       speakingRate: segment.speakingRate ?? 1.0,
       pitch: segment.pitch ?? 0,
     };
+    // `lang` is deliberately absent from the hash — see ttsHash. It selects whether marks are
+    // inserted, and marks do not change a single audio sample, so two requests differing only in
+    // it must share a cache entry.
     const hash = ttsHash(req);
 
     const hit = await options.cache?.get(hash);
@@ -445,7 +526,12 @@ export async function resolveNarrationAudio(
       resolved.push({
         ...segment,
         ssml,
-        audio: { url: hit.audioUrl, durationSeconds: hit.durationSeconds, ttsAssetId: hit.id },
+        audio: {
+          url: hit.audioUrl,
+          durationSeconds: hit.durationSeconds,
+          ttsAssetId: hit.id,
+          words: hit.words ?? undefined,
+        },
       });
       continue;
     }
@@ -465,12 +551,18 @@ export async function resolveNarrationAudio(
       durationSeconds: audio.durationSeconds,
       charCount: audio.charCount,
       estimatedCostUsd: audio.estimatedCostUsd,
-    })) ?? { id: hash, audioUrl, durationSeconds: audio.durationSeconds };
+      words: audio.words,
+    })) ?? { id: hash, audioUrl, durationSeconds: audio.durationSeconds, words: audio.words };
 
     resolved.push({
       ...segment,
       ssml,
-      audio: { url: stored.audioUrl, durationSeconds: stored.durationSeconds, ttsAssetId: stored.id },
+      audio: {
+        url: stored.audioUrl,
+        durationSeconds: stored.durationSeconds,
+        ttsAssetId: stored.id,
+        words: stored.words ?? audio.words,
+      },
     });
   }
 

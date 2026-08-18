@@ -1,0 +1,33 @@
+{
+  // Type-checks scripts/, which the main tsconfig EXCLUDES.
+  //
+  // That exclusion is not an oversight — the scripts are run through tsx, which strips types
+  // without checking them, and pulling them into the Next.js build config caused problems. The
+  // cost is that `npx tsc --noEmit` reports a clean tree while a script is genuinely broken, and
+  // that is not theoretical: extracting the chroma matter into a shared module left KEY_DISTANCE
+  // behind in the caller, so `npm run video:mascots` would have thrown ReferenceError at the first
+  // pixel — and tsc, lint and `npm run build` were all green.
+  //
+  // Run via `npm run typecheck:scripts`, alongside the main typecheck.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    // Scripts are executed by tsx as ESM-ish modules rather than bundled by Next.
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "types": ["node"]
+  },
+  // SCOPED, not repo-wide. The older scripts carry long-standing implicit-any and Neon-typing
+  // errors that predate this config and are why `scripts` was excluded in the first place; a
+  // check that is permanently red is a check nobody runs. This lists the video-pipeline scripts
+  // that are clean today, so a NEW break is caught. Add a file here once it type-checks.
+  "include": [
+    "scripts/generate-video-assets.ts",
+    "scripts/generate-mascots.ts",
+    "scripts/detect-bgm-tempo.ts",
+    "scripts/backfill-examples.ts",
+    "scripts/lib/chromaMatte.ts",
+    "src/**/*.ts"
+  ],
+  "exclude": ["node_modules", ".next"]
+}

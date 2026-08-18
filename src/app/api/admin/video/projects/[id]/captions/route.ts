@@ -40,6 +40,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       : DEFAULT_CAPTIONS.position,
     opacity: clamp(Number.isFinite(Number(incoming.opacity)) ? Number(incoming.opacity) : DEFAULT_CAPTIONS.opacity, 0, 1),
     maxWidthPct: clamp(Number(incoming.maxWidthPct) || DEFAULT_CAPTIONS.maxWidthPct, 40, 100),
+    // Word-by-word highlighting. Like every other field here it is a render-time setting, so
+    // turning it on is a re-cut rather than a regenerate — the timings already sit in the
+    // storyboard's audio clips whether or not anything draws them.
+    mode: incoming.mode === "word" ? "word" : DEFAULT_CAPTIONS.mode,
   };
 
   const rows = (await sql`

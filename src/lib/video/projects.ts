@@ -7,6 +7,7 @@
  * rather than shared, because the worker runs outside Next and cannot use the `sql` proxy.
  */
 import { sql } from "@/lib/db";
+import { stylePresetForFormats } from "./types";
 import type {
   ApprovalMode,
   BrandingSettings,
@@ -21,6 +22,7 @@ import type {
   VideoFormat,
   VideoProjectRow,
   VideoRenderJobRow,
+  VideoStylePreset,
 } from "./types";
 
 export class VideoStudioError extends Error {
@@ -91,6 +93,9 @@ function toProjectRow(row: Record<string, unknown>): VideoProjectRow {
     pacing: (row.pacing as PacingConfig | null) ?? null,
     voices: (row.voices as VoiceConfig | null) ?? null,
     batchId: (row.batch_id as string | null) ?? null,
+    // Rows written before the column existed read NULL, which resolves to `lesson` — exactly how
+    // they were generated and rendered.
+    stylePreset: ((row.style_preset as string | null) ?? "lesson") as VideoStylePreset,
     captions: (row.captions as Partial<CaptionSettings> | null) ?? null,
     branding: (row.branding as Partial<BrandingSettings> | null) ?? null,
     status: row.status as ProjectStatus,
@@ -104,7 +109,7 @@ function toProjectRow(row: Record<string, unknown>): VideoProjectRow {
 
 const PROJECT_COLUMNS = `id, title, scope_kind, scope_ref, grouping, theme_key, bgm_track_id,
   narration_langs, formats, target_duration_seconds, tone, include_broll, pacing, voices,
-  captions, branding, batch_id,
+  captions, branding, batch_id, style_preset,
   status, current_storyboard_id, error_message, created_by, created_at::text, updated_at::text`;
 
 export interface CreateProjectInput {
@@ -123,6 +128,8 @@ export interface CreateProjectInput {
   voices?: VoiceConfig | null;
   /** Shared by the siblings of one video_per_item split. NULL for a standalone project. */
   batchId?: string | null;
+  /** Omitted, it is derived from `formats` by `stylePresetForFormats`. */
+  stylePreset?: VideoStylePreset;
   /** Inherited when a project is derived from another — a Short keeps its parent's look. */
   captions?: Partial<CaptionSettings> | null;
   branding?: Partial<BrandingSettings> | null;
@@ -137,9 +144,9 @@ export async function createProject(input: CreateProjectInput): Promise<VideoPro
     `INSERT INTO video_projects
        (title, scope_kind, scope_ref, grouping, theme_key, bgm_track_id, narration_langs, formats,
         target_duration_seconds, tone, include_broll, pacing, voices, batch_id, captions, branding,
-        created_by)
+        created_by, style_preset)
      VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7::text[], $8::text[], $9, $10, $11, $12::jsonb, $13::jsonb,
-             $14::uuid, $15::jsonb, $16::jsonb, $17)
+             $14::uuid, $15::jsonb, $16::jsonb, $17, $18)
      RETURNING ${PROJECT_COLUMNS}`,
     [
       input.title,

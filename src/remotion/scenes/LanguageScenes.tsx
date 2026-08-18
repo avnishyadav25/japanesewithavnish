@@ -85,7 +85,10 @@ function ExampleBlock({ example, highlight, delay = 0 }: { example: ExampleSente
 export const VocabCardScene: React.FC<{ visual: VocabCardVisual }> = ({ visual }) => {
   const { theme, scale, layout } = useLayout();
   const { item } = visual;
-  const twoColumn = layout === "landscape" && Boolean(item.example);
+  // `word` withholds the meaning so the next beat can land it. Absent means `all`, which is what
+  // every storyboard written before the beat split meant, so nothing changes for them.
+  const held = visual.reveal === "word";
+  const twoColumn = layout === "landscape" && Boolean(item.example) && !held;
 
   const wordBlock = (
     <div style={{ display: "grid", gap: scale.gap * 0.45, justifyItems: twoColumn ? "start" : "center", textAlign: twoColumn ? "left" : "center" }}>
@@ -118,14 +121,20 @@ export const VocabCardScene: React.FC<{ visual: VocabCardVisual }> = ({ visual }
             fontFamily: fontStackSerif(theme),
             fontSize: scale.title,
             fontWeight: 700,
-            color: theme.primary,
+            color: held ? theme.textSubtle : theme.primary,
             lineHeight: 1.2,
+            // A blank space where the answer goes, rather than nothing. Letting the layout
+            // collapse and then re-expand on the next beat would make the word jump, and the word
+            // is the one element that must stay nailed to the same spot across the cut — that
+            // stability is what makes the reveal read as an answer rather than a new slide.
+            letterSpacing: held ? "0.3em" : undefined,
+            opacity: held ? 0.45 : 1,
           }}
         >
-          {item.meaning}
+          {held ? "? ? ?" : item.meaning}
         </div>
       </FadeUp>
-      {item.partOfSpeech || item.transitivity ? (
+      {!held && (item.partOfSpeech || item.transitivity) ? (
         <FadeUp delay={20} style={{ display: "flex", gap: scale.gap * 0.35, flexWrap: "wrap", justifyContent: twoColumn ? "flex-start" : "center" }}>
           {item.partOfSpeech ? <Chip>{item.partOfSpeech}</Chip> : null}
           {item.transitivity ? <Chip>{item.transitivity}</Chip> : null}
@@ -150,7 +159,7 @@ export const VocabCardScene: React.FC<{ visual: VocabCardVisual }> = ({ visual }
       ) : (
         <>
           {wordBlock}
-          {item.example ? <ExampleBlock example={item.example} highlight={[item.word]} delay={26} /> : null}
+          {item.example && !held ? <ExampleBlock example={item.example} highlight={[item.word]} delay={26} /> : null}
         </>
       )}
     </SceneFrame>

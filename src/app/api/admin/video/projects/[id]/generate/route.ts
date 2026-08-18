@@ -10,6 +10,7 @@ import {
   outroSiteUrl,
   planGenerationBatches,
 } from "@/lib/video/storyboard";
+import { beatGridForTrack } from "@/lib/video/bgmCatalogue";
 import { resolvePacing } from "@/lib/video/pacing";
 import { recordGenerationRun, snapshotStoryboardState } from "@/lib/video/audit";
 import { triggerWorkflow } from "@/lib/video/dispatch";
@@ -58,9 +59,23 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   try {
     const snapshot = await resolveScope(project.scopeKind, project.scopeRef);
     // Pacing is what makes the requested duration binding — see src/lib/video/pacing.ts.
+    const stylePreset = project.stylePreset ?? "lesson";
+    // Tempo is frozen into the storyboard rather than looked up at render time: the timeline is
+    // computed once and every downstream consumer — the srt writer, FCPXML, the highlight
+    // extractor — reads those frame spans. A tempo re-measured later must not silently move them.
+    const bgmSettings = project.bgmTrackId
+      ? {
+          trackId: project.bgmTrackId,
+          gainDb: -18,
+          duckDb: -12,
+          ...((stylePreset === "shorts" && sql ? await beatGridForTrack(sql, project.bgmTrackId) : null) ?? {}),
+        }
+      : undefined;
+
     const pacing = resolvePacing(
       (body?.pacing as Record<string, number> | undefined) ?? project.pacing,
-      snapshot.items[0]?.kind
+      snapshot.items[0]?.kind,
+      stylePreset
     );
     // Cost the request before committing to it. buildGenerationRequest is the same builder
     // generateStoryboard uses, so this counts the batches that would actually run — and it makes
@@ -70,6 +85,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       narrationLang: lang,
       themeKey: project.themeKey,
       pacing,
+      stylePreset,
       voices: project.voices,
       tone: toneOverride ?? project.tone,
       includeBroll: project.includeBroll,
@@ -129,7 +145,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         pacing,
         voices: project.voices,
         tone: toneOverride ?? project.tone,
-        bgm: project.bgmTrackId ? { trackId: project.bgmTrackId, gainDb: -18, duckDb: -12 } : undefined,
+        bgm: bgmSettings,
         includeBroll: project.includeBroll,
         siteName: "JapaneseWithAvnish",
         siteUrl: outroSiteUrl(),

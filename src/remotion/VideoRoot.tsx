@@ -13,11 +13,13 @@ import { resolveCaptions } from "@/lib/video/types";
 import type { CaptionSettings, ResolvedTimeline, Storyboard, VideoThemeTokens } from "@/lib/video/types";
 import { buildTimeline, segmentOffsets } from "@/lib/video/timeline";
 import { resolveBranding, showsHashtag, showsTitleBar } from "@/lib/video/branding";
-import { LayoutProvider } from "./LayoutContext";
+import { LayoutProvider, SceneMotionProvider } from "./LayoutContext";
 import { resolveTheme, type SceneLayout } from "./theme";
 import { SceneRenderer } from "./scenes";
 import { BrandOverlay } from "./components/BrandOverlay";
 import { Captions } from "./components/Captions";
+import { SceneTransition } from "./components/SceneTransition";
+import { motionFor } from "@/lib/video/motion";
 
 export interface VideoRootProps {
   storyboard: Storyboard;
@@ -79,22 +81,38 @@ export const VideoRoot: React.FC<VideoRootProps> = ({
   const timeline: ResolvedTimeline = storyboard.resolved ?? buildTimeline(storyboard, { format });
 
   const branding = resolveBranding(storyboard.branding);
+  // Absent means `lesson` — every storyboard written before the preset existed was rendered that
+  // way, so defaulting anywhere else would retroactively restyle the back catalogue.
+  const stylePreset = storyboard.stylePreset ?? "lesson";
+  const motion = motionFor(stylePreset);
   // Project override wins over the storyboard's frozen copy; resolveCaptions fills the fields
   // storyboards written before caption styling existed do not carry.
   const captions = resolveCaptions({ ...storyboard.captions, ...(captionSettings ?? {}) });
 
   return (
-    <LayoutProvider layout={layout} theme={theme}>
+    <LayoutProvider layout={layout} theme={theme} stylePreset={stylePreset}>
       <AbsoluteFill style={{ background: theme.bg }}>
         {storyboard.scenes.map((scene, i) => {
           const span = timeline.sceneFrameSpans[i];
           if (!span) return null;
           const [start, end] = span;
           const offsets = segmentOffsets(scene);
+          const durationInFrames = Math.max(1, end - start);
+          // Scene-relative frames where each narration segment begins. The camera punches on these
+          // so a beat change is felt even when the scene behind it continues, and they cost
+          // nothing — segmentOffsets is already computed for audio placement below.
+          const beatFrames = offsets.map((o) => Math.round(o * fps));
 
           return (
-            <Sequence key={scene.id} from={start} durationInFrames={Math.max(1, end - start)} name={`${i + 1}. ${scene.sceneType}`}>
-              <SceneRenderer scene={scene} />
+            <Sequence key={scene.id} from={start} durationInFrames={durationInFrames} name={`${i + 1}. ${scene.sceneType}`}>
+              <SceneMotionProvider beatFrames={beatFrames} durationInFrames={durationInFrames}>
+                <SceneTransition
+                  transition={scene.transitionIn ?? motion.transition}
+                  durationInFrames={durationInFrames}
+                >
+                  <SceneRenderer scene={scene} />
+                </SceneTransition>
+              </SceneMotionProvider>
               {scene.narration.map((segment, si) =>
                 segment.audio?.url ? (
                   <Sequence key={segment.id} from={Math.round(offsets[si] * fps)} name={`audio:${segment.id}`}>

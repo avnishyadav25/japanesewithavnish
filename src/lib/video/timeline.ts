@@ -70,16 +70,68 @@ export function resolveSceneDuration(scene: Scene, tailPadding: number): number 
   return Math.max(narration + tailPadding, floor);
 }
 
+/**
+ * The furthest a cut is moved to reach a beat: half a beat, hard-capped at 250ms.
+ *
+ * A FIXED 150ms CAP DOES NOT WORK, and measuring it is the only way to see why. Scene lengths are
+ * set by measured narration, so a run of similar scenes lands at a near-constant offset from the
+ * grid — five 2.833s beats against a 0.5s grid leave a remainder of 0.333s every single time.
+ * That is outside a 150ms window at every cut, so quantisation silently never fires and the
+ * feature ships inert while looking implemented.
+ *
+ * Half a beat guarantees the next beat is always reachable, so a cut lands on the grid whenever
+ * one exists. The 250ms ceiling keeps a slow track from stalling: at 60 BPM half a beat is 500ms,
+ * which would be felt. Below that the extension is silence appended to a scene that already ends
+ * with 0.25-0.45s of tail padding, so it reads as pacing rather than as a pause.
+ */
+function maxBeatShift(periodSeconds: number): number {
+  return Math.min(0.25, periodSeconds / 2);
+}
+
+interface BeatGrid {
+  periodSeconds: number;
+  offsetSeconds: number;
+}
+
+function beatGrid(storyboard: Storyboard): BeatGrid | null {
+  if (storyboard.stylePreset !== "shorts") return null;
+  const bpm = storyboard.bgm?.bpm;
+  if (!bpm || bpm <= 0) return null;
+  return { periodSeconds: 60 / bpm, offsetSeconds: storyboard.bgm?.beatOffsetSeconds ?? 0 };
+}
+
+/** Lengthens a scene so it ends on the next beat, when that costs less than MAX_BEAT_SHIFT. */
+function quantiseUp(startSeconds: number, seconds: number, beat: BeatGrid): number {
+  const end = startSeconds + seconds;
+  const since = end - beat.offsetSeconds;
+  const nextBeat = beat.offsetSeconds + Math.ceil(since / beat.periodSeconds) * beat.periodSeconds;
+  const shift = nextBeat - end;
+  return shift > 0 && shift <= maxBeatShift(beat.periodSeconds) ? seconds + shift : seconds;
+}
+
 export function buildTimeline(storyboard: Storyboard, options: BuildTimelineOptions): ResolvedTimeline {
   const { fps } = FORMAT_SPECS[options.format];
   const tailPadding = options.tailPaddingSeconds ?? DEFAULT_TAIL_PADDING_SECONDS;
 
   const sceneFrameSpans: [number, number][] = [];
-  const cues: { start: number; end: number; text: string; lang: NarrationLang }[] = [];
+  // Typed off ResolvedTimeline rather than restated, so the two cannot drift apart again.
+  const cues: ResolvedTimeline["cues"] = [];
+
+  // Beat quantisation, Shorts only and only with a measured tempo. A cut that lands on the
+  // downbeat reads as intentional; one that lands 200ms off reads as a mistake even to someone
+  // who could not name why.
+  const beat = beatGrid(storyboard);
 
   let frameCursor = 0;
   for (const scene of storyboard.scenes) {
-    const seconds = resolveSceneDuration(scene, tailPadding);
+    const naturalSeconds = resolveSceneDuration(scene, tailPadding);
+    // EXTEND ONLY, NEVER SHORTEN. The narration audio is a fixed-length WAV; taking time away
+    // from a scene to reach an earlier beat would cut a word off mid-syllable. So the scene is
+    // only ever held slightly longer, and only when the next beat is close enough that the extra
+    // hold is imperceptible.
+    const seconds = beat
+      ? quantiseUp(frameCursor / fps, naturalSeconds, beat)
+      : naturalSeconds;
     // Frames, not seconds, are the unit of truth from here on: accumulating rounded frame
     // counts keeps scene N's start exactly equal to scene N-1's end, whereas rounding each
     // boundary from a running seconds total drifts by up to a frame per scene.
@@ -98,6 +150,10 @@ export function buildTimeline(storyboard: Storyboard, options: BuildTimelineOpti
         end: sceneStartSeconds + offsets[i] + duration,
         text: segment.text.trim(),
         lang: segment.lang,
+        // Measured per-word starts when the TTS layer got them. Relative to the clip, so the
+        // caption renderer offsets by cue.start rather than storing absolute times that would
+        // have to be rewritten every time a scene above this one changed length.
+        words: segment.audio?.words,
       });
     });
 
