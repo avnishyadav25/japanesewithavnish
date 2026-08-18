@@ -36,6 +36,35 @@ const label = "block text-sm font-semibold text-charcoal mb-1.5";
 const input =
   "w-full border border-[var(--divider)] rounded-button px-3 py-2 text-sm focus:outline-none focus:border-primary";
 
+/**
+ * Parse a response body that MIGHT not be JSON.
+ *
+ * `res.json()` on a 500 throws "Failed to execute 'json' on 'Response': Unexpected end of JSON
+ * input", which is what the wizard showed the user when createProject failed on a parameter
+ * mismatch. That message describes the parser, not the problem — it is the same string for a
+ * crashed route, a proxy timeout and an empty body, and it sent me looking at the client when the
+ * fault was a SQL statement.
+ *
+ * Returns the server's own error when there is one, and the status line when there is not.
+ *
+ * Typed as `any` to match what `res.json()` already returned, so this is a drop-in replacement at
+ * every call site rather than a typing change disguised as a bug fix.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function readJson(res: Response): Promise<any> {
+  const text = await res.text();
+  if (!text.trim()) {
+    throw new Error(`The server returned ${res.status} ${res.statusText} with an empty body. Check the dev server log.`);
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    // An HTML error page, most often. Show the first readable line rather than the markup.
+    const plain = text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    throw new Error(`The server returned ${res.status} instead of JSON: ${plain.slice(0, 200) || "(unreadable body)"}`);
+  }
+}
+
 export function NewVideoWizard({ themes, bgmTracks, levels, lessons, initial }: Props) {
   const router = useRouter();
   const [step, setStep] = useState(0);
@@ -190,7 +219,7 @@ export function NewVideoWizard({ themes, bgmTracks, levels, lessons, initial }: 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ topic, jlptLevel: jlptLevel || undefined, count: limit }),
       });
-      const data = await res.json();
+      const data = await readJson(res);
       if (!res.ok) throw new Error(data.error ?? "Could not resolve that topic");
 
       const items: PickerItem[] = [...(data.library ?? []), ...(data.proposed ?? [])];
@@ -231,7 +260,7 @@ export function NewVideoWizard({ themes, bgmTracks, levels, lessons, initial }: 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ scopeKind, scopeRef, grouping, formats, narrationLangs, pacing, voices }),
       });
-      const data = await res.json();
+      const data = await readJson(res);
       if (!res.ok) throw new Error(data.error || "Could not resolve that scope");
       setEstimate(data);
       // Adopt the per-content-type defaults the first time a scope resolves, so step 3 opens on
@@ -268,7 +297,7 @@ export function NewVideoWizard({ themes, bgmTracks, levels, lessons, initial }: 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ lang, voice, rate }),
       });
-      const data = await res.json();
+      const data = await readJson(res);
       if (!res.ok) throw new Error(data.error || "Could not synthesise a sample");
       sampleAudio.current?.pause();
       sampleAudio.current = new Audio(data.url);
@@ -302,7 +331,7 @@ export function NewVideoWizard({ themes, bgmTracks, levels, lessons, initial }: 
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ topic, words: keptProposals }),
           });
-          const data = await res.json();
+          const data = await readJson(res);
           if (!res.ok) throw new Error(data.error ?? "Could not save the new words");
           effectivePostIds = [...libraryIds, ...(data.postIds ?? [])];
         } else {
@@ -332,7 +361,7 @@ export function NewVideoWizard({ themes, bgmTracks, levels, lessons, initial }: 
           voices,
         }),
       });
-      const data = await res.json();
+      const data = await readJson(res);
       if (!res.ok) throw new Error(data.error || "Could not create the project");
 
       // A split lands on the batch, not on one of its ten children — the useful next action is

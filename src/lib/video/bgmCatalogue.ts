@@ -104,14 +104,37 @@ export interface BgmSearchPreset {
 }
 
 export const BGM_SEARCH_PRESETS: BgmSearchPreset[] = [
-  { label: "Koto / traditional", query: "koto japanese traditional", mood: "traditional", suits: "Kanji, culture notes" },
-  { label: "Shakuhachi / meditative", query: "shakuhachi flute meditation", mood: "calm", suits: "Reading, long-form lessons" },
-  { label: "Wafū lo-fi", query: "japanese lofi chill", mood: "lofi", suits: "Vocabulary shorts, study content" },
-  { label: "Sakura / gentle", query: "sakura gentle piano japan", mood: "gentle", suits: "Intro and outro beds" },
-  { label: "Study beats", query: "lofi study beats", mood: "study", suits: "Anything long enough to need a bed" },
-  { label: "Upbeat / energetic", query: "upbeat happy ukulele", mood: "upbeat", suits: "Shorts, Reels, TikTok" },
-  { label: "Cinematic intro", query: "cinematic inspiring intro", mood: "cinematic", suits: "Course trailers" },
-  { label: "Minimal ambient", query: "minimal ambient background", mood: "ambient", suits: "Grammar explainers — stays out of the way" },
+  // QUERIES ARE ONE OR TWO WORDS ON PURPOSE. Jamendo ANDs every search term against its own
+  // tags, so a descriptive phrase matches almost nothing — measured across 44 candidate queries:
+  // "koto japanese traditional" returned 0 results, "koto japanese" returns 23; "lofi study beats"
+  // returned 0, "chillhop" returns 26; "shakuhachi flute meditation" returned 0, "shakuhachi"
+  // returns 28. The three presets that imported nothing on the first run were all three-word
+  // phrases, and the catalogue was not the problem.
+  //
+  // Every count below is commercially-usable AND downloadable tracks, filtered as the importer
+  // filters. Terms that scored zero and are NOT here: zen, ninja, samurai, lofi, study, phonk,
+  // vaporwave-adjacent multiword, "japanese lofi", "j-pop instrumental", "8bit chiptune".
+  { label: "Koto / traditional", query: "koto japanese", mood: "traditional", suits: "Kanji, culture notes" },
+  { label: "Shakuhachi / meditative", query: "shakuhachi", mood: "calm", suits: "Reading, long-form lessons" },
+  { label: "Bamboo flute", query: "bamboo flute", mood: "calm", suits: "Culture notes, slow reveals" },
+  { label: "Shamisen", query: "shamisen", mood: "traditional", suits: "Kanji, history, culture" },
+  { label: "Taiko drums", query: "taiko drums", mood: "driving", suits: "Energetic Shorts, quiz beats" },
+  { label: "Sakura / gentle", query: "sakura", mood: "gentle", suits: "Intro and outro beds" },
+  { label: "Tokyo / city", query: "tokyo", mood: "city", suits: "Conversation, modern topics" },
+  { label: "City pop", query: "city pop", mood: "citypop", suits: "Vocabulary Shorts with a retro feel" },
+  { label: "Anime opening", query: "anime opening", mood: "anime", suits: "High-energy Shorts and Reels" },
+  { label: "Kawaii", query: "kawaii", mood: "cute", suits: "Beginner vocabulary, kana" },
+  // --- beat-led, for Shorts. These are what the beat quantiser actually has something to lock to.
+  { label: "Chillhop", query: "chillhop", mood: "lofi", suits: "Vocabulary Shorts, study content" },
+  { label: "Beats", query: "beats", mood: "study", suits: "Anything long enough to need a bed" },
+  { label: "Hip hop", query: "hiphop", mood: "hiphop", suits: "Shorts with a strong pulse" },
+  { label: "Trap", query: "trap", mood: "trap", suits: "Punchy Reels and TikToks" },
+  { label: "Synthwave", query: "synthwave", mood: "synth", suits: "Kanji stroke reveals" },
+  { label: "Chiptune", query: "chiptune", mood: "chiptune", suits: "Quiz and game-style Shorts" },
+  { label: "Upbeat / energetic", query: "bright ukulele", mood: "upbeat", suits: "Shorts, Reels, TikTok" },
+  { label: "Cinematic intro", query: "cinematic", mood: "cinematic", suits: "Course trailers" },
+  { label: "Minimal ambient", query: "ambient", mood: "ambient", suits: "Grammar explainers — stays out of the way" },
+  { label: "Meditation", query: "meditation", mood: "calm", suits: "Long reading passages" },
 ];
 
 /**
