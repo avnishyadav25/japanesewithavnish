@@ -1,11 +1,9 @@
 import { sql } from "@/lib/db";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
-import { AdminCard } from "@/components/admin/AdminCard";
-import { AdminTable } from "@/components/admin/AdminTable";
-import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
 import { BgmLibrary, type BgmTrack } from "./BgmLibrary";
 import { ThemeEditor, type ThemeRow } from "./ThemeEditor";
 import { BrollLibrary } from "./BrollLibrary";
+import { AssetLibrary } from "./AssetLibrary";
 
 export const dynamic = "force-dynamic";
 
@@ -68,6 +66,15 @@ export default async function VideoAssetsPage() {
           experimenting — every project defaults to these.
         </p>
         <ThemeEditor initial={themes} />
+      </section>
+
+      <section className="mb-10">
+        <h2 className="font-heading text-lg font-bold text-charcoal mb-1">Characters &amp; art</h2>
+        <p className="text-sm text-secondary mb-4">
+          The mascot cast, plus the sticker library Shorts decorate scenes with. Both are generated
+          once and reused, so the look stays consistent and decorating another video costs nothing.
+        </p>
+        <AssetLibrary />
       </section>
 
       <section>

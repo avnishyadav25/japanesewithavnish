@@ -304,6 +304,14 @@ export interface Scene {
    */
   minDurationSeconds?: number;
   transitionIn: Transition;
+  /**
+   * A sticker from the reusable asset library, chosen at generation and frozen here.
+   *
+   * Frozen rather than looked up at render for the same reason as branding: the Remotion bundle is
+   * a browser build with no database, and a re-render must reproduce what was approved rather than
+   * whatever the library holds today. Absent on every lesson-preset scene by design.
+   */
+  decor?: { slug: string; url: string; corner: "left" | "right" };
   narration: NarrationSegment[];
   visual: VisualSpec;
   /** Overrides project pacing for this scene alone — one hard word may deserve three repeats

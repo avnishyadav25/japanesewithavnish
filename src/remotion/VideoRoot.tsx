@@ -105,7 +105,7 @@ export const VideoRoot: React.FC<VideoRootProps> = ({
 
           return (
             <Sequence key={scene.id} from={start} durationInFrames={durationInFrames} name={`${i + 1}. ${scene.sceneType}`}>
-              <SceneMotionProvider beatFrames={beatFrames} durationInFrames={durationInFrames}>
+              <SceneMotionProvider beatFrames={beatFrames} durationInFrames={durationInFrames} decor={scene.decor}>
                 <SceneTransition
                   transition={scene.transitionIn ?? motion.transition}
                   durationInFrames={durationInFrames}

@@ -11,6 +11,7 @@ import {
   planGenerationBatches,
 } from "@/lib/video/storyboard";
 import { beatGridForTrack } from "@/lib/video/bgmCatalogue";
+import { listDecorAssets } from "@/lib/video/decor";
 import { resolvePacing } from "@/lib/video/pacing";
 import { recordGenerationRun, snapshotStoryboardState } from "@/lib/video/audit";
 import { triggerWorkflow } from "@/lib/video/dispatch";
@@ -60,6 +61,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const snapshot = await resolveScope(project.scopeKind, project.scopeRef);
     // Pacing is what makes the requested duration binding — see src/lib/video/pacing.ts.
     const stylePreset = project.stylePreset ?? "lesson";
+    // Only fetched for Shorts — a lesson never decorates, so a lesson generation should not pay
+    // for the query.
+    const decorAssets = stylePreset === "shorts" && sql ? await listDecorAssets(sql) : [];
     // Tempo is frozen into the storyboard rather than looked up at render time: the timeline is
     // computed once and every downstream consumer — the srt writer, FCPXML, the highlight
     // extractor — reads those frame spans. A tempo re-measured later must not silently move them.
@@ -86,6 +90,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       themeKey: project.themeKey,
       pacing,
       stylePreset,
+      decorAssets,
       voices: project.voices,
       tone: toneOverride ?? project.tone,
       includeBroll: project.includeBroll,

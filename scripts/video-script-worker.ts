@@ -88,6 +88,9 @@ async function main() {
       for (const lang of langs) {
         const startedAt = Date.now();
         const stylePreset = project.stylePreset ?? "lesson";
+        // Only fetched for Shorts — a lesson never decorates, so a lesson generation should not pay
+        // for the query.
+        const decorAssets = stylePreset === "shorts" ? await listDecorAssets(sql) : [];
         const bgmSettings = project.bgmTrackId
           ? {
               trackId: project.bgmTrackId,
@@ -107,6 +110,7 @@ async function main() {
           themeKey: project.themeKey,
           pacing,
           stylePreset,
+          decorAssets,
           voices: project.voices,
           tone: project.tone,
           bgm: bgmSettings,

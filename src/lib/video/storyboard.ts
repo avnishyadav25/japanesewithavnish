@@ -31,6 +31,7 @@ import {
   resolvePacing,
   secondsForWords,
 } from "./pacing";
+import { decorateScenes, type DecorAsset } from "./decor";
 import { CHROME_SCENE_IDS } from "./types";
 import type {
   BrandingSettings,
@@ -79,6 +80,11 @@ export interface GenerateStoryboardConfig {
    * `lesson`, which is what every skeleton did before this existed.
    */
   stylePreset?: VideoStylePreset;
+  /**
+   * The enabled sticker library, fetched by the caller. Empty or absent means no decoration, which
+   * is what every lesson gets and what a Short gets before anything has been promoted to R2.
+   */
+  decorAssets?: DecorAsset[];
 }
 
 export interface GeneratedStoryboard {
@@ -1421,6 +1427,18 @@ export async function generateStoryboard(
       .filter((segment) => segment.text.trim().length > 0),
   }));
 
+  // Stickers, Shorts only. Applied here rather than inside each skeleton so all five get it from
+  // one place and a new skeleton cannot forget — and applied AFTER narration is filled, so the
+  // terms used for tag-matching include what the model actually wrote.
+  const decorated =
+    config.stylePreset === "shorts" && (config.decorAssets?.length ?? 0) > 0
+      ? decorateScenes(filled, config.decorAssets!, [
+          snapshot.title,
+          snapshot.items[0]?.kind ?? "",
+          ...snapshot.items.slice(0, 8).map((i) => `${i.title} ${i.summary ?? ""}`),
+        ])
+      : filled;
+
   const storyboard: Storyboard = {
     schemaVersion: 1,
     projectId: config.projectId,
@@ -1444,7 +1462,7 @@ export async function generateStoryboard(
     // under lesson motion would hold a 3-second beat perfectly still.
     branding: resolveBranding(config.branding),
     stylePreset: config.stylePreset ?? "lesson",
-    scenes: filled,
+    scenes: decorated,
   };
 
   return {

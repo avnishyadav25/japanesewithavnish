@@ -18,8 +18,8 @@ export type MascotId =
   | "owl-think"
   | "red-panda-wave"
   // Second cast. Declared here before the art exists so the picker can offer them and
-  // scripts/generate-mascots.ts has a target list; `availableMascots()` below is what any
-  // renderer should use, since it filters to ids whose PNG is actually on disk.
+  // scripts/generate-mascots.ts has a target list. Renderers must filter through `isGenerated()`,
+  // which is the only thing that knows whether the PNG is really on disk.
   | "cat-point"
   | "cat-bow"
   | "shiba-celebrate"
@@ -40,14 +40,23 @@ export const MASCOTS: readonly MascotId[] = [
 /**
  * The ids with a PNG in public/mascots.
  *
- * Maintained by hand rather than read from disk on purpose: this module is imported by the
- * Remotion tree, which is bundled for the browser and has no filesystem. A mascot referenced but
- * missing renders as a broken <Img> mid-video, which is worse than not offering it.
+ * A literal rather than a directory read, because this module is imported by the Remotion tree,
+ * which is bundled for the browser and has no filesystem. A mascot referenced but missing renders
+ * as a broken <Img> mid-video, which is worse than not offering it.
+ *
+ * It used to be maintained BY HAND, which quietly breaks the promote flow: copying art into
+ * public/ without editing this list leaves the new mascots invisible to `isGenerated()`, so nothing
+ * ever selects them and Brand Check still reports the old count. `--promote` now rewrites the block
+ * below from what it actually copied.
  */
+// GENERATED-START — rewritten by `npm run video:mascots -- --promote`. Edit the art, not this.
 export const GENERATED: readonly MascotId[] = [
-  "fox-wave", "fox-point", "fox-celebrate", "tanuki-write", "tanuki-think",
-  "owl-point", "owl-think", "red-panda-wave",
+  "cat-bow", "cat-point", "crane-bow", "crane-think",
+  "fox-celebrate", "fox-point", "fox-wave", "owl-point",
+  "owl-think", "rabbit-read", "rabbit-wave", "red-panda-wave",
+  "shiba-celebrate", "shiba-wave", "tanuki-think", "tanuki-write",
 ];
+// GENERATED-END
 
 export function isGenerated(id: string): id is MascotId {
   return (GENERATED as readonly string[]).includes(id);
