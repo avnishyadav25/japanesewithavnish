@@ -52,6 +52,11 @@ docs/*
 # the gotchas, and the open backlog that future sessions read before touching databases,
 # crons or deploys. Ignored, it would exist on one machine only.
 !docs/ENGINEERING_LOG.md
+# The playbook and the manual-steps guide are written to be READ BY OTHER PEOPLE and reused on
+# other projects — that is the whole reason they exist. Ignored, they lived on one laptop while
+# commit messages claimed they had shipped, which is the exact failure the note above warns about.
+!docs/VIDEO_PIPELINE_PLAYBOOK.md
+!docs/VIDEO_MANUAL_STEPS.md
 google-cloud-sdk/
 google-cloud-cli-*.tar.gz
 

@@ -54,7 +54,13 @@ export async function triggerWorkflow(
       },
       body: JSON.stringify({
         event_type: eventType,
-        client_payload: payload,
+        client_payload: {
+          ...payload,
+          // Optional. Lets a feature branch be rendered before it is merged — without it the
+          // workflow checks out the default branch, so the job succeeds while building code you
+          // are not testing. Unset in production, where main IS what should render.
+          ...(process.env.GITHUB_DISPATCH_REF ? { ref: process.env.GITHUB_DISPATCH_REF } : {}),
+        },
       }),
       // Netlify functions have roughly ten seconds total; never let a slow GitHub API call
       // be the thing that times out a request whose real work is already committed.
