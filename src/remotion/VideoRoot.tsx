@@ -12,7 +12,7 @@ import { AbsoluteFill, Audio, Sequence, useVideoConfig } from "remotion";
 import { resolveCaptions } from "@/lib/video/types";
 import type { CaptionSettings, ResolvedTimeline, Storyboard, VideoThemeTokens } from "@/lib/video/types";
 import { buildTimeline, segmentOffsets } from "@/lib/video/timeline";
-import { resolveBranding, showsHashtag } from "@/lib/video/branding";
+import { resolveBranding, showsHashtag, showsTitleBar } from "@/lib/video/branding";
 import { LayoutProvider } from "./LayoutContext";
 import { resolveTheme, type SceneLayout } from "./theme";
 import { SceneRenderer } from "./scenes";
@@ -111,6 +111,8 @@ export const VideoRoot: React.FC<VideoRootProps> = ({
         <BrandOverlay
           branding={branding}
           showHashtag={showsHashtag(format, branding)}
+          showTitleBar={showsTitleBar(format, branding)}
+          title={storyboard.title}
           scenes={storyboard.scenes}
           timeline={timeline}
         />

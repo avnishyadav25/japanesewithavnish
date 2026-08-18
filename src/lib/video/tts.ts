@@ -36,6 +36,9 @@ const SAMPLE_RATE = 24000;
 export const DEFAULT_VOICES: Record<NarrationLang, string> = {
   en: "en-US-Neural2-F",
   hi: "hi-IN-Neural2-A",
+  // Indian English, not a Hindi voice: Hinglish is written in Latin script and a hi-IN voice
+  // would apply Hindi phonetics to it.
+  hinglish: "en-IN-Neural2-A",
   ja: "ja-JP-Neural2-B",
 };
 

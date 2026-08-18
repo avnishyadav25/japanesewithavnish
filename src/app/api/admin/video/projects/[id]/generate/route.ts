@@ -12,6 +12,7 @@ import {
 } from "@/lib/video/storyboard";
 import { resolvePacing } from "@/lib/video/pacing";
 import { recordGenerationRun, snapshotStoryboardState } from "@/lib/video/audit";
+import { triggerWorkflow } from "@/lib/video/dispatch";
 import {
   getProject,
   insertStoryboardVersion,
@@ -42,6 +43,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   const project = await getProject(id);
   if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
+  // Captured before anything overwrites it, so a finished project can be put back afterwards.
+  const previousStatus = project.status;
 
   const body = await req.json().catch(() => ({}));
   const lang = (body?.narrationLang ?? project.narrationLangs[0]) as NarrationLang;
@@ -76,16 +79,38 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const batchCount = planGenerationBatches(planned.skeleton.scenes, planned.skeleton.blanks).length;
 
     if (batchCount > MAX_BATCHES_PER_REQUEST) {
+      // Too big for a request, but not too big full stop — a runner has no function ceiling.
+      // `onCi: true` asks for it to be generated there instead of refusing outright.
+      if (body?.onCi === true) {
+        await setProjectStatus(id, "generating_script");
+        const dispatch = await triggerWorkflow("video-script", { projectId: id, narrationLang: lang });
+        await logEvent({
+          projectId: id,
+          actor: admin.email,
+          eventType: "script_dispatched_ci",
+          payload: { slots: planned.skeleton.blanks.length, batches: batchCount, dispatch },
+        });
+        return NextResponse.json({
+          dispatched: true,
+          slots: planned.skeleton.blanks.length,
+          batches: batchCount,
+          dispatch,
+          message: dispatch.ok
+            ? `Generating ${planned.skeleton.blanks.length} lines on GitHub Actions — this page updates when it finishes.`
+            : `Could not reach GitHub: ${dispatch.detail}`,
+        });
+      }
+
       return NextResponse.json(
         {
           error:
             `This scope needs ${planned.skeleton.blanks.length} narration slots across ${batchCount} ` +
-            `model calls, which will not finish inside the ~30s request limit. ` +
-            `Generate a smaller scope — a single lesson or submodule rather than a whole ` +
-            `level — or split it into several projects.`,
+            `model calls, which will not finish inside the ~30s request limit.`,
           slots: planned.skeleton.blanks.length,
           batches: batchCount,
           maxBatches: MAX_BATCHES_PER_REQUEST,
+          // The client offers this as a button rather than telling you to shrink the scope.
+          canGenerateOnCi: true,
         },
         { status: 413 }
       );
@@ -170,7 +195,29 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       actor: admin.email,
     });
 
-    await setProjectStatus(id, approvalStatus === "approved" ? "script_ready" : "script_pending_review");
+    // A project that was already finished stays finished.
+    //
+    // This route used to leave every regenerate at script_ready/script_pending_review, so
+    // rewriting one line of narration on a rendered project dropped it out of `render_ready` —
+    // and the only ways back are rendering again or approving a render. The existing renders were
+    // never touched (`is_current` stays true), so the MP4 was still there; only the status that
+    // the "Done" filter and the batch panel's rendered count read was lost.
+    //
+    // Restored only when the new script needs no review AND a current render still exists. A
+    // script awaiting a human read must not claim the project is done.
+    const currentRenders = (await sql`
+      SELECT COUNT(*)::int AS n FROM video_renders
+      WHERE project_id = ${id}::uuid AND is_current AND approval_status <> 'rejected'
+    `) as { n: number }[];
+    const stillRendered = (currentRenders[0]?.n ?? 0) > 0;
+
+    const nextStatus =
+      approvalStatus === "approved"
+        ? stillRendered && previousStatus === "render_ready"
+          ? "render_ready"
+          : "script_ready"
+        : "script_pending_review";
+    await setProjectStatus(id, nextStatus);
 
     // Same AI audit trail as every other generated-content path in the admin.
     await insertAiLog({

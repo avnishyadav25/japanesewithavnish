@@ -1,4 +1,5 @@
 import { toIso8601Duration, type EmbeddedVideo } from "@/lib/video/embeds";
+import { publicLanguageTag } from "@/lib/video/types";
 
 /**
  * Player for a Video Studio render embedded on a content page.
@@ -23,7 +24,7 @@ export function ContentVideo({ video, className = "" }: { video: EmbeddedVideo; 
           playsInline
           className="w-full rounded-bento bg-black shadow-card"
         >
-          {video.vttUrl && <track kind="captions" src={video.vttUrl} srcLang={video.narrationLang} label="Captions" default />}
+          {video.vttUrl && <track kind="captions" src={video.vttUrl} srcLang={publicLanguageTag(video.narrationLang)} label="Captions" default />}
         </video>
       </div>
       <figcaption className="text-sm text-secondary mt-2 text-center">
@@ -54,7 +55,9 @@ export function VideoObjectSchema({ video, pageUrl }: { video: EmbeddedVideo; pa
     ...(video.durationSeconds && { duration: toIso8601Duration(video.durationSeconds) }),
     contentUrl: video.videoUrl,
     embedUrl: pageUrl.startsWith("http") ? pageUrl : `${siteUrl}${pageUrl}`,
-    inLanguage: video.narrationLang,
+    // publicLanguageTag, not the raw value: "hinglish" is not a BCP-47 tag, and an invalid
+    // inLanguage in VideoObject schema is an SEO-visible error. It becomes "hi-Latn".
+    inLanguage: publicLanguageTag(video.narrationLang),
     publisher: {
       "@type": "Organization",
       name: "Japanese with Avnish",

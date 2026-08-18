@@ -31,7 +31,7 @@ export async function POST(req: Request) {
   const rate = typeof body?.rate === "number" ? Math.min(1.5, Math.max(0.5, body.rate)) : 1.0;
 
   if (!NARRATION_LANGS.includes(lang)) {
-    return NextResponse.json({ error: "lang must be en, hi or ja" }, { status: 400 });
+    return NextResponse.json({ error: `lang must be one of: ${NARRATION_LANGS.join(", ")}` }, { status: 400 });
   }
   // Only catalogue voices, so this cannot be used to probe arbitrary Google voice names.
   if (!isKnownVoice(lang, voice)) {

@@ -265,6 +265,8 @@ export interface RenderRecord {
   posterUrl: string | null;
   srtUrl: string | null;
   vttUrl: string | null;
+  /** The FCPXML timeline. See the note on the column in migration 134. */
+  bundleUrl?: string | null;
   durationSeconds: number;
   width: number;
   height: number;
@@ -287,11 +289,12 @@ export async function recordRender(record: RenderRecord): Promise<string> {
   const rows = (await sql`
     INSERT INTO video_renders
       (job_id, project_id, storyboard_id, format, narration_lang, video_url, poster_url, srt_url,
-       vtt_url, duration_seconds, width, height, fps, file_size_bytes, render_seconds,
+       vtt_url, bundle_url, duration_seconds, width, height, fps, file_size_bytes, render_seconds,
        approval_status, is_current)
     VALUES (${record.jobId}::uuid, ${record.projectId}::uuid, ${record.storyboardId}::uuid,
             ${record.format}, ${record.narrationLang}, ${record.videoUrl}, ${record.posterUrl},
-            ${record.srtUrl}, ${record.vttUrl}, ${record.durationSeconds}, ${record.width},
+            ${record.srtUrl}, ${record.vttUrl}, ${record.bundleUrl ?? null},
+            ${record.durationSeconds}, ${record.width},
             ${record.height}, ${record.fps}, ${record.fileSizeBytes}, ${record.renderSeconds},
             ${record.approvalStatus}, true)
     RETURNING id
@@ -346,4 +349,63 @@ export async function getProjectMeta(projectId: string): Promise<{ scopeKind: st
     FROM video_projects WHERE id = ${projectId}::uuid
   `) as { scope_kind: string; content_type: string }[];
   return { scopeKind: rows[0]?.scope_kind ?? "*", contentType: rows[0]?.content_type ?? "*" };
+}
+
+// ---------------------------------------------------------------------------
+// Render artifacts
+// ---------------------------------------------------------------------------
+
+export interface ArtifactRow {
+  kind: "tts" | "broll" | "bgm" | "poster" | "captions" | "video";
+  url: string;
+  sceneId?: string | null;
+  segmentId?: string | null;
+  assetId?: string | null;
+  durationSeconds?: number | null;
+  bytes?: number | null;
+  fromCache?: boolean;
+}
+
+/**
+ * Records every file that went into one render.
+ *
+ * `video_render_artifacts` has existed since migration 141 and was never written to — the app-side
+ * `recordArtifacts` in src/lib/video/audit.ts has zero callers, and the worker cannot use it
+ * anyway because it imports `@/lib/db`, a Next-runtime proxy that plain tsx does not resolve.
+ * Hence this near-duplicate, which is the same trade this module's header already documents.
+ *
+ * WHAT IT IS FOR. Without it, "which narration clips does this render use" can only be answered by
+ * re-reading the storyboard document and hoping it has not been edited since. The export bundle
+ * needs exactly that list, and `from_cache` is what makes the TTS spend per render auditable
+ * rather than inferred.
+ *
+ * One multi-row INSERT: a 100-scene render has ~200 artifacts and that many round trips over HTTP
+ * would add real time to every job.
+ */
+export async function recordArtifacts(renderId: string, jobId: string, rows: ArtifactRow[]): Promise<number> {
+  if (rows.length === 0) return 0;
+
+  // Arrays plus unnest, because the Neon HTTP driver has no multi-value binding helper and
+  // building a VALUES list by hand is where SQL injection lives.
+  const kinds = rows.map((r) => r.kind);
+  const urls = rows.map((r) => r.url);
+  const sceneIds = rows.map((r) => r.sceneId ?? null);
+  const segmentIds = rows.map((r) => r.segmentId ?? null);
+  const assetIds = rows.map((r) => r.assetId ?? null);
+  const durations = rows.map((r) => (r.durationSeconds == null ? null : String(r.durationSeconds)));
+  const bytes = rows.map((r) => (r.bytes == null ? null : String(r.bytes)));
+  const fromCache = rows.map((r) => r.fromCache === true);
+
+  await sql`
+    INSERT INTO video_render_artifacts
+      (render_id, job_id, kind, url, scene_id, segment_id, asset_id, duration_seconds, bytes, from_cache)
+    -- asset_id is a uuid column; the array arrives as text, so it is cast per row rather than
+    -- as a whole array, which keeps NULLs working.
+    SELECT ${renderId}::uuid, ${jobId}::uuid, k, u, sc, sg, a::uuid, d::numeric, b::bigint, fc
+    FROM unnest(
+      ${kinds}::text[], ${urls}::text[], ${sceneIds}::text[], ${segmentIds}::text[],
+      ${assetIds}::text[], ${durations}::text[], ${bytes}::text[], ${fromCache}::boolean[]
+    ) AS t(k, u, sc, sg, a, d, b, fc)
+  `;
+  return rows.length;
 }

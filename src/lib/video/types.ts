@@ -43,17 +43,37 @@ export const FORMAT_SPECS: Record<VideoFormat, FormatSpec> = {
 // Narration
 // ---------------------------------------------------------------------------
 
-/** The language the *explanation* is in. Japanese terms inside a scene are always spoken by a
- * native ja-JP voice regardless of this, via per-segment `lang`. */
-export type NarrationLang = "en" | "hi" | "ja";
+/**
+ * The language the *explanation* is in. Japanese terms inside a scene are always spoken by a
+ * native ja-JP voice regardless of this, via per-segment `lang`.
+ *
+ * `hinglish` is romanised Hindi-English read by an Indian English voice — the register this
+ * audience actually speaks, and the same convention the social engine uses (SOCIAL_LANGS in
+ * src/lib/social/platforms.ts). Devanagari is `hi`; Latin script is `hinglish`. Keeping them
+ * separate matters because they need different voices and pace differently: measured 14.29 c/s
+ * against 15.45.
+ */
+export type NarrationLang = "en" | "hi" | "hinglish" | "ja";
 
-export const NARRATION_LANGS: NarrationLang[] = ["en", "hi", "ja"];
+export const NARRATION_LANGS: NarrationLang[] = ["en", "hi", "hinglish", "ja"];
 
 export const NARRATION_LANG_LABELS: Record<NarrationLang, string> = {
   en: "English narration",
-  hi: "Hindi narration",
+  hi: "Hindi narration (Devanagari)",
+  hinglish: "Hinglish narration (romanised)",
   ja: "Japanese immersion (subtitled)",
 };
+
+/**
+ * A valid BCP-47 tag for public output.
+ *
+ * `hinglish` is not a language tag. It reaches the page as `<track srcLang>` and as schema.org
+ * `inLanguage`, where an invalid value is an SEO-visible error, so it is mapped to `hi-Latn` —
+ * Hindi language, Latin script, which is exactly what it is.
+ */
+export function publicLanguageTag(lang: NarrationLang | string): string {
+  return lang === "hinglish" ? "hi-Latn" : lang;
+}
 
 export interface NarrationSegment {
   /** Stable across edits. Caption cues and per-segment audio are keyed off this. */
@@ -144,6 +164,14 @@ export type SceneType =
   | "summary_recap"
   | "broll_page"
   | "cta_outro";
+
+/**
+ * Scenes the storyboard builder adds around the content — the mascot beat, the title, the outro,
+ * the b-roll shot. Lives here rather than in storyboard.ts because both the highlight builder and
+ * the editor need it, and storyboard.ts reaches src/lib/db (and therefore `pg` and `fs`) through
+ * load-prompts, which cannot be in a client bundle.
+ */
+export const CHROME_SCENE_IDS: ReadonlySet<string> = new Set(["sc-mascot", "sc-intro", "sc-outro", "sc-broll"]);
 
 export const SCENE_TYPES: SceneType[] = [
   "mascot_intro", "title_card", "vocab_card", "vocab_list", "kanji_stroke", "kanji_detail", "kana_grid",
@@ -595,6 +623,13 @@ export interface BrandingSettings {
   mascot?: string;
   /** Character art on the intro beat, the bookends and teaching-scene corners. */
   mascots: boolean;
+  /**
+   * Small persistent title at top centre, on vertical and square only.
+   *
+   * A viewer arriving mid-scroll on a Reel has no title anywhere on screen — the opening card is
+   * long gone. Landscape is excluded because YouTube already shows the title above the player.
+   */
+  titleBar: boolean;
 }
 
 export interface Storyboard {

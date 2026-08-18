@@ -5,6 +5,7 @@ import { listChannels } from "@/lib/social/channels";
 import { capabilityReport } from "@/lib/social/adapters";
 import { listPostsForBrief } from "@/lib/social/publications";
 import { BriefWorkspace } from "./BriefWorkspace";
+import { ImageStudio } from "./ImageStudio";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,16 @@ export default async function SocialBriefPage({ params }: { params: Promise<{ id
             : []
         }
       />
+      {/* Above the copy, because the image is decided before the caption in practice — you write
+          to the picture you have. */}
+      <ImageStudio
+        briefId={brief.id}
+        defaultHeadline={brief.title}
+        jlptLevel={brief.jlptLevel ?? null}
+        contentType={brief.contentType ?? null}
+        hasPost={Boolean(brief.postId)}
+      />
+
       <BriefWorkspace
         brief={brief}
         initialVariants={variants}

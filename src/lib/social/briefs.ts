@@ -253,12 +253,16 @@ export interface SaveVariantInput {
 export async function saveVariant(input: SaveVariantInput): Promise<SocialVariantRow> {
   const db = requireSql();
 
+  // `media` comes back too, because a regenerate must not throw away attached images. The
+  // thumbnail is not a property of the words — it was chosen for the brief, and rewriting the
+  // caption should not silently detach it. Explicit input always wins.
   const prior = (await db`
-    SELECT version FROM social_variants
+    SELECT version, media FROM social_variants
     WHERE brief_id = ${input.briefId} AND surface = ${input.surface} AND lang = ${input.lang}
     ORDER BY version DESC LIMIT 1
   `) as Row[];
   const nextVersion = prior.length > 0 ? Number(prior[0].version) + 1 : 1;
+  const carriedMedia = input.media ?? (prior[0]?.media as unknown[] | undefined) ?? [];
 
   await db`
     UPDATE social_variants SET is_current = false, updated_at = NOW()
@@ -272,7 +276,7 @@ export async function saveVariant(input: SaveVariantInput): Promise<SocialVarian
     ) VALUES (
       ${input.briefId}, ${platformOf(input.surface)}, ${input.surface}, ${input.lang},
       ${nextVersion}, ${input.source}, ${JSON.stringify(input.content)}::jsonb,
-      ${input.hashtags}, ${JSON.stringify(input.media ?? [])}::jsonb,
+      ${input.hashtags}, ${JSON.stringify(carriedMedia)}::jsonb,
       ${JSON.stringify(input.clampReport)}::jsonb, ${input.generationRunId ?? null}, true,
       ${input.createdBy ?? null}
     )
@@ -377,4 +381,54 @@ export async function generationSpendUsd(sinceHours = 24): Promise<number> {
     WHERE created_at > NOW() - (${sinceHours} || ' hours')::interval
   `) as Row[];
   return Number(rows[0]?.total ?? 0);
+}
+
+/**
+ * Every version of one surface, newest first.
+ *
+ * Nothing is ever deleted — saveVariant supersedes by flipping is_current and inserting a new row —
+ * but the workspace only ever loaded `is_current`, so earlier drafts existed and were invisible.
+ * A regenerate that produced worse copy than the previous attempt was effectively unrecoverable
+ * without a SQL client.
+ */
+export async function listVariantHistory(
+  briefId: string,
+  surface: string,
+  lang: string
+): Promise<SocialVariantRow[]> {
+  const db = requireSql();
+  const rows = (await db`
+    SELECT * FROM social_variants
+    WHERE brief_id = ${briefId} AND surface = ${surface} AND lang = ${lang}
+    ORDER BY version DESC
+  `) as Row[];
+  return rows.map(toVariant);
+}
+
+/**
+ * Makes an earlier version current again.
+ *
+ * Flips is_current rather than copying the old content into a new version. Both are defensible;
+ * this one keeps the version numbers meaning "the Nth thing that was written", which is what makes
+ * the history readable. The partial unique index on (brief_id, surface, lang) where is_current
+ * means the demotion has to happen before the promotion, in that order.
+ */
+export async function restoreVariantVersion(variantId: string): Promise<SocialVariantRow> {
+  const db = requireSql();
+  const target = (await db`
+    SELECT brief_id, surface, lang FROM social_variants WHERE id = ${variantId}::uuid
+  `) as Row[];
+  if (!target[0]) throw new Error("That version no longer exists");
+
+  await db`
+    UPDATE social_variants SET is_current = false, updated_at = NOW()
+    WHERE brief_id = ${target[0].brief_id} AND surface = ${target[0].surface}
+      AND lang = ${target[0].lang} AND is_current
+  `;
+  const rows = (await db`
+    UPDATE social_variants SET is_current = true, updated_at = NOW()
+    WHERE id = ${variantId}::uuid
+    RETURNING *
+  `) as Row[];
+  return toVariant(rows[0]);
 }

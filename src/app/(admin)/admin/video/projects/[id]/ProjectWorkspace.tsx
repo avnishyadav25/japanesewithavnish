@@ -21,6 +21,7 @@ import { StoryboardPlayer, type PlayerHandle } from "./StoryboardPlayer";
 import { Timeline, usePlayerTime } from "./Timeline";
 import { PromptPanel, type GenerateOverrides } from "./PromptPanel";
 import { CaptionControls } from "./CaptionControls";
+import { INSERTABLE_SCENE_LABELS, INSERTABLE_SCENE_TYPES } from "@/lib/video/blankScene";
 
 interface Props {
   project: VideoProjectRow;
@@ -197,13 +198,18 @@ export function ProjectWorkspace({
     wasActive.current = hasActiveJob;
   }, [hasActiveJob, router]);
 
-  async function call(action: string, url: string, body?: unknown) {
+  /**
+   * `method` is explicit because it used to be `body === undefined ? "POST" : "POST"` — both
+   * branches the same, evidently a leftover from a refactor. The storyboard route exports only GET
+   * and PUT, so "Save as new version" has been answering 405 for as long as it has existed.
+   */
+  async function call(action: string, url: string, body?: unknown, method: "POST" | "PUT" = "POST") {
     setBusy(action);
     setError(null);
     setNotice(null);
     try {
       const res = await fetch(url, {
-        method: body === undefined ? "POST" : "POST",
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body ?? {}),
       });
@@ -218,29 +224,72 @@ export function ProjectWorkspace({
     }
   }
 
-  async function generate(regenerate: boolean, overrides?: GenerateOverrides) {
+  /**
+   * Generates the script, offering CI when the scope is too large for a request.
+   *
+   * Its own fetch rather than call(), because call() throws away the response body on a failure
+   * and the 413 carries the thing that matters: whether this can be generated on a runner
+   * instead. Refusing outright when a perfectly good path exists would be the wrong answer.
+   */
+  async function generate(regenerate: boolean, overrides?: GenerateOverrides, onCi = false) {
     const tone = regenerate ? window.prompt("Any steer for this rewrite? (tone, length, audience)") : null;
     if (regenerate && tone === null) return;
-    const data = await call(regenerate ? "regenerate" : "generate", `/api/admin/video/projects/${project.id}/generate`, {
-      narrationLang: lang,
-      regenerate,
-      tone: tone || undefined,
-      systemPrompt: overrides?.systemPrompt,
-      slotOverrides: overrides?.slotOverrides,
-    });
-    if (data) {
+
+    setBusy(regenerate ? "regenerate" : "generate");
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/admin/video/projects/${project.id}/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          narrationLang: lang,
+          regenerate,
+          tone: tone || undefined,
+          systemPrompt: overrides?.systemPrompt,
+          slotOverrides: overrides?.slotOverrides,
+          onCi,
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        if (data.canGenerateOnCi) {
+          const go = window.confirm(
+            `${data.error}\n\n${data.slots} lines across ${data.batches} model calls. ` +
+              `Generate it on GitHub Actions instead? It runs in the background and this page ` +
+              `updates when it finishes.`
+          );
+          if (go) {
+            setBusy(null);
+            return generate(regenerate, overrides, true);
+          }
+        }
+        throw new Error(data.error || "Request failed");
+      }
+
+      if (data.dispatched) {
+        setNotice(data.message);
+        router.refresh();
+        return;
+      }
+
       setNotice(
         data.approvalMode === "auto"
           ? "Script generated and auto-approved by policy — ready to render."
           : "Script generated. Read it through, then approve it to unlock rendering."
       );
       router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Request failed");
+    } finally {
+      setBusy(null);
     }
   }
 
   async function saveEdits() {
     if (!selected || !draft) return;
-    const data = await call("save", `/api/admin/video/storyboards/${selected.id}`, { doc: draft });
+    const data = await call("save", `/api/admin/video/storyboards/${selected.id}`, { doc: draft }, "PUT");
     if (data) {
       // The draft has been promoted, so stop offering to restore work that is already saved.
       await fetch(`/api/admin/video/storyboards/${selected.id}/draft`, { method: "DELETE" }).catch(() => {});
@@ -345,6 +394,58 @@ export function ProjectWorkspace({
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not queue the re-render");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  /**
+   * Rewrites one scene's narration, leaving its visuals alone.
+   *
+   * Applies to the local draft rather than saving: autosave picks it up, and you can undo by
+   * reloading before saving a version. Same reasoning as every other edit in this editor.
+   */
+  async function regenerateOneScene(sceneId: string) {
+    if (!selected || !draft) return;
+    const hint = window.prompt("Any steer for this scene? (shorter, more casual, mention the particle…)") ?? undefined;
+    setBusy(`scene:${sceneId}`);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/admin/video/storyboards/${selected.id}/scenes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "regenerate", sceneId, hint, doc: draft }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not regenerate");
+      setDraft(data.doc);
+      setNotice(data.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not regenerate");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  /** Inserts a blank scene after `index`. Only commentary types are offered — see blankScene.ts. */
+  async function insertScene(index: number, sceneType: string) {
+    if (!selected || !draft) return;
+    setBusy("insert");
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/video/storyboards/${selected.id}/scenes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "insert", sceneType, at: index + 1, doc: draft }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not insert");
+      setDraft(data.doc);
+      setSelectedSceneId(data.sceneId);
+      setNotice(data.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not insert");
     } finally {
       setBusy(null);
     }
@@ -787,6 +888,9 @@ export function ProjectWorkspace({
                 onChangeSegment={(segmentId, text) => updateSegment(index, segmentId, text)}
                 onMove={(dir) => moveScene(index, dir)}
                 onDelete={() => deleteScene(index)}
+                onRegenerate={() => regenerateOneScene(scene.id)}
+                onInsertAfter={(type) => insertScene(index, type)}
+                busy={busy !== null}
               />
             ))}
           </div>
@@ -891,6 +995,18 @@ export function ProjectWorkspace({
                     {render.srtUrl && (
                       <a href={render.srtUrl} download className="text-primary hover:underline">
                         Captions
+                      </a>
+                    )}
+                    {/* The FCPXML references the video by RELATIVE path, so both files have to
+                        land in the same folder for Final Cut to resolve the media. */}
+                    {render.bundleUrl && (
+                      <a
+                        href={render.bundleUrl}
+                        download
+                        title="Final Cut / DaVinci Resolve timeline, one clip per scene. Download it into the same folder as the video."
+                        className="text-primary hover:underline"
+                      >
+                        Timeline
                       </a>
                     )}
                     {render.approvalStatus === "pending_review" && (
@@ -1094,6 +1210,9 @@ function SceneEditor({
   onChangeSegment,
   onMove,
   onDelete,
+  onRegenerate,
+  onInsertAfter,
+  busy,
 }: {
   scene: Scene;
   index: number;
@@ -1102,6 +1221,9 @@ function SceneEditor({
   onSelect: () => void;
   onUnpin: () => void;
   onChangeSegment: (segmentId: string, text: string) => void;
+  onRegenerate: () => void;
+  onInsertAfter: (sceneType: string) => void;
+  busy: boolean;
   onMove: (direction: -1 | 1) => void;
   onDelete: () => void;
 }) {
@@ -1143,6 +1265,18 @@ function SceneEditor({
           )}
         </div>
         <div className="flex gap-1 shrink-0">
+          {/* Rewrites this scene's narration only. Visuals come from the database and are never
+              touched by a regenerate — see regenerateScene() in storyboard.ts. */}
+          <button
+            type="button"
+            onClick={onRegenerate}
+            disabled={busy}
+            title="Rewrite just this scene's narration. The visuals stay exactly as they are."
+            aria-label="Regenerate this scene"
+            className="w-7 h-7 rounded-button border border-[var(--divider)] text-secondary hover:border-primary hover:text-primary disabled:opacity-30"
+          >
+            ↻
+          </button>
           <button
             type="button"
             onClick={() => onMove(-1)}
@@ -1172,6 +1306,30 @@ function SceneEditor({
           </button>
         </div>
       </div>
+
+      {/* Insert after this scene. A <select> rather than a menu because the list is short, fixed,
+          and each option needs a sentence of explanation. Only commentary scene types appear —
+          anything whose visual comes from the content database is excluded in blankScene.ts. */}
+      {selected && (
+        <div className="mb-3">
+          <select
+            value=""
+            disabled={busy}
+            onChange={(e) => {
+              if (e.target.value) onInsertAfter(e.target.value);
+              e.target.value = "";
+            }}
+            className="text-xs border border-[var(--divider)] rounded-button px-2 py-1 text-secondary bg-transparent"
+          >
+            <option value="">+ Insert a scene after this one…</option>
+            {INSERTABLE_SCENE_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {INSERTABLE_SCENE_LABELS[t]}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <div className="space-y-2">
         {scene.narration.map((segment) =>

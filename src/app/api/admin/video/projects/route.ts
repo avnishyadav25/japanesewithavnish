@@ -60,22 +60,6 @@ const SCOPE_KINDS: ScopeKind[] = [
   "content_batch", "content_item", "topic",
 ];
 
-/**
- * Makes an auto-generated project label identifiable in a list.
- *
- * `scopeTitle` returns "N5 kanji" for every content_batch with that type and level, and nothing
- * dedupes. Two same-day projects were then distinguishable only by their status badge, so it was
- * genuinely easy to open the empty twin of a finished video and see a Generate-script page.
- *
- * Only the PROJECT ROW is decorated. The storyboard re-resolves its own title from the snapshot
- * at generation time (storyboard.ts reads `snapshot.title`, never `project.title`), so none of
- * this reaches the screen in the finished video.
- */
-function disambiguateTitle(base: string, itemCount: number): string {
-  const stamp = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-  return `${base} · ${itemCount} item${itemCount === 1 ? "" : "s"} · ${stamp}`;
-}
-
 export async function GET(req: Request) {
   const admin = await getAdminSession();
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -120,7 +104,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to resolve scope" }, { status: 400 });
   }
   const resolvedTitle = snapshot.title;
-  const resolvedItemCount = snapshot.items.length;
 
   const typedTitle = typeof body?.title === "string" ? body.title.trim() : "";
   const grouping = body?.grouping === "video_per_item" ? "video_per_item" : "single_video";
@@ -201,8 +184,15 @@ export async function POST(req: Request) {
   }
 
   const project = await createProject({
-    // A title you typed is used exactly as typed; only the fallback gets disambiguated.
-    title: typedTitle || disambiguateTitle(resolvedTitle, resolvedItemCount),
+    // The scope's own title, undecorated.
+    //
+    // This used to append "· 10 items · 17 Aug" so two same-scope projects could be told apart in
+    // a list. That backfired: briefForRender() takes a brief's title from project_title and
+    // derives its UTM campaign slug from it, so real brief titles read "Number in Japanese · 40
+    // items · 17 Aug", that string became the default thumbnail headline, and campaign slugs
+    // carried a date. The Videos count and timestamp now shown in the projects list and on the
+    // dashboard distinguish duplicates better and leak nowhere.
+    title: typedTitle || resolvedTitle,
     scopeKind,
     scopeRef,
     grouping,
