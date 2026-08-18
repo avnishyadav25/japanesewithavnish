@@ -637,6 +637,14 @@ export interface BgmSettings {
   gainDb: number;
   /** How far the music drops while narration plays. Applied via ffmpeg sidechaincompress. */
   duckDb: number;
+  /**
+   * Measured tempo, frozen from `video_bgm_tracks` at generation time so the timeline can land
+   * cuts on the beat. Absent for free-tempo material and for anything measured at low confidence,
+   * and absent means no quantisation rather than a guessed grid.
+   */
+  bpm?: number;
+  /** Seconds from the start of the track to its first beat, so the grid is phase-aligned. */
+  beatOffsetSeconds?: number;
 }
 
 /**

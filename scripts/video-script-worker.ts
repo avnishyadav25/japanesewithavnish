@@ -88,6 +88,16 @@ async function main() {
       for (const lang of langs) {
         const startedAt = Date.now();
         const stylePreset = project.stylePreset ?? "lesson";
+        const bgmSettings = project.bgmTrackId
+          ? {
+              trackId: project.bgmTrackId,
+              gainDb: -18,
+              duckDb: -12,
+              // Frozen at generation, not read at render: see the note in the generate route.
+              ...((stylePreset === "shorts" ? await beatGridForTrack(sql, project.bgmTrackId) : null) ?? {}),
+            }
+          : undefined;
+
         const pacing = resolvePacing(project.pacing, snapshot.items[0]?.kind, stylePreset);
 
         // No batch cap: that limit belongs to the request path, not here.
@@ -99,7 +109,7 @@ async function main() {
           stylePreset,
           voices: project.voices,
           tone: project.tone,
-          bgm: project.bgmTrackId ? { trackId: project.bgmTrackId, gainDb: -18, duckDb: -12 } : undefined,
+          bgm: bgmSettings,
           includeBroll: project.includeBroll,
           branding: project.branding,
           siteName: "JapaneseWithAvnish",

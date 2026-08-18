@@ -144,3 +144,27 @@ export function ccPermitsCommercial(licenceUrl: string | null | undefined): "all
   }
   return "unknown";
 }
+
+/**
+ * The tempo to freeze into a storyboard's `bgm`, or null when the track cannot be quantised
+ * against.
+ *
+ * CONFIDENCE GATE. `detect-bgm-tempo.ts` records how clearly the autocorrelation peak stood out,
+ * and a weak peak means the estimate is a guess. Quantising against a wrong grid is strictly
+ * worse than not quantising: every cut is nudged toward beats that are not there, so the video
+ * gets slightly less accurate pacing and no musical payoff. Below 0.35 the tempo is stored for
+ * reference and deliberately not used.
+ */
+export async function beatGridForTrack(
+  db: (strings: TemplateStringsArray, ...values: unknown[]) => Promise<unknown>,
+  trackId: string
+): Promise<{ bpm: number; beatOffsetSeconds: number } | null> {
+  const rows = (await db`
+    SELECT bpm, beat_offset_seconds, bpm_confidence
+    FROM video_bgm_tracks WHERE id = ${trackId}::uuid
+  `) as { bpm: string | null; beat_offset_seconds: string | null; bpm_confidence: string | null }[];
+  const row = rows[0];
+  if (!row?.bpm) return null;
+  if (Number(row.bpm_confidence ?? 0) < 0.35) return null;
+  return { bpm: Number(row.bpm), beatOffsetSeconds: Number(row.beat_offset_seconds ?? 0) };
+}
