@@ -174,6 +174,15 @@ export interface PacingConfig {
   japaneseRate: number;
   /** 1.0 by default — the explanation should not drag. */
   narrationRate: number;
+  /**
+   * How many example sentences each item gets, where the content has them.
+   *
+   * A ceiling, not a target — most items simply do not have three. Measured across the library:
+   * grammar averages 4.4 examples and 67% have two or more, but only 12% of vocabulary and 16% of
+   * kanji do. So raising this changes a grammar video substantially and most vocabulary videos not
+   * at all, and the UI has to say so rather than offering a knob that silently does nothing.
+   */
+  examplesPerItem?: number;
 }
 
 /** Per-language Google TTS voice names. */

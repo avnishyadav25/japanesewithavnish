@@ -188,6 +188,11 @@ function strArray(value: unknown): string[] {
   return value.filter((v): v is string => typeof v === "string" && v.trim().length > 0);
 }
 
+/** How many examples this item may show: what was asked for, capped by what actually exists. */
+function exampleBudget(pacing: PacingConfig, available: number): number {
+  return Math.max(0, Math.min(available, Math.round(pacing.examplesPerItem ?? 1)));
+}
+
 function toVocabItem(item: ContentItem): VocabItem {
   const d = item.data;
   return {
@@ -536,7 +541,7 @@ function kanjiSkeleton(snapshot: ContentSnapshot, config: GenerateStoryboardConf
       });
     }
 
-    item.examples.slice(0, 2).forEach((example, ei) => {
+    item.examples.slice(0, exampleBudget(pacing, item.examples.length)).forEach((example, ei) => {
       const exBase = `${base}-ex${ei + 1}`;
       const exLeadId = `${exBase}-lead`;
       scenes.push({
@@ -658,7 +663,7 @@ function grammarSkeleton(snapshot: ContentSnapshot, config: GenerateStoryboardCo
       });
     }
 
-    item.examples.slice(0, 3).forEach((example, ei) => {
+    item.examples.slice(0, exampleBudget(pacing, item.examples.length)).forEach((example, ei) => {
       const exBase = `${base}-ex${ei + 1}`;
       const exLeadId = `${exBase}-lead`;
       scenes.push({
@@ -725,7 +730,7 @@ function genericSkeleton(snapshot: ContentSnapshot, config: GenerateStoryboardCo
       )
     );
 
-    item.examples.slice(0, 2).forEach((example, ei) => {
+    item.examples.slice(0, exampleBudget(pacing, item.examples.length)).forEach((example, ei) => {
       const exBase = `${base}-ex${ei + 1}`;
       scenes.push({
         id: exBase,

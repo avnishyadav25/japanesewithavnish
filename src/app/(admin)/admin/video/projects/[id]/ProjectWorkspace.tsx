@@ -21,10 +21,14 @@ import { StoryboardPlayer, type PlayerHandle } from "./StoryboardPlayer";
 import { Timeline, usePlayerTime } from "./Timeline";
 import { PromptPanel, type GenerateOverrides } from "./PromptPanel";
 import { CaptionControls } from "./CaptionControls";
+import { PacingControls } from "./PacingControls";
+import { resolvePacing } from "@/lib/video/pacing";
 import { INSERTABLE_SCENE_LABELS, INSERTABLE_SCENE_TYPES } from "@/lib/video/blankScene";
 
 interface Props {
   project: VideoProjectRow;
+  /** Projects sharing this one's batch, so "apply to all" can name a real number. */
+  batchCount: number;
   storyboards: StoryboardRow[];
   initialJobs: VideoRenderJobRow[];
   initialRenders: RenderRow[];
@@ -45,6 +49,7 @@ interface LinkTarget {
 
 export function ProjectWorkspace({
   project,
+  batchCount,
   storyboards,
   initialJobs,
   initialRenders,
@@ -760,6 +765,15 @@ export function ProjectWorkspace({
               hasRenders={renders.some((r) => r.isCurrent)}
               recutting={busy === "restyle"}
               onRecut={restyleRenders}
+            />
+
+            {/* Beside the subtitle panel on purpose: both are settings you change after watching a
+                render, and both have to be explicit about what a change costs. */}
+            <PacingControls
+              projectId={project.id}
+              initial={resolvePacing(project.pacing, undefined, project.stylePreset ?? "lesson")}
+              batchCount={batchCount}
+              stylePreset={project.stylePreset ?? "lesson"}
             />
 
             <AdminCard>

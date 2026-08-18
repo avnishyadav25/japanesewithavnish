@@ -500,3 +500,58 @@ no fixed prefix of the citation form can match.
 **Not automated on purpose:** `npm run video:assets` needs a human to look at the contact sheet
 before `--promote`, because chroma-keyed AI art picks up edge fringing that is only visible over a
 checkerboard.
+
+
+---
+
+## 2026-08-18 (later) — Asset gallery, stickers on screen, pacing on the project page
+
+**What changed.** `video_assets` gained readers: an API route, a gallery on Music & Assets, and a
+`StickerLayer` that draws a scene's frozen sticker in Shorts. All 16 mascots promoted. A Pacing
+panel on the project page, split into a free re-cut and a paid rewrite, with apply-to-batch and a
+lesson-to-Shorts conversion.
+
+### Gotchas found
+
+**`npm run x --flag` silently hands the flag to npm.** Two `--promote` runs did nothing but print a
+`Unknown cli config` warning and run another pilot. It needs `npm run x -- --flag`. The script's own
+tail message now prints the full command including the `--`.
+
+**A pilot message told the user to use the flag the file's header warns against.** `generate-mascots.ts`
+said "re-run with --apply" while its docblock explains --apply regenerates and ships a different
+cast than the sheet just approved. The one line anyone reads after a run named the wrong flag.
+
+**`GENERATED` was hand-maintained, which made promote a silent no-op.** Copying art into `public/`
+without editing the array leaves the ids invisible to `isGenerated()`, so nothing selects them.
+`--promote` now rewrites the block. The diff it prints was itself wrong first time — the regex
+`GENERATED[^[]*\[` matched the `MascotId[]` **type annotation's** brackets and captured an empty
+string, reporting all 16 as new. Anchor on the assignment, not the identifier.
+
+**"Free" was a lie until measured.** The re-cut transform clones a Japanese segment to add a repeat,
+and the claim is that it costs nothing because the clip is content-hashed. It was not: `buildSsml`
+renders `leadInSeconds` as a `<break>` **inside the SSML**, so a clone with a lead-in no existing
+segment used produced a different hash — three clones, two distinct hashes, one synthesis charge.
+Fixed by copying the lead-in from an existing segment in the run. Asserted: every repeat count from
+1 to 3, from both a 1× and a 2× starting point, resolves entirely from cache. **If a panel claims a
+change is free, assert the hash, not the intent.**
+
+**A flat default silently shortens content.** `examplesPerItem` replaced hardcoded slices that
+differed per skeleton — kanji 2, grammar 3. A single default of 1 would have cut a third of the
+content out of every grammar video with nothing failing. Defaults are now per-kind.
+
+**Tag matching without scoring picks nonsense.** A "does any tag match" test gave a ramen lesson
+`banana-sponge`, because both carry the tag "food" and it took whichever sorted first. Scoring by
+specificity — slug words above tags, longer tags above short generic ones — gives 6/6 sensible.
+
+**`video-doctor` reported a blocking problem on a healthy database** by asserting
+`video_publications`/`video_publish_targets`, which migration 143 deliberately drops. A permanently
+red doctor trains you to skip its output.
+
+### Measured, and worth knowing before promising a feature
+
+- Examples per item is only a meaningful control for **grammar**: 4.39 average, 67% have two or
+  more. Vocabulary is 12% and kanji 16%, so the same slider does almost nothing there. The panel
+  says so rather than offering a knob that quietly no-ops.
+- 46 assets: 16 food, 14 object, 6 animal, 6 character, 4 texture. Textures and characters are
+  excluded from scene decoration — a texture is a full-bleed background, and a second character
+  competes with the corner mascot.

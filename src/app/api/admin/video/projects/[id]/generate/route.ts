@@ -60,7 +60,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   try {
     const snapshot = await resolveScope(project.scopeKind, project.scopeRef);
     // Pacing is what makes the requested duration binding — see src/lib/video/pacing.ts.
-    const stylePreset = project.stylePreset ?? "lesson";
+    // A regenerate may also CONVERT the project. The beat split happens at generation, so a
+    // lesson storyboard cannot become a Short by re-cutting — switching has to come through here,
+    // and it persists so later renders and regenerations agree with what was just produced.
+    const requestedPreset = body?.stylePreset === "shorts" ? "shorts" : body?.stylePreset === "lesson" ? "lesson" : null;
+    const stylePreset = requestedPreset ?? project.stylePreset ?? "lesson";
+    if (requestedPreset && requestedPreset !== project.stylePreset && sql) {
+      await sql`UPDATE video_projects SET style_preset = ${requestedPreset}, updated_at = NOW() WHERE id = ${id}::uuid`;
+    }
     // Only fetched for Shorts — a lesson never decorates, so a lesson generation should not pay
     // for the query.
     const decorAssets = stylePreset === "shorts" && sql ? await listDecorAssets(sql) : [];
