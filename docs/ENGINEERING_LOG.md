@@ -437,9 +437,23 @@ which does not exist. Added `tsconfig.scripts.json` + `npm run typecheck:scripts
 video-pipeline scripts because the older ones carry long-standing errors and a permanently-red check
 gets ignored.
 
-**A new column must be added to the SELECT list as well as the table.** `style_preset` was in the
-migration, the insert, the type and the mapper — but not in `PROJECT_COLUMNS`, so every read fell
-back to `lesson` and the entire feature would have been inert. Invisible to tsc and lint.
+**Adding one column to a hand-written INSERT touches FOUR places, and missing any one fails
+differently.** `style_preset` needed: the migration, the column list, a `$18` placeholder, a value
+in the array, and `PROJECT_COLUMNS` for reads. I missed two of them in separate passes:
+
+- **`PROJECT_COLUMNS`** — every read fell back to `lesson`, so the feature would have been silently
+  inert. No error anywhere.
+- **The values array** — `bind message supplies 17 parameters, but prepared statement "" requires
+  18`. Every project creation 500'd. This one at least failed loudly, but only at runtime, in the
+  browser, after the user had filled in the whole wizard.
+
+**Neither is visible to tsc, lint or `npm run build`**, because the query is a string and the values
+are a plain array. `db.query` is used here rather than a tagged template precisely so
+`PROJECT_COLUMNS` can be spliced into `RETURNING` — that is a deliberate trade, and this is its
+cost. When touching that INSERT, count the columns, the placeholders and the values, then actually
+call `createProject` against the database. A round-trip assertion of
+`db.style_preset === row.stylePreset` for vertical-only, mixed and landscape-only took a minute and
+is the only thing that would have caught both.
 
 **`TransitionKind` had been dead since the first version.** Declared in types.ts, written onto every
 scene by `storyboard.ts` at 13 call sites, read by nothing. Every scene change in every video

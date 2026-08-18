@@ -166,6 +166,9 @@ export async function createProject(input: CreateProjectInput): Promise<VideoPro
       input.captions ? JSON.stringify(input.captions) : null,
       input.branding ? JSON.stringify(input.branding) : null,
       input.createdBy,
+      // $18. Derived from the formats rather than asked for: a vertical-only project is a Short,
+      // and making that an extra checkbox means one forgotten toggle produces a slow Reel.
+      input.stylePreset ?? stylePresetForFormats(input.formats),
     ]
   )) as Record<string, unknown>[];
   return toProjectRow(rows[0]);
