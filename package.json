@@ -49,7 +49,8 @@
     "video:script": "tsx scripts/video-script-worker.ts",
     "video:bgm-tempo": "tsx scripts/detect-bgm-tempo.ts",
     "video:assets": "tsx scripts/generate-video-assets.ts",
-    "typecheck:scripts": "tsc -p tsconfig.scripts.json"
+    "typecheck:scripts": "tsc -p tsconfig.scripts.json",
+    "content:backfill-examples": "tsx scripts/backfill-examples.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1000.0",

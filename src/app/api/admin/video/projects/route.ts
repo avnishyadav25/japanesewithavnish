@@ -85,6 +85,14 @@ export async function POST(req: Request) {
   }
 
   const scopeRef = (body?.scopeRef ?? {}) as ScopeRef;
+  // "Make N Shorts": one vertical Short per item, in one action.
+  //
+  // This is not a new pipeline — splitSnapshot() already turns a scope into N per-item scopes for
+  // `video_per_item`. What `bulkShorts` adds is pinning the output to vertical ONLY, which is what
+  // makes stylePresetForFormats() derive `shorts` for every child. Requesting a landscape cut
+  // alongside would silently drop all of them back to lesson pacing, so the flag overrides rather
+  // than merges with whatever formats were posted.
+  const bulkShorts = body?.bulkShorts === true;
   const formats = (Array.isArray(body?.formats) ? body.formats : ["vertical"]).filter((f: string) =>
     VIDEO_FORMATS.includes(f as VideoFormat)
   ) as VideoFormat[];
@@ -92,6 +100,10 @@ export async function POST(req: Request) {
     NARRATION_LANGS.includes(l as NarrationLang)
   ) as NarrationLang[];
 
+  if (bulkShorts) {
+    formats.length = 0;
+    formats.push("vertical");
+  }
   if (formats.length === 0) return NextResponse.json({ error: "At least one output format is required" }, { status: 400 });
   if (narrationLangs.length === 0) return NextResponse.json({ error: "At least one narration language is required" }, { status: 400 });
 
@@ -108,12 +120,13 @@ export async function POST(req: Request) {
   const typedTitle = typeof body?.title === "string" ? body.title.trim() : "";
   const grouping = body?.grouping === "video_per_item" ? "video_per_item" : "single_video";
 
+
   // ---- one video per item: N sibling projects sharing a batch id --------------
   //
   // This grouping did nothing before. It reported `items.length` planned videos and then wrote a
   // single project, so it produced one video covering everything — identical to single_video
   // apart from the promise.
-  if (grouping === "video_per_item") {
+  if (grouping === "video_per_item" || bulkShorts) {
     const { children, problems } = splitSnapshot(snapshot);
 
     if (children.length === 0) {
@@ -172,6 +185,9 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       batchId,
+      // Children are queued one at a time by the existing GitHub Actions worker — renders are
+      // serialised, so this is a queue rather than a fan-out.
+      mode: bulkShorts ? "bulk_shorts" : "video_per_item",
       projects: created,
       // The first project, so the existing client redirect keeps working unchanged.
       project: created[0],

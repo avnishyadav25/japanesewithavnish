@@ -397,3 +397,71 @@ keeps NULLs working where an array-level cast would not.
   zip: a media bundle measured ~48MB per render duplicating a video already in R2.
 - Scene-level regenerate and insert; Shorts cut from long videos, reusing cached narration.
 - Regenerating a script no longer drops a project out of `render_ready`.
+
+---
+
+## 2026-08-18 — Video round 4: a Shorts register, beat sync, asset library
+
+**What changed.** Vertical videos now generate and render under a separate `shorts` style preset:
+items split into 2–3 short beats, a camera that keeps moving for the whole scene, real scene
+transitions, a spoken hook, word-by-word captions, and cuts quantised to the music.
+`video_projects.style_preset` (migration 151), `video_tts_assets.word_timings` (152),
+`video_bgm_tracks.bpm/beat_offset_seconds/bpm_confidence`, and a new `video_assets` library.
+
+**Why.** Format had *no effect on timing anywhere*: `buildTimeline` took a format and used it only
+to read `fps`, and all four formats are 30fps, so a vertical render was frame-identical to a
+landscape one. There was no Shorts path to improve.
+
+### Gotchas found, each with the measurement
+
+**A fixed-window beat quantiser silently never fires.** Scene lengths come from measured narration,
+so consecutive scenes sit at a near-constant offset from the beat grid — five 2.833s scenes against
+a 0.5s grid leave a remainder of 0.333s *every time*, outside a 150ms window at every cut. The
+feature was fully implemented, passed review, and moved nothing. Window is now half a beat capped at
+250ms: 5/5 cuts on the grid, was 0/5. **If a feature can do nothing without erroring, assert that it
+did something.**
+
+**Google TTS returns word timings only on `v1beta1`, and `v1` ignores `enableTimePointing`
+silently.** No error, no warning, empty `timepoints`. Cost an hour of assuming the marks were wrong.
+
+**Adding SSML marks would have invalidated the entire TTS cache.** The key is
+`sha256(ssml + voice + rate + pitch)`; marks change the string but not one audio sample. 450 clips
+would have been re-billed. The hash is now computed on the mark-free SSML with timings stored in a
+separate column. There is an explicit assertion that the digest is unchanged.
+
+**`tsconfig.json` excludes `scripts/`.** `tsc --noEmit`, `next lint` and `npm run build` were all
+green while `scripts/lib/chromaMatte.ts` referenced an undefined `KEY_DISTANCE` — I had extracted a
+helper and left the constant behind in the caller, so `npm run video:mascots` would have thrown
+`ReferenceError` at the first pixel. A second bug in the same commit read `MASCOT_CHROMA.name`,
+which does not exist. Added `tsconfig.scripts.json` + `npm run typecheck:scripts`, scoped to the
+video-pipeline scripts because the older ones carry long-standing errors and a permanently-red check
+gets ignored.
+
+**A new column must be added to the SELECT list as well as the table.** `style_preset` was in the
+migration, the insert, the type and the mapper — but not in `PROJECT_COLUMNS`, so every read fell
+back to `lesson` and the entire feature would have been inert. Invisible to tsc and lint.
+
+**`TransitionKind` had been dead since the first version.** Declared in types.ts, written onto every
+scene by `storyboard.ts` at 13 call sites, read by nothing. Every scene change in every video
+shipped as a hard cut, including scenes whose storyboard said `fade`. Worth grepping for *readers*
+of a field, not just writers.
+
+### Corrected assumptions
+
+- **"88% of vocabulary pages are thin (no examples)" is wrong and out of date.** Measured:
+  5,215/5,215 published vocabulary items have an example. The real gaps were grammar (182) and
+  kanji (644 with neither a sentence nor an example word — not the 2,068 that lack a *sentence*,
+  because `KanjiStrokeScene` renders example words drawn from the vocabulary table).
+- **The mascot intro was working against the thing its own docstring claimed.** It said the beat
+  "buys the first-second hook a Reel lives or dies on" while being 2.5s of `durationMode: "fixed"`
+  with `narration: []` — the most expensive place in a Short to say nothing.
+
+### Content and cost
+
+`npm run content:backfill-examples` generates the missing examples, rejects any sentence that does
+not actually contain its target (models return sentences *about* a pattern, and substitute kana for
+kanji), writes the row live and flips the parent post to `needs_human_review`. ~$0.05 total.
+
+**Not automated on purpose:** `npm run video:assets` needs a human to look at the contact sheet
+before `--promote`, because chroma-keyed AI art picks up edge fringing that is only visible over a
+checkerboard.
