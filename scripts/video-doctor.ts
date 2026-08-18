@@ -69,10 +69,19 @@ function checkTooling(): void {
 // Database
 // ---------------------------------------------------------------------------
 
+/**
+ * NOT `video_publications` / `video_publish_targets`. Migration 143 supersedes both — it modelled
+ * publishing per-video, the social engine models it per-brief — and DROPs them after asserting
+ * they are empty. Listing them here made the doctor report "1 blocking problem" on a perfectly
+ * healthy database, which is worse than not checking at all: a permanently-red doctor trains you
+ * to skip its output, and then a real failure goes unread.
+ *
+ * `video_assets` is the round-4 sticker/character library.
+ */
 const VIDEO_TABLES = [
   "video_projects", "video_storyboards", "video_render_jobs", "video_renders", "video_themes",
   "video_bgm_tracks", "video_policies", "video_tts_assets", "video_broll_assets",
-  "video_content_links", "video_events", "video_publications", "video_publish_targets",
+  "video_content_links", "video_events", "video_assets",
 ];
 
 async function checkDatabase(): Promise<void> {
