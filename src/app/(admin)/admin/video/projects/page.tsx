@@ -17,6 +17,7 @@ type Row = {
   status: string;
   scope_kind: string;
   formats: string[];
+  style_preset: string | null;
   narration_langs: string[];
   created_by: string | null;
   created_at: string;
@@ -47,7 +48,7 @@ export default async function VideoProjectsPage({
       conditions.push(`p.batch_id = $${values.length}::uuid`);
     }
     projects = (await sql.query(
-      `SELECT p.id, p.title, p.status, p.scope_kind, p.formats, p.narration_langs, p.created_by,
+      `SELECT p.id, p.title, p.status, p.scope_kind, p.formats, p.narration_langs, p.created_by, p.style_preset,
               p.created_at::text AS created_at, p.batch_id,
               (SELECT COUNT(*)::int FROM video_renders r WHERE r.project_id = p.id AND r.is_current) AS render_count,
               (SELECT COUNT(*)::int FROM video_storyboards s WHERE s.project_id = p.id) AS storyboard_count
@@ -122,7 +123,17 @@ export default async function VideoProjectsPage({
                   {project.created_by && <div className="text-xs text-secondary">{project.created_by}</div>}
                 </td>
                 <td className="py-3 px-2 text-secondary">{project.scope_kind.replace(/_/g, " ")}</td>
-                <td className="py-3 px-2 text-secondary">{(project.formats ?? []).join(", ")}</td>
+                <td className="py-3 px-2 text-secondary">
+                  {(project.formats ?? []).join(", ")}
+                  {/* Which register it was generated under. Worth a badge rather than a column:
+                      it changes the scene count, the pacing and the captions, and is otherwise
+                      only discoverable by opening the storyboard. */}
+                  {project.style_preset === "shorts" && (
+                    <span className="ml-2 rounded-full bg-sakura/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sakura-dark">
+                      Shorts
+                    </span>
+                  )}
+                </td>
                 <td className="py-3 px-2 text-secondary">{(project.narration_langs ?? []).join(", ")}</td>
                 <td className="py-3 px-2 text-secondary">{project.render_count}</td>
                 <td className="py-3 px-2">

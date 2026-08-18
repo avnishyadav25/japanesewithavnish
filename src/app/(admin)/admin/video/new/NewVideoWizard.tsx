@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LEARN_CONTENT_TYPES } from "@/lib/learn-filters";
-import { FORMAT_SPECS, NARRATION_LANG_LABELS, NARRATION_LANGS, VIDEO_FORMATS } from "@/lib/video/types";
+import { FORMAT_SPECS, NARRATION_LANG_LABELS, NARRATION_LANGS, VIDEO_FORMATS, stylePresetForFormats } from "@/lib/video/types";
 import type { NarrationLang, PacingConfig, ScopeKind, ScopeRef, VideoFormat, VoiceConfig } from "@/lib/video/types";
 import { formatDuration } from "@/lib/video/pacing";
 import { VOICE_CATALOGUE } from "@/lib/video/voices";
@@ -585,6 +585,32 @@ export function NewVideoWizard({ themes, bgmTracks, levels, lessons, initial }: 
                     {FORMAT_SPECS[format].label}
                   </label>
                 ))}
+              </div>
+
+              {/* Which register these formats produce.
+                  The preset is DERIVED from the formats rather than chosen, so without this the
+                  most consequential decision in the wizard is invisible — you would pick formats
+                  and silently get either a fast Reel or a calm lesson with nothing saying which. */}
+              <div
+                className={`mt-3 rounded-lg border p-3 text-xs leading-relaxed ${
+                  stylePresetForFormats(formats) === "shorts"
+                    ? "border-sakura/40 bg-sakura/5 text-charcoal"
+                    : "border-stone-200 bg-stone-50 text-charcoal/80"
+                }`}
+              >
+                {stylePresetForFormats(formats) === "shorts" ? (
+                  <>
+                    <strong>Shorts pacing.</strong> Each item is split into 2–3 short beats, the camera
+                    keeps moving, captions highlight each word as it is spoken, and the hook is spoken
+                    over the first second. Roughly 45% shorter than a lesson.
+                  </>
+                ) : (
+                  <>
+                    <strong>Lesson pacing.</strong> One card per item, held for as long as the narration
+                    takes. <em>Vertical on its own</em> switches to Shorts pacing — adding any other
+                    format keeps lesson pacing, so a YouTube cut is never chopped into beats.
+                  </>
+                )}
               </div>
             </div>
 
