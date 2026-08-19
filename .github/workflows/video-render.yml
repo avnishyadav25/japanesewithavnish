@@ -39,7 +39,16 @@ jobs:
     timeout-minutes: 90
 
     steps:
+      # WHICH CODE RENDERS. On a repository_dispatch there is no branch context, so a bare
+      # checkout silently takes the DEFAULT BRANCH — meaning a render queued from a feature branch
+      # builds main and produces a video from code you are not testing. That is invisible in the
+      # UI: the job succeeds and the output simply lacks whatever you were working on.
+      #
+      # GITHUB_DISPATCH_REF (optional, set locally) rides along in the payload so a branch can be
+      # rendered before it is merged. Unset, this resolves to the default branch exactly as before.
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.client_payload.ref || github.ref }}
 
       - uses: actions/setup-node@v4
         with:

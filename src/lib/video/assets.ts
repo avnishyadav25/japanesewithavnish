@@ -89,7 +89,10 @@ export const ASSET_SPECS: AssetSpec[] = [
   animal("crane-bird", "Crane", "a red-crowned crane standing tall", ["animal", "bird", "luck"]),
 
   // --- original cast, anime register, owned outright ---------------------------------------
-  character("student-hero", "Student hero", "an original spiky-haired teenage student in a school uniform, grinning, one fist raised, anime style", ["character", "study", "energy"]),
+  // No age word. The first version asked for a "teenage student" and was the only character the
+  // model refused outright — image models routinely decline to depict minors, and the refusal was
+  // invisible because the provider reported it as "model may not support image generation".
+  character("student-hero", "Student hero", "an original spiky-haired young adult in a college jacket, grinning, one fist raised in triumph, anime style", ["character", "study", "energy"]),
   character("magical-learner", "Magical learner", "an original cheerful magical-girl style student holding a glowing pen like a wand, anime style", ["character", "study", "magic"]),
   character("calm-sensei", "Calm sensei", "an original patient teacher in a simple haori holding a book, warm expression, anime style", ["character", "teach", "calm"]),
   character("spark-creature", "Spark creature", "an original small round yellow creature with a lightning-bolt tail tuft, cheerful, anime style, NOT any existing franchise character", ["character", "mascot", "energy"]),

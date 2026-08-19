@@ -10,6 +10,7 @@ import React from "react";
 import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
 import { useLayout, useSceneMotion } from "../LayoutContext";
 import { cameraScaleAt } from "@/lib/video/motion";
+import { StickerLayer } from "./StickerLayer";
 import { nearestJaWeight } from "../fonts";
 import { fontStackJa, fontStackSans } from "../theme";
 
@@ -196,10 +197,13 @@ export const SceneFrame: React.FC<{
   const { theme, scale, motion } = useLayout();
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const { beatFrames, durationInFrames } = useSceneMotion();
+  const { beatFrames, durationInFrames, decor } = useSceneMotion();
   const camera = cameraScaleAt(frame, durationInFrames, beatFrames, motion, fps);
   return (
     <AbsoluteFill style={{ background: background ?? theme.bg }}>
+      {/* Under the content column, above the background fill. Absent unless the storyboard froze
+          one, which only happens on the Shorts preset. */}
+      {decor ? <StickerLayer decor={decor} /> : null}
       <AbsoluteFill
         style={{
           transform: camera === 1 ? undefined : `scale(${camera})`,

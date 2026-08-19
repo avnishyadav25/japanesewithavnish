@@ -174,6 +174,15 @@ export interface PacingConfig {
   japaneseRate: number;
   /** 1.0 by default — the explanation should not drag. */
   narrationRate: number;
+  /**
+   * How many example sentences each item gets, where the content has them.
+   *
+   * A ceiling, not a target — most items simply do not have three. Measured across the library:
+   * grammar averages 4.4 examples and 67% have two or more, but only 12% of vocabulary and 16% of
+   * kanji do. So raising this changes a grammar video substantially and most vocabulary videos not
+   * at all, and the UI has to say so rather than offering a knob that silently does nothing.
+   */
+  examplesPerItem?: number;
 }
 
 /** Per-language Google TTS voice names. */
@@ -304,6 +313,14 @@ export interface Scene {
    */
   minDurationSeconds?: number;
   transitionIn: Transition;
+  /**
+   * A sticker from the reusable asset library, chosen at generation and frozen here.
+   *
+   * Frozen rather than looked up at render for the same reason as branding: the Remotion bundle is
+   * a browser build with no database, and a re-render must reproduce what was approved rather than
+   * whatever the library holds today. Absent on every lesson-preset scene by design.
+   */
+  decor?: { slug: string; url: string; corner: "left" | "right" };
   narration: NarrationSegment[];
   visual: VisualSpec;
   /** Overrides project pacing for this scene alone — one hard word may deserve three repeats

@@ -39,7 +39,29 @@ export async function generateImageWithGemini(prompt: string): Promise<Generated
   const imagePart = parts.find((p: { inlineData?: { mimeType?: string; data?: string } }) => p.inlineData?.data);
 
   if (!imagePart?.inlineData?.data) {
-    throw new Error("Gemini returned no image (model may not support image generation)");
+    /**
+     * Say WHY, not "the model may not support image generation".
+     *
+     * That old message was a guess dressed as a diagnosis, and it was wrong in the case that
+     * actually happens: a batch of 46 assets had 44 succeed and 2 fail, so the model plainly does
+     * support image generation. The response carries the real reason — `finishReason` is
+     * SAFETY/PROHIBITED_CONTENT on a refusal, and any `text` part is Gemini explaining itself —
+     * and the old throw discarded both, which is what turned a two-minute fix into an
+     * investigation.
+     */
+    const candidate = data.candidates?.[0] ?? {};
+    const why = [
+      candidate.finishReason && `finishReason=${candidate.finishReason}`,
+      data.promptFeedback?.blockReason && `blockReason=${data.promptFeedback.blockReason}`,
+      textResponse && `model said: ${String(textResponse).slice(0, 200)}`,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    throw new Error(
+      why
+        ? `Gemini returned no image — ${why}`
+        : "Gemini returned no image, and gave no reason (no finishReason, no blockReason, no text part)."
+    );
   }
 
   const mime = imagePart.inlineData.mimeType || "image/png";

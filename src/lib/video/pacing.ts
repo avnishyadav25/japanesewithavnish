@@ -78,6 +78,9 @@ export const DEFAULT_PACING: PacingConfig = {
   scenePaddingSeconds: 0.45,
   japaneseRate: 0.85,
   narrationRate: 1.0,
+  // Overridden per content kind below — the skeletons used different hardcoded caps, and a single
+  // flat default here would silently shorten every kanji and grammar video.
+  examplesPerItem: 2,
 };
 
 /**
@@ -135,6 +138,16 @@ export const SHORTS_SECONDS_PER_ITEM_BY_KIND: Record<string, number> = {
   lesson: 20,
 };
 
+/**
+ * Per-kind example caps, preserving exactly what each skeleton hardcoded before this was a knob:
+ * kanji sliced to 2, grammar to 3, everything else to 2. Getting this wrong is not cosmetic — a
+ * flat default would have quietly cut a third of the content out of every grammar video, and
+ * nothing would have failed.
+ *
+ * Shorts take one regardless: three example sentences in a nine-second budget is not a Short.
+ */
+const EXAMPLES_PER_ITEM_BY_KIND: Record<string, number> = { kanji: 2, grammar: 3 };
+
 export function defaultPacingFor(kind: string | undefined, preset: VideoStylePreset = "lesson"): PacingConfig {
   const shorts = preset === "shorts";
   const table = shorts ? SHORTS_SECONDS_PER_ITEM_BY_KIND : SECONDS_PER_ITEM_BY_KIND;
@@ -147,6 +160,7 @@ export function defaultPacingFor(kind: string | undefined, preset: VideoStylePre
     repeatJapanese: kind === "vocabulary" || kind === "kanji" ? 2 : 1,
     pauseAfterJapaneseSeconds: shorts ? 0.6 : DEFAULT_PACING.pauseAfterJapaneseSeconds,
     scenePaddingSeconds: shorts ? 0.25 : DEFAULT_PACING.scenePaddingSeconds,
+    examplesPerItem: shorts ? 1 : EXAMPLES_PER_ITEM_BY_KIND[kind ?? ""] ?? 2,
   };
 }
 

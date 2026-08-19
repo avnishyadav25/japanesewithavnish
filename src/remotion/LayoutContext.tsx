@@ -55,6 +55,14 @@ interface SceneMotionValue {
   /** Frames, scene-relative, at which each narration segment begins. */
   beatFrames: number[];
   durationInFrames: number;
+  /**
+   * The scene's frozen sticker, carried here rather than passed as a prop.
+   *
+   * Every one of the twenty scene components renders through SceneFrame, so a prop would mean
+   * editing all twenty to thread a value none of them use — and the next scene added would forget.
+   * Context puts it in one place, and SceneFrame is the only reader.
+   */
+  decor?: { slug: string; url: string; corner: "left" | "right" };
 }
 
 const SceneMotionContext = createContext<SceneMotionValue>({ beatFrames: [], durationInFrames: 0 });
@@ -62,9 +70,10 @@ const SceneMotionContext = createContext<SceneMotionValue>({ beatFrames: [], dur
 export const SceneMotionProvider: React.FC<{
   beatFrames: number[];
   durationInFrames: number;
+  decor?: { slug: string; url: string; corner: "left" | "right" };
   children: React.ReactNode;
-}> = ({ beatFrames, durationInFrames, children }) => {
-  const value = useMemo(() => ({ beatFrames, durationInFrames }), [beatFrames, durationInFrames]);
+}> = ({ beatFrames, durationInFrames, decor, children }) => {
+  const value = useMemo(() => ({ beatFrames, durationInFrames, decor }), [beatFrames, durationInFrames, decor]);
   return <SceneMotionContext.Provider value={value}>{children}</SceneMotionContext.Provider>;
 };
 

@@ -437,9 +437,23 @@ which does not exist. Added `tsconfig.scripts.json` + `npm run typecheck:scripts
 video-pipeline scripts because the older ones carry long-standing errors and a permanently-red check
 gets ignored.
 
-**A new column must be added to the SELECT list as well as the table.** `style_preset` was in the
-migration, the insert, the type and the mapper — but not in `PROJECT_COLUMNS`, so every read fell
-back to `lesson` and the entire feature would have been inert. Invisible to tsc and lint.
+**Adding one column to a hand-written INSERT touches FOUR places, and missing any one fails
+differently.** `style_preset` needed: the migration, the column list, a `$18` placeholder, a value
+in the array, and `PROJECT_COLUMNS` for reads. I missed two of them in separate passes:
+
+- **`PROJECT_COLUMNS`** — every read fell back to `lesson`, so the feature would have been silently
+  inert. No error anywhere.
+- **The values array** — `bind message supplies 17 parameters, but prepared statement "" requires
+  18`. Every project creation 500'd. This one at least failed loudly, but only at runtime, in the
+  browser, after the user had filled in the whole wizard.
+
+**Neither is visible to tsc, lint or `npm run build`**, because the query is a string and the values
+are a plain array. `db.query` is used here rather than a tagged template precisely so
+`PROJECT_COLUMNS` can be spliced into `RETURNING` — that is a deliberate trade, and this is its
+cost. When touching that INSERT, count the columns, the placeholders and the values, then actually
+call `createProject` against the database. A round-trip assertion of
+`db.style_preset === row.stylePreset` for vertical-only, mixed and landscape-only took a minute and
+is the only thing that would have caught both.
 
 **`TransitionKind` had been dead since the first version.** Declared in types.ts, written onto every
 scene by `storyboard.ts` at 13 call sites, read by nothing. Every scene change in every video
@@ -458,10 +472,143 @@ of a field, not just writers.
 
 ### Content and cost
 
-`npm run content:backfill-examples` generates the missing examples, rejects any sentence that does
-not actually contain its target (models return sentences *about* a pattern, and substitute kana for
-kanji), writes the row live and flips the parent post to `needs_human_review`. ~$0.05 total.
+`npm run content:backfill-examples` wrote **817 of 822** missing examples for $0.043. Grammar
+coverage went 366/548 → 547/548; the kanji gap went 644 → 4.
+
+**The containment guard was wrong on its first version, and the failures looked like bad data.**
+It required the sentence to contain the pattern as a literal substring, which rejected 23 items
+that were all correct. Two distinct causes, only visible by reading the rejected output:
+
+- **Conjugation.** `〜てくださる` is demonstrated by 「教えてくださいました」, which does not contain
+  「てくださる」 anywhere. Patterns inflect; the citation form rarely survives into a sentence.
+- **The "pattern" is often a lesson heading, not a string.** 「い-adjective (past, negative)」 has
+  exactly one Japanese character in it — 「い」 — and 「昨日は寒くなかったです。」 is a textbook-perfect
+  example that happens not to contain it. Same for 「Special case: いい → よい」 and
+  「やゆよ + small ゃゅょ」.
+
+Fixed by skipping the check for descriptive headings and matching literal patterns on a **60%
+prefix** of their longest Japanese run, which survives inflection because Japanese conjugates at
+the tail. Ten assertions cover both directions, including two sentences that must still be
+rejected. **I nearly recorded this as a data-quality problem; it was my check.**
+
+The 5 that remain need a human and will not resolve by retrying: four are rare kanji (膚, 准, 斥,
+錮) where the model substitutes a common alternative every time — 肌 for 膚, 準 for 准 — and
+rejecting that is correct, since a sentence without the character teaches nothing. The fifth is
+`Vさせてもらう`, where the causative attaches per verb class (休む → 休**ま**せて, not 休**さ**せて) so
+no fixed prefix of the citation form can match.
 
 **Not automated on purpose:** `npm run video:assets` needs a human to look at the contact sheet
 before `--promote`, because chroma-keyed AI art picks up edge fringing that is only visible over a
 checkerboard.
+
+
+---
+
+## 2026-08-18 (later) — Asset gallery, stickers on screen, pacing on the project page
+
+**What changed.** `video_assets` gained readers: an API route, a gallery on Music & Assets, and a
+`StickerLayer` that draws a scene's frozen sticker in Shorts. All 16 mascots promoted. A Pacing
+panel on the project page, split into a free re-cut and a paid rewrite, with apply-to-batch and a
+lesson-to-Shorts conversion.
+
+### Gotchas found
+
+**`npm run x --flag` silently hands the flag to npm.** Two `--promote` runs did nothing but print a
+`Unknown cli config` warning and run another pilot. It needs `npm run x -- --flag`. The script's own
+tail message now prints the full command including the `--`.
+
+**A pilot message told the user to use the flag the file's header warns against.** `generate-mascots.ts`
+said "re-run with --apply" while its docblock explains --apply regenerates and ships a different
+cast than the sheet just approved. The one line anyone reads after a run named the wrong flag.
+
+**`GENERATED` was hand-maintained, which made promote a silent no-op.** Copying art into `public/`
+without editing the array leaves the ids invisible to `isGenerated()`, so nothing selects them.
+`--promote` now rewrites the block. The diff it prints was itself wrong first time — the regex
+`GENERATED[^[]*\[` matched the `MascotId[]` **type annotation's** brackets and captured an empty
+string, reporting all 16 as new. Anchor on the assignment, not the identifier.
+
+**"Free" was a lie until measured.** The re-cut transform clones a Japanese segment to add a repeat,
+and the claim is that it costs nothing because the clip is content-hashed. It was not: `buildSsml`
+renders `leadInSeconds` as a `<break>` **inside the SSML**, so a clone with a lead-in no existing
+segment used produced a different hash — three clones, two distinct hashes, one synthesis charge.
+Fixed by copying the lead-in from an existing segment in the run. Asserted: every repeat count from
+1 to 3, from both a 1× and a 2× starting point, resolves entirely from cache. **If a panel claims a
+change is free, assert the hash, not the intent.**
+
+**A flat default silently shortens content.** `examplesPerItem` replaced hardcoded slices that
+differed per skeleton — kanji 2, grammar 3. A single default of 1 would have cut a third of the
+content out of every grammar video with nothing failing. Defaults are now per-kind.
+
+**Tag matching without scoring picks nonsense.** A "does any tag match" test gave a ramen lesson
+`banana-sponge`, because both carry the tag "food" and it took whichever sorted first. Scoring by
+specificity — slug words above tags, longer tags above short generic ones — gives 6/6 sensible.
+
+**`video-doctor` reported a blocking problem on a healthy database** by asserting
+`video_publications`/`video_publish_targets`, which migration 143 deliberately drops. A permanently
+red doctor trains you to skip its output.
+
+### Measured, and worth knowing before promising a feature
+
+- Examples per item is only a meaningful control for **grammar**: 4.39 average, 67% have two or
+  more. Vocabulary is 12% and kanji 16%, so the same slider does almost nothing there. The panel
+  says so rather than offering a knob that quietly no-ops.
+- 46 assets: 16 food, 14 object, 6 animal, 6 character, 4 texture. Textures and characters are
+  excluded from scene decoration — a texture is a full-bleed background, and a second character
+  competes with the corner mascot.
+
+
+---
+
+## 2026-08-18 (later still) — The Shorts preset never reached generation
+
+**Nine of nine Shorts projects had lesson-shaped scripts.** Zero Shorts storyboards existed and no
+sticker had ever been placed, while the admin badged the projects "SHORTS" and the wizard priced
+them as Shorts.
+
+**Cause.** `generateStoryboard` in the admin's generate route was never passed `stylePreset` or
+`decorAssets`. I added them with a scripted edit that matched the `buildGenerationRequest` call
+above it and did not match the real generation call, which is formatted differently. So **the cost
+estimate was calculated for a Short and the video was built as a lesson.** The CLI worker did pass
+them, which is why my smoke test through `npm run video:script` produced a correct Shorts storyboard
+and I concluded the feature worked.
+
+### Gotchas
+
+**An optional config field with a legitimate default fails silently.** `stylePreset?:` meant a
+caller that forgot it compiled and got `lesson` — a real value, not undefined. Making it
+**required** turned the omission into a build error, and doing so immediately surfaced a *second*
+call site (the generate preview) that had the same bug, so previews were lesson-priced too.
+
+**Scoping the scripts typecheck left a hole exactly where it mattered.** `tsconfig.scripts.json`
+did not include `video-script-worker.ts`, so when I tested that the new required field would fail
+the build, it did not — and the same gap had already let two undefined functions ship: the worker
+called `listDecorAssets` and `beatGridForTrack` with no import, because that file uses dynamic
+imports inside `main()` and my top-level import line never matched. **The worker was broken at
+runtime and the repair plan depended on it.** A partial typecheck is most dangerous where you
+assume it is complete.
+
+**Verify the artefact, not the estimate.** The generate route returned a correct Shorts cost while
+producing a lesson. A test asserting the response would have passed.
+
+**Decoration keyed on scene index makes one sticker hop.** Three beats teaching いぬ all match
+`akita-loyal`, and alternating corners by index made the dog jump left/right/left across the cuts.
+Keyed on the slug instead, a sticker keeps one corner.
+
+### Version history
+
+`video_storyboards.change_summary` (migration 153) records what changed at the moment of the
+change, because `source` is too coarse — a re-cut, a rewrite and a preset switch are all
+"human_edited" or "regenerated". `src/lib/video/storyboardDiff.ts` computes a diff for versions
+predating the column; verified against a real four-version history, it reports the re-cut as
+"3 → 4 Japanese clips" and the rewrites as word-count changes.
+
+`STORYBOARD_COLUMNS` needed `parent_storyboard_id` **and** `change_summary` adding — the same
+"column exists on the table but not in the SELECT list" failure that made `style_preset` read as
+`lesson` everywhere. Adding a column touches the migration, the insert, the placeholder list, the
+values array, the row type, the mapper and the SELECT list. Miss any one and it fails differently.
+
+### Result
+
+`npm run video:fix-shorts` regenerates any Shorts project whose script was built as a lesson, by
+calling the worker rather than reimplementing generation, and refuses to report success on a project
+that is still wrong. All nine now render as 6-scene Shorts with three stickers each.

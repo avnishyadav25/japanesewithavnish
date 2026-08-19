@@ -146,7 +146,18 @@ async function main() {
   }
 
   if (made.length > 0) {
-    await fs.writeFile(path.join(REVIEW_DIR, "contact-sheet.png"), await contactSheet(made));
+    // Built from EVERY png on disk, not just this run's output. With --only=a,b the sheet would
+    // otherwise be replaced by a two-cell image, silently destroying the review artefact for the
+    // other 44 — and the whole point of the sheet is that you approve the library on one screen.
+    const onDisk = (await fs.readdir(REVIEW_DIR))
+      .filter((f) => f.endsWith(".png") && f !== "contact-sheet.png")
+      .sort();
+    const all: { slug: string; buffer: Buffer }[] = [];
+    for (const file of onDisk) {
+      all.push({ slug: file.replace(/\.png$/, ""), buffer: await fs.readFile(path.join(REVIEW_DIR, file)) });
+    }
+    await fs.writeFile(path.join(REVIEW_DIR, "contact-sheet.png"), await contactSheet(all));
+    console.log(`\nContact sheet rebuilt with all ${all.length} asset(s) on disk, not just this run's ${made.length}.`);
   }
 
   console.log(`\n${made.length} generated, ${failed.length} failed${failed.length ? `: ${failed.join(", ")}` : ""}.`);

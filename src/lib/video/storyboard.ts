@@ -31,6 +31,7 @@ import {
   resolvePacing,
   secondsForWords,
 } from "./pacing";
+import { decorateScenes, type DecorAsset } from "./decor";
 import { CHROME_SCENE_IDS } from "./types";
 import type {
   BrandingSettings,
@@ -75,10 +76,20 @@ export interface GenerateStoryboardConfig {
    */
   includeBroll?: boolean;
   /**
-   * `shorts` splits each item into several short beats and shortens every budget. Absent means
-   * `lesson`, which is what every skeleton did before this existed.
+   * `shorts` splits each item into several short beats and shortens every budget.
+   *
+   * REQUIRED, deliberately. It was optional, and a caller that forgot it compiled fine and got
+   * `lesson` — a real, legitimate value — so the admin's generate route silently produced
+   * lesson-shaped scripts for nine Shorts projects while the cost estimate beside it said
+   * otherwise. Nothing failed: not tsc, not lint, not the build, not either test suite. Required,
+   * that omission is a compile error.
    */
-  stylePreset?: VideoStylePreset;
+  stylePreset: VideoStylePreset;
+  /**
+   * The enabled sticker library, fetched by the caller. Empty or absent means no decoration, which
+   * is what every lesson gets and what a Short gets before anything has been promoted to R2.
+   */
+  decorAssets?: DecorAsset[];
 }
 
 export interface GeneratedStoryboard {
@@ -180,6 +191,11 @@ function str(value: unknown): string | undefined {
 function strArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.filter((v): v is string => typeof v === "string" && v.trim().length > 0);
+}
+
+/** How many examples this item may show: what was asked for, capped by what actually exists. */
+function exampleBudget(pacing: PacingConfig, available: number): number {
+  return Math.max(0, Math.min(available, Math.round(pacing.examplesPerItem ?? 1)));
 }
 
 function toVocabItem(item: ContentItem): VocabItem {
@@ -530,7 +546,7 @@ function kanjiSkeleton(snapshot: ContentSnapshot, config: GenerateStoryboardConf
       });
     }
 
-    item.examples.slice(0, 2).forEach((example, ei) => {
+    item.examples.slice(0, exampleBudget(pacing, item.examples.length)).forEach((example, ei) => {
       const exBase = `${base}-ex${ei + 1}`;
       const exLeadId = `${exBase}-lead`;
       scenes.push({
@@ -652,7 +668,7 @@ function grammarSkeleton(snapshot: ContentSnapshot, config: GenerateStoryboardCo
       });
     }
 
-    item.examples.slice(0, 3).forEach((example, ei) => {
+    item.examples.slice(0, exampleBudget(pacing, item.examples.length)).forEach((example, ei) => {
       const exBase = `${base}-ex${ei + 1}`;
       const exLeadId = `${exBase}-lead`;
       scenes.push({
@@ -719,7 +735,7 @@ function genericSkeleton(snapshot: ContentSnapshot, config: GenerateStoryboardCo
       )
     );
 
-    item.examples.slice(0, 2).forEach((example, ei) => {
+    item.examples.slice(0, exampleBudget(pacing, item.examples.length)).forEach((example, ei) => {
       const exBase = `${base}-ex${ei + 1}`;
       scenes.push({
         id: exBase,
@@ -1421,6 +1437,18 @@ export async function generateStoryboard(
       .filter((segment) => segment.text.trim().length > 0),
   }));
 
+  // Stickers, Shorts only. Applied here rather than inside each skeleton so all five get it from
+  // one place and a new skeleton cannot forget — and applied AFTER narration is filled, so the
+  // terms used for tag-matching include what the model actually wrote.
+  const decorated =
+    config.stylePreset === "shorts" && (config.decorAssets?.length ?? 0) > 0
+      ? decorateScenes(filled, config.decorAssets!, [
+          snapshot.title,
+          snapshot.items[0]?.kind ?? "",
+          ...snapshot.items.slice(0, 8).map((i) => `${i.title} ${i.summary ?? ""}`),
+        ])
+      : filled;
+
   const storyboard: Storyboard = {
     schemaVersion: 1,
     projectId: config.projectId,
@@ -1444,7 +1472,7 @@ export async function generateStoryboard(
     // under lesson motion would hold a 3-second beat perfectly still.
     branding: resolveBranding(config.branding),
     stylePreset: config.stylePreset ?? "lesson",
-    scenes: filled,
+    scenes: decorated,
   };
 
   return {

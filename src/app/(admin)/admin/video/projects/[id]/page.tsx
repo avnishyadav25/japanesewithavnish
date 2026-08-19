@@ -24,6 +24,13 @@ export default async function VideoProjectPage({ params }: { params: Promise<{ i
   const project = await getProject(id);
   if (!project) notFound();
 
+  // Siblings from the same wizard run, so the panel can offer "apply to all N" with a real number
+  // rather than a guess. One when the project was created on its own.
+  const batchCount = project.batchId && sql
+    ? Number(((await sql`SELECT COUNT(*)::int AS n FROM video_projects WHERE batch_id = ${project.batchId}::uuid`) as { n: number }[])[0]?.n ?? 1)
+    : 1;
+
+
   const [storyboards, jobs, renders, themeRow, bgmRow] = await Promise.all([
     listStoryboards(id),
     listJobs({ projectId: id, limit: 25 }),
@@ -81,6 +88,7 @@ export default async function VideoProjectPage({ params }: { params: Promise<{ i
 
       <ProjectWorkspace
         project={project}
+      batchCount={batchCount}
         storyboards={storyboards}
         initialJobs={jobs}
         initialRenders={rendersWithPublications}

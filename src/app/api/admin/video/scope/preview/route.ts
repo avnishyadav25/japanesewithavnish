@@ -12,6 +12,7 @@ import {
 } from "@/lib/video/pacing";
 import { buildGenerationRequest } from "@/lib/video/storyboard";
 import { DEFAULT_VOICES } from "@/lib/video/tts";
+import { stylePresetForFormats } from "@/lib/video/types";
 import type {
   NarrationLang, PacingConfig, ScopeKind, ScopeRef, VideoFormat } from "@/lib/video/types";
 
@@ -40,7 +41,13 @@ export async function POST(req: Request) {
   try {
     const snapshot = await resolveScope(scopeKind, scopeRef);
     const kind = snapshot.items[0]?.kind;
-    const pacing = resolvePacing((body?.pacing as Partial<PacingConfig> | undefined) ?? null, kind);
+    // The preset the project WOULD be created with, derived from the same formats the wizard is
+    // about to post. Without this the estimate silently prices a lesson: it reported "16s per
+    // item" and "31s each" for a vertical-only project that will actually generate 9s beats, so
+    // the panel's headline number, its per-item warning and its cost were all for a video that was
+    // never going to be built.
+    const stylePreset = stylePresetForFormats(formats);
+    const pacing = resolvePacing((body?.pacing as Partial<PacingConfig> | undefined) ?? null, kind, stylePreset);
 
     const videos = plannedVideoCount(snapshot, grouping);
     const renders = videos * Math.max(1, formats.length) * Math.max(1, langs.length);
@@ -61,6 +68,8 @@ export async function POST(req: Request) {
       narrationLang: (langs[0] ?? "en") as NarrationLang,
       themeKey: "washi-light",
       pacing,
+      // Also drives the beat split, so the scene count the estimate walks is the real one.
+      stylePreset,
     });
     const planned = new Map(
       request.slots.map((slot) => [slot.id, secondsForWords(slot.maxWords, "en", pacing.narrationRate)])
