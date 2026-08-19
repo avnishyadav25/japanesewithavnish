@@ -57,9 +57,18 @@ jobs:
 
       - run: npm ci
 
-      # Chromium is ~150MB and Remotion downloads its own headless shell on first use; caching
-      # both turns a 2-3 minute cold start into a few seconds.
+      # ASK BEFORE PAYING FOR SETUP. The schedule fires four times an hour whether or not anything
+      # is queued, and everything below this used to run unconditionally — a browser install and an
+      # apt-get, several minutes each, to then find an empty queue. This also tells us whether any
+      # queued job needs B-roll, which is the only thing Chromium is for.
+      - name: What is in the queue
+        id: queue
+        run: npm run video:queue-status
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
       - name: Cache browsers
+        if: steps.queue.outputs.jobs != '0'
         uses: actions/cache@v4
         with:
           path: |
@@ -68,18 +77,37 @@ jobs:
           key: browsers-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
           restore-keys: browsers-${{ runner.os }}-
 
-      # Playwright is only needed once B-roll capture lands (Phase 4), but installing it here
-      # keeps the cache warm and the workflow unchanged when that ships.
+      # NO `--with-deps`, and only when a queued job actually captures a page.
+      #
+      # `--with-deps` shells out to apt-get, and when GitHub's Azure Ubuntu mirror is unreachable
+      # that hangs: run #291 spent 9m43s emitting `Ign: azure.archive.ubuntu.com` before falling
+      # back, against a 90-minute job budget with no step timeout to stop it. The ubuntu-latest
+      # image already ships the shared libraries Chromium needs — it comes with Chrome, Edge and
+      # Firefox preinstalled — so the apt call bought nothing and cost ten minutes.
+      #
+      # Bounded anyway: if this ever hangs again it fails in six minutes instead of burning the job.
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        if: steps.queue.outputs.broll == 'true'
+        timeout-minutes: 6
+        run: npx playwright install chromium
 
       # ffmpeg is preinstalled on ubuntu-latest. fonts-noto-cjk is the fallback face if the
       # Google Fonts fetch in src/remotion/fonts.ts fails — without a system CJK font, a failed
       # fetch renders Japanese as tofu boxes rather than degrading gracefully.
+      #
+      # Bounded and non-fatal for the same mirror reason: this is a FALLBACK font, so losing it is
+      # a worse-looking render in one failure mode, while hanging on apt costs every render.
+      # Explicit apt timeouts so a dead mirror is skipped rather than retried for minutes.
       - name: Install CJK fonts
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+        if: steps.queue.outputs.jobs != '0'
+        timeout-minutes: 5
+        continue-on-error: true
+        run: |
+          sudo apt-get update -o Acquire::Retries=2 -o Acquire::http::Timeout=15
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
 
       - name: Drain the render queue
+        if: steps.queue.outputs.jobs != '0'
         run: npm run video:worker -- --once --max-jobs=${{ github.event.inputs.max_jobs || 2 }} --runner=github-actions
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
