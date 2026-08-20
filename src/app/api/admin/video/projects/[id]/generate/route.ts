@@ -12,7 +12,7 @@ import {
 } from "@/lib/video/storyboard";
 import { beatGridForTrack } from "@/lib/video/bgmCatalogue";
 import { listDecorAssets } from "@/lib/video/decor";
-import { resolvePacing } from "@/lib/video/pacing";
+import { levelPacing, resolvePacing } from "@/lib/video/pacing";
 import { recordGenerationRun, snapshotStoryboardState } from "@/lib/video/audit";
 import { triggerWorkflow } from "@/lib/video/dispatch";
 import {
@@ -88,6 +88,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       snapshot.items[0]?.kind,
       stylePreset
     );
+
+    // Level shifts pacing on top of whatever the project set. It changed nothing at all before
+
+    // this — an N1 video was an N5 video with harder words in it.
+
+    const levelledPacing = levelPacing(pacing, snapshot.jlptLevel);
     // Cost the request before committing to it. buildGenerationRequest is the same builder
     // generateStoryboard uses, so this counts the batches that would actually run — and it makes
     // no network call, so refusing here is free.
@@ -95,7 +101,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       projectId: id,
       narrationLang: lang,
       themeKey: project.themeKey,
-      pacing,
+      pacing: levelledPacing,
       stylePreset,
       decorAssets,
       voices: project.voices,
@@ -173,7 +179,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         projectId: id,
         narrationLang: lang,
         themeKey: project.themeKey,
-        pacing,
+        pacing: levelledPacing,
         // THE BUG. These two were added to the cost-estimate call above and not to this one, so
         // every video generated from the admin UI was built as a lesson while the estimate beside
         // it was priced as a Short. Nine projects, every version. stylePreset is now required on
@@ -234,7 +240,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       userMessage: generated.request.userMessage,
       rawResponse: generated.rawResponse,
       slots: generated.request.slots,
-      pacing,
+      pacing: levelledPacing,
       estimatedSeconds: generated.request.estimatedSeconds,
       promptTokens: generated.usage.promptTokens,
       completionTokens: generated.usage.completionTokens,

@@ -148,6 +148,42 @@ export const SHORTS_SECONDS_PER_ITEM_BY_KIND: Record<string, number> = {
  */
 const EXAMPLES_PER_ITEM_BY_KIND: Record<string, number> = { kanji: 2, grammar: 3 };
 
+/**
+ * How pacing changes with JLPT level.
+ *
+ * Level used to change NOTHING in generation — it was display text, a database filter and one line
+ * in the prompt, so an N1 video really was an N5 video with harder words in it. Pacing keyed on
+ * content kind alone.
+ *
+ * The shape of the adjustment: a beginner needs to hear a word more times and needs longer to say
+ * it back; an advanced learner does not, and padding their video with repetition is condescending
+ * as well as slow. So repeats fall and pauses shorten as the level rises.
+ *
+ * Multipliers rather than absolute values, so a template that deliberately sets three repeats for a
+ * drill still gets a drill at every level — the level shifts it, it does not overwrite it.
+ */
+const LEVEL_PACING: Record<string, { repeatDelta: number; pauseFactor: number; secondsFactor: number }> = {
+  N5: { repeatDelta: +1, pauseFactor: 1.25, secondsFactor: 1.15 },
+  N4: { repeatDelta: 0, pauseFactor: 1.1, secondsFactor: 1.05 },
+  N3: { repeatDelta: 0, pauseFactor: 1.0, secondsFactor: 1.0 },
+  N2: { repeatDelta: -1, pauseFactor: 0.85, secondsFactor: 0.95 },
+  N1: { repeatDelta: -1, pauseFactor: 0.7, secondsFactor: 0.9 },
+};
+
+export function levelPacing(base: PacingConfig, jlptLevel: string | null | undefined): PacingConfig {
+  const rule = LEVEL_PACING[(jlptLevel ?? "").toUpperCase()];
+  if (!rule) return base;
+  const repeat = Math.max(1, Math.min(3, base.repeatJapanese + rule.repeatDelta)) as 1 | 2 | 3;
+  return {
+    ...base,
+    repeatJapanese: repeat,
+    // Rounded to a tenth: these end up in TTS timing and in the UI, and 1.2000000000000002 reads
+    // as a bug in both.
+    pauseAfterJapaneseSeconds: Math.round(base.pauseAfterJapaneseSeconds * rule.pauseFactor * 10) / 10,
+    secondsPerItem: Math.round(base.secondsPerItem * rule.secondsFactor),
+  };
+}
+
 export function defaultPacingFor(kind: string | undefined, preset: VideoStylePreset = "lesson"): PacingConfig {
   const shorts = preset === "shorts";
   const table = shorts ? SHORTS_SECONDS_PER_ITEM_BY_KIND : SECONDS_PER_ITEM_BY_KIND;

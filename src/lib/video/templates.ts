@@ -86,6 +86,74 @@ export const VIDEO_TEMPLATES: Record<string, VideoTemplate> = {
     description:
       "25 words, each said three times with a gap to repeat it back, then a recall round over all 25. About nine minutes.",
   },
+
+  /**
+   * The same shape for kanji and grammar (roadmap 6.7), with each subject's own unit.
+   *
+   * Not 25 across the board. A kanji needs stroke order, readings and example words, and a grammar
+   * point needs a pattern, when to use it and examples — both are several times the screen time of
+   * a vocabulary word, so 25 of either is a very long video nobody finishes.
+   *
+   * MEASURED, not guessed, and the first numbers here were wrong: at N5 these come out at 5.5 and
+   * 5.6 minutes against the vocabulary drill's 8.4. Lengths vary by level, because higher levels
+   * carry more readings and longer examples — these units are tuned for N5, which is where the
+   * series starts.
+   */
+  "kanji-drill-12": {
+    id: "kanji-drill-12",
+    label: "Kanji drill (12 characters + recall)",
+    contentType: "kanji",
+    stylePreset: "lesson",
+    motionProfile: "teaching",
+    itemsPerVideo: 12,
+    pacing: { repeatJapanese: 2, pauseAfterJapaneseSeconds: 2, examplesPerItem: 1 },
+    recall: { thinkingSeconds: 2, direction: "ja_to_en" },
+    description: "12 characters with stroke order and readings, then a recall round. About 5-6 minutes at N5.",
+  },
+
+  "grammar-drill-8": {
+    id: "grammar-drill-8",
+    label: "Grammar drill (8 patterns + recall)",
+    contentType: "grammar",
+    stylePreset: "lesson",
+    motionProfile: "teaching",
+    itemsPerVideo: 8,
+    // Grammar is the one content type with examples to spare — 4.4 on average, and 67% have two or
+    // more, against 12% of vocabulary. This is the one place raising the example count does work.
+    pacing: { repeatJapanese: 1, pauseAfterJapaneseSeconds: 1.5, examplesPerItem: 3 },
+    recall: { thinkingSeconds: 3, direction: "ja_to_en" },
+    description: "8 patterns with three examples each, then a recall round. About 5-6 minutes at N5.",
+  },
+
+  /**
+   * Shorts, at two scopes on purpose (roadmap 6.6).
+   *
+   * One word is the discovery firehose — ~22 seconds, the whole published vocabulary is a thousand
+   * of them. Five words is a "5 a day" series at around a minute, long enough to be worth
+   * subscribing to and short enough to finish. They are different jobs, so both exist rather than
+   * one replacing the other.
+   */
+  "vocabulary-short-1": {
+    id: "vocabulary-short-1",
+    label: "Short — one word",
+    contentType: "vocabulary",
+    stylePreset: "shorts",
+    itemsPerVideo: 1,
+    pacing: {},
+    description: "One word in about 22 seconds. The high-volume discovery format.",
+  },
+
+  "vocabulary-short-5": {
+    id: "vocabulary-short-5",
+    label: "Short — five a day",
+    contentType: "vocabulary",
+    stylePreset: "shorts",
+    itemsPerVideo: 5,
+    // No recall round: at five words the video IS the review, and a quiz would double its length
+    // past what a Reel holds.
+    pacing: {},
+    description: "Five words in about 70 seconds. A daily series that points at the full lesson.",
+  },
 };
 
 export function templateById(id: string | null | undefined): VideoTemplate | null {
