@@ -38,6 +38,16 @@ export const MASCOT_POSES = {
   // change rather than a facial expression.
   bow: "bowing forward from the waist, both paws at its sides, eyes closed respectfully",
   read: "seated cross-legged holding an open book with both paws, absorbed",
+  // --- the teaching set (roadmap 6.3) --------------------------------------------------------
+  // A teacher needs more than a greeting and a wave. These are the gestures a long-form lesson
+  // actually calls for, and each is a whole-body silhouette change for the same reason as above:
+  // at the 180px a corner slot renders, a change of expression alone is invisible.
+  explain: "standing, both paws open and turned upward at chest height, mid-sentence, explaining patiently",
+  pointLeft: "standing side-on facing left, one paw extended pointing to its left at something off to the side, attentive",
+  pointDown: "standing, one paw angled downward-forward indicating something below it, head tilted to follow the gesture",
+  encourage: "standing, one paw raised with a thumbs-up gesture, eyes bright, encouraging",
+  surprise: "standing upright, both paws raised near its cheeks, eyes wide, mouth open in delighted surprise",
+  correct: "standing, one paw raised palm-outward in a gentle stop gesture, brows drawn slightly, correcting kindly",
 } as const;
 
 export type MascotPose = keyof typeof MASCOT_POSES;

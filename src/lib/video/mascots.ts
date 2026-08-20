@@ -27,13 +27,31 @@ export type MascotId =
   | "crane-think"
   | "crane-bow"
   | "rabbit-read"
-  | "rabbit-wave";
+  | "rabbit-wave"
+  // The teaching set (roadmap 6.3) — the gestures a long-form lesson calls for, for the three
+  // subject teachers MASCOT_BY_SCENE_TYPE already casts. Declared before the art exists, like the
+  // second cast above; isGenerated() is what stops an ungenerated id reaching a render.
+  | "fox-explain"
+  | "fox-pointLeft"
+  | "fox-encourage"
+  | "fox-surprise"
+  | "owl-explain"
+  | "owl-pointLeft"
+  | "owl-correct"
+  | "owl-encourage"
+  | "tanuki-explain"
+  | "tanuki-pointDown"
+  | "tanuki-encourage"
+  | "tanuki-surprise";
 
 /** Every id the cast defines. Not every one necessarily has art yet — see GENERATED. */
 export const MASCOTS: readonly MascotId[] = [
   "fox-wave", "fox-point", "fox-celebrate", "tanuki-write", "tanuki-think",
   "owl-point", "owl-think", "red-panda-wave",
   "cat-point", "cat-bow", "shiba-celebrate", "shiba-wave",
+  "fox-explain", "fox-pointLeft", "fox-encourage", "fox-surprise",
+  "owl-explain", "owl-pointLeft", "owl-correct", "owl-encourage",
+  "tanuki-explain", "tanuki-pointDown", "tanuki-encourage", "tanuki-surprise",
   "crane-think", "crane-bow", "rabbit-read", "rabbit-wave",
 ];
 
@@ -153,6 +171,42 @@ export function mascotForScene(sceneType: string): MascotId | null {
 }
 
 /** Greeting spoken over the intro beat, per narration language. */
+/**
+ * The pose sequence a teaching scene cycles through, by scene type.
+ *
+ * This is what makes a static PNG read as a character rather than a sticker: the corner teacher
+ * changes pose as the narration moves from sentence to sentence — explaining, then pointing at the
+ * thing, then encouraging. Cheap, because each pose is an image that already exists rather than a
+ * rig, and it is the whole of "reusable expressions and gestures" that a corner slot can show.
+ *
+ * Every entry is filtered through `isGenerated()` at use, so a scene falls back to its single
+ * MASCOT_BY_SCENE_TYPE pose until the art is promoted — no broken <Img> mid-video.
+ */
+const TEACHING_SEQUENCE: Record<string, MascotId[]> = {
+  vocab_card: ["fox-explain", "fox-point", "fox-encourage"],
+  example_sentence: ["fox-pointLeft", "fox-explain"],
+  grammar_pattern: ["owl-explain", "owl-pointLeft", "owl-encourage"],
+  grammar_formation: ["owl-pointLeft", "owl-explain"],
+  comparison: ["owl-think", "owl-correct"],
+  kanji_stroke: ["tanuki-explain", "tanuki-pointDown", "tanuki-encourage"],
+  kanji_detail: ["tanuki-explain", "tanuki-pointDown"],
+  quiz_question: ["owl-think", "owl-encourage"],
+  summary_recap: ["fox-celebrate", "fox-encourage"],
+};
+
+/**
+ * Which pose the corner teacher holds during narration segment `beat`.
+ *
+ * Falls back to the scene's single cast pose whenever the sequence is unavailable — art not yet
+ * generated, or a scene type with no sequence. Returning the same id every beat is a valid answer
+ * and is exactly what happens today.
+ */
+export function mascotForBeat(sceneType: string, beat: number): MascotId | null {
+  const sequence = (TEACHING_SEQUENCE[sceneType] ?? []).filter(isGenerated);
+  if (sequence.length === 0) return MASCOT_BY_SCENE_TYPE[sceneType] ?? null;
+  return sequence[Math.max(0, beat) % sequence.length];
+}
+
 export const MASCOT_GREETING: Record<string, { ja: string; romaji: string }> = {
   en: { ja: "こんにちは", romaji: "konnichiwa" },
   hi: { ja: "こんにちは", romaji: "konnichiwa" },

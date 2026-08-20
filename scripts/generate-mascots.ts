@@ -72,6 +72,24 @@ const CAST: { character: MascotCharacter; pose: MascotPose }[] = [
   { character: "crane", pose: "bow" },
   { character: "rabbit", pose: "read" },
   { character: "rabbit", pose: "wave" },
+
+  // --- the teaching set (roadmap 6.3) --------------------------------------------------------
+  // Only the three subject teachers, not all eight characters. MASCOT_BY_SCENE_TYPE already casts
+  // by subject — owl explains grammar, tanuki does handwriting, fox introduces vocabulary — and
+  // giving the whole cast six new poses each would be 48 images to generate and review for
+  // characters that appear in one scene type apiece.
+  { character: "fox", pose: "explain" },
+  { character: "fox", pose: "pointLeft" },
+  { character: "fox", pose: "encourage" },
+  { character: "fox", pose: "surprise" },
+  { character: "owl", pose: "explain" },
+  { character: "owl", pose: "pointLeft" },
+  { character: "owl", pose: "correct" },
+  { character: "owl", pose: "encourage" },
+  { character: "tanuki", pose: "explain" },
+  { character: "tanuki", pose: "pointDown" },
+  { character: "tanuki", pose: "encourage" },
+  { character: "tanuki", pose: "surprise" },
 ];
 
 /**
