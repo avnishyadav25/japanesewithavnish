@@ -270,8 +270,15 @@ async function queryPosts(params: {
 async function resolveLessonItems(lessonIds: string[]): Promise<ContentItem[]> {
   if (!sql || lessonIds.length === 0) return [];
   const lessons = (await sql.query(
+    // IDs, not just titles. A finished video has to be attachable to the lesson AND to the module
+    // and submodule above it, and only the titles used to survive this query — so nothing
+    // downstream could name the tier it belonged to. `curriculum_lessons` carries only
+    // `submodule_id`, so the ids for the tiers above exist nowhere else without this join chain.
     `SELECT l.id, l.code, l.title, l.slug, l.goal, l.introduction, l.summary, l.content_type,
-            l.estimated_minutes, sm.title AS submodule_title, m.title AS module_title, lv.code AS level_code
+            l.estimated_minutes,
+            sm.id AS submodule_id, sm.title AS submodule_title,
+            m.id AS module_id, m.title AS module_title,
+            lv.id AS level_id, lv.code AS level_code
      FROM curriculum_lessons l
      JOIN curriculum_submodules sm ON sm.id = l.submodule_id
      JOIN curriculum_modules m ON m.id = sm.module_id
@@ -332,8 +339,11 @@ async function resolveLessonItems(lessonIds: string[]): Promise<ContentItem[]> {
         introduction: lesson.introduction,
         contentType: lesson.content_type,
         estimatedMinutes: lesson.estimated_minutes,
+        moduleId: lesson.module_id,
         moduleTitle: lesson.module_title,
+        submoduleId: lesson.submodule_id,
         submoduleTitle: lesson.submodule_title,
+        levelId: lesson.level_id,
         objectives: objectives.map((o) => o.objective_text),
       },
       examples: [],
