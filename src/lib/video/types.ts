@@ -725,6 +725,12 @@ export interface Storyboard {
   /** Optional so storyboards written before the Shorts preset existed still parse; absent means
    * `lesson`, which is exactly how they were rendered. */
   stylePreset?: VideoStylePreset;
+  /**
+   * Which motion profile renders this document. Absent falls back to the style preset's own name,
+   * so every storyboard made before profiles existed keeps its exact motion — `lesson` returns an
+   * identity camera, and the back catalogue is not restyled by a format opting into movement.
+   */
+  motionProfile?: "lesson" | "teaching" | "shorts";
   /** Optional so every storyboard authored before branding existed still parses. Consumers
    * resolve it through `resolveBranding()`, which fills in the defaults. */
   branding?: BrandingSettings;

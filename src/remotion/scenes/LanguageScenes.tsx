@@ -11,6 +11,7 @@ import type {
 import { useLayout } from "../LayoutContext";
 import { fontStackJa, fontStackSans, fontStackSerif } from "../theme";
 import { Chip, Eyebrow, FadeUp, JapaneseText, PopIn, SceneFrame, StepIndicator, Surface } from "../components/primitives";
+import { Emphasis } from "../components/Emphasis";
 
 /** Splits a Japanese sentence around the substrings worth emphasising (the target word or
  * grammar point), so the viewer's eye lands on the thing being taught rather than scanning the
@@ -92,14 +93,20 @@ export const VocabCardScene: React.FC<{ visual: VocabCardVisual }> = ({ visual }
 
   const wordBlock = (
     <div style={{ display: "grid", gap: scale.gap * 0.45, justifyItems: twoColumn ? "start" : "center", textAlign: twoColumn ? "left" : "center" }}>
-      <PopIn>
-        <JapaneseText
-          text={item.word}
-          reading={visual.showFurigana ? item.reading : undefined}
-          size={scale.displayJa}
-          weight={800}
-        />
-      </PopIn>
+      {/* Segment 0 is the Japanese the native voice speaks — pushJapanese puts it first on a
+          vocabulary card. So the word lights up exactly while it is being pronounced, which is the
+          roadmap's rule: tie the animation to the concept, not to the clock. On a profile with no
+          camera, Emphasis returns its child untouched. */}
+      <Emphasis kind="spotlight" segmentIndex={0}>
+        <PopIn>
+          <JapaneseText
+            text={item.word}
+            reading={visual.showFurigana ? item.reading : undefined}
+            size={scale.displayJa}
+            weight={800}
+          />
+        </PopIn>
+      </Emphasis>
       {item.romaji ? (
         <FadeUp delay={8}>
           <div

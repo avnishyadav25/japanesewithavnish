@@ -17,6 +17,7 @@
  * configuration, because it reads as working.
  */
 import type { PacingConfig, VideoStylePreset } from "./types";
+import type { MotionProfile } from "./motion";
 
 export interface RecallConfig {
   /**
@@ -39,6 +40,11 @@ export interface VideoTemplate {
   /** The content kind this applies to — matches `ContentItem.kind`. */
   contentType: string;
   stylePreset: VideoStylePreset;
+  /**
+   * Motion profile. Omitted, the style preset's own is used — which is what keeps every existing
+   * lesson frame-identical while a new format opts into movement.
+   */
+  motionProfile?: MotionProfile;
   /** How many items one video covers. The unit that makes a series repeatable. */
   itemsPerVideo: number;
   /** Overrides on top of `defaultPacingFor(contentType, stylePreset)`. */
@@ -64,6 +70,10 @@ export const VIDEO_TEMPLATES: Record<string, VideoTemplate> = {
     label: "Vocabulary drill (25 words + recall)",
     contentType: "vocabulary",
     stylePreset: "lesson",
+    // Long-form that moves. A 16-second teaching scene finishes every entrance by frame 40 and
+    // then holds a still image; `teaching` is half the Shorts camera, which is enough to keep the
+    // frame alive without competing with the word, reading, meaning and example on it.
+    motionProfile: "teaching",
     itemsPerVideo: 25,
     pacing: {
       repeatJapanese: 3,

@@ -33,6 +33,7 @@ import {
 } from "./pacing";
 import { decorateScenes, type DecorAsset } from "./decor";
 import type { RecallConfig } from "./templates";
+import type { MotionProfile } from "./motion";
 import { CHROME_SCENE_IDS } from "./types";
 import type {
   BrandingSettings,
@@ -96,6 +97,8 @@ export interface GenerateStoryboardConfig {
    * recall, which is every format that existed before this.
    */
   recall?: RecallConfig;
+  /** Overrides the motion the style preset would imply. Set by a template. */
+  motionProfile?: MotionProfile;
 }
 
 export interface GeneratedStoryboard {
@@ -1543,6 +1546,7 @@ export async function generateStoryboard(
     // under lesson motion would hold a 3-second beat perfectly still.
     branding: resolveBranding(config.branding),
     stylePreset: config.stylePreset ?? "lesson",
+    motionProfile: config.motionProfile,
     scenes: decorated,
   };
 
