@@ -612,3 +612,61 @@ values array, the row type, the mapper and the SELECT list. Miss any one and it 
 `npm run video:fix-shorts` regenerates any Shorts project whose script was built as a lesson, by
 calling the worker rather than reimplementing generation, and refuses to report success on a project
 that is still wrong. All nine now render as 6-scene Shorts with three stickers each.
+
+---
+
+## 2026-08-22 — Roadmap 6.1–6.10: the learning-system phases
+
+**What changed.** Seven format templates as data; a recall round; attachment to lessons, modules and
+submodules with validation; a `teaching` motion profile and emphasis primitives; teacher poses per
+narration beat; level-adaptive pacing and prompts; reading and listening formats. Migrations 153–155.
+
+### The recurring failure, now named in three places
+
+**Configuration that looks wired and does nothing.** Four such fields already existed
+(`Scene.pacingOverride`, `VocabListVisual.highlightSchedule`, `BLOCK_TYPE_TO_SCENE`,
+`QuizQuestionVisual.thinkingSeconds`). I then produced a fifth: **five templates with no picker, no
+column and no reader** — one commit from shipping. Caught only by asking "what selects this?"
+
+`thinkingSeconds` is the instructive one: declared on the visual since the scene existed, while the
+component derived its reveal from scene length alone. So "give them two seconds to answer" was
+silently ignored, and a recall round is exactly that instruction. Fixed, and extracted as a pure
+`quizRevealFrame()` **specifically so it can be asserted** — buried in a component body the only
+proof would have been watching a video, which is how it stayed inert.
+
+**Adding a column touches five places** — migration, INSERT, placeholder, values array, row
+type/mapper, and `PROJECT_COLUMNS`. Missing the SELECT list made `style_preset` read as `lesson`
+everywhere. `template_id` was round-tripped against the database rather than assumed.
+
+### Corrections I had to make to my own claims
+
+- **"main is 37 commits behind with none of the Shorts code" was false.** My `origin/main` ref was
+  stale because I checked without fetching. Main had everything; PRs #33–35 were already merged.
+- **"the nine Shorts were rendered by old lesson code" was mostly false.** PR #33 merged at 12:31
+  IST and they rendered at 14:24–14:42, so they had the camera, transitions, reveal gate, word
+  captions and title bar. Only stickers (PR #34, next day) were missing. **Check timestamps before
+  claiming a render predates a feature.**
+- **Template lengths** were written as "about ten/eleven minutes" for kanji and grammar before
+  measuring. They are 5.7 and 6.0 at N5.
+
+### Gotchas
+
+**Motion profiles had to be decoupled from style presets.** They were the same thing, so giving
+long-form any motion would have restyled every lesson ever rendered. `lesson` now returns an
+identity camera — asserted at exactly 1.0000 — and a format opts in via its template.
+
+**Emphasis must be a window in time.** A spotlight that is simply on is decoration; one bounded by
+the narration segment that mentions the thing is teaching. `useSegmentWindow` reuses the beat frames
+the camera already publishes, so it cannot drift from the audio.
+
+**A skeleton that skips bad input hides a content gap.** Only 5 of 47 reading posts carry
+`meta.sentences` (all N5), so a three-passage template produces one passage. Skipping is correct —
+inventing a passage from the summary would be worse — but it is silent, and the estimate showing
+0.8 minutes is the only signal.
+
+### Still blocked on content, not code
+
+- `dialogue`: zero published conversation posts.
+- `kana_grid`: the `kana` table has no `post_id`, and every scope path resolves through posts. Needs
+  a new scope kind.
+- Reading beyond N5: 24 posts across N1–N4, none with sentences.
