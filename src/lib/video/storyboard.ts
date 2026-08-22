@@ -1385,6 +1385,99 @@ function kanaSkeleton(snapshot: ContentSnapshot, config: GenerateStoryboardConfi
   return withIntroOutro(scenes, blanks, snapshot, config, snapshot.title);
 }
 
+/**
+ * A conversation, spoken by two different voices.
+ *
+ * `dialogue` renders with auto-scroll and was emitted by nothing, because the `conversation`
+ * content type had never had a single post.
+ *
+ * TWO VOICES IS THE WHOLE POINT. A dialogue read entirely by one voice is a monologue with names
+ * in front of it — the learner cannot tell where a turn ends without reading. `NarrationSegment`
+ * has always carried a per-segment `voice` and `voiceForSegment` honours it; nothing had used it
+ * to distinguish speakers before.
+ */
+const DIALOGUE_VOICES = ["ja-JP-Neural2-B", "ja-JP-Neural2-C"] as const;
+
+function conversationSkeleton(snapshot: ContentSnapshot, config: GenerateStoryboardConfig): Skeleton {
+  const lang = config.narrationLang;
+  const pacing = config.pacing;
+  const scenes: Scene[] = [];
+  const blanks: BlankSlot[] = [];
+
+  snapshot.items.forEach((item, i) => {
+    const base = `sc-cv${i + 1}`;
+    const raw = (item.data.meta as { turns?: unknown } | undefined)?.turns ?? item.data.turns;
+    const turns = (Array.isArray(raw) ? raw : [])
+      .map((x) => x as Record<string, unknown>)
+      .map((x) => ({
+        speaker: str(x.speaker) ?? "A",
+        ja: str(x.japanese) ?? str(x.ja) ?? "",
+        romaji: str(x.romaji),
+        en: str(x.translation) ?? str(x.en) ?? "",
+      }))
+      .filter((x) => x.ja);
+    if (turns.length === 0) return;
+
+    // Speaker label -> voice, assigned in order of appearance so the first speaker is consistently
+    // the same voice across every conversation.
+    const order = Array.from(new Set(turns.map((t) => t.speaker)));
+    const voiceFor = (speaker: string) => DIALOGUE_VOICES[Math.max(0, order.indexOf(speaker)) % DIALOGUE_VOICES.length];
+
+    const leadId = `${base}-lead`;
+    const narration: NarrationSegment[] = [blankSegment(leadId, lang, pacing)];
+    const japanese: string[] = [];
+
+    turns.forEach((turn, ti) => {
+      const seg = jaSegment(`${base}-t${ti + 1}`, turn.ja, turn.romaji, pacing, ti === 0 ? 0.4 : 0.25, false);
+      narration.push({ ...seg, voice: voiceFor(turn.speaker) });
+      japanese.push(turn.ja);
+    });
+
+    scenes.push({
+      id: base,
+      sceneType: "dialogue",
+      sourceRef: item.postId ? { kind: "post", id: item.postId, url: item.url } : undefined,
+      durationMode: "auto",
+      durationSeconds: pacing.secondsPerItem,
+      transitionIn: { kind: "fade", durationSeconds: 0.4 },
+      narration,
+      visual: {
+        sceneType: "dialogue",
+        title: item.title,
+        lines: turns.map((t) => ({ speaker: t.speaker, ja: t.ja, romaji: t.romaji, en: t.en })),
+      },
+    });
+
+    const afterId = `${base}-after`;
+    scenes.push({
+      id: `${base}-note`,
+      sceneType: "tip_callout",
+      durationMode: "auto",
+      durationSeconds: Math.max(5, pacing.secondsPerItem * 0.3),
+      transitionIn: { kind: "slide", durationSeconds: 0.3 },
+      narration: [blankSegment(afterId, lang, pacing)],
+      visual: {
+        sceneType: "tip_callout",
+        heading: "What to notice",
+        body: turns.map((t) => t.en).filter(Boolean).slice(0, 3).join(" "),
+      },
+    });
+
+    blanks.push(
+      ...budgetItemSlots(
+        [
+          { id: leadId, hint: `Set up a conversation: "${item.title}". Say who is talking and what the situation is, in one or two sentences. Do NOT read the Japanese — two native voices do.`, weight: 2 },
+          { id: afterId, hint: `Point out one useful phrase or grammar point from this conversation. It went: ${turns.map((t) => `${t.speaker}: ${t.en}`).join(" ").slice(0, 400)}`, weight: 2 },
+        ],
+        japanese,
+        config
+      )
+    );
+  });
+
+  return withIntroOutro(scenes, blanks, snapshot, config, snapshot.title);
+}
+
 export function buildSkeleton(snapshot: ContentSnapshot, config: GenerateStoryboardConfig): Skeleton {
   const kind = snapshot.items[0]?.kind;
   if (kind === "vocabulary") return vocabularySkeleton(snapshot, config);
@@ -1396,6 +1489,7 @@ export function buildSkeleton(snapshot: ContentSnapshot, config: GenerateStorybo
   if (kind === "reading") return readingSkeleton(snapshot, config);
   if (kind === "listening") return listeningSkeleton(snapshot, config);
   if (kind === "kana") return kanaSkeleton(snapshot, config);
+  if (kind === "conversation") return conversationSkeleton(snapshot, config);
   return genericSkeleton(snapshot, config);
 }
 
