@@ -175,6 +175,8 @@ export async function POST(req: Request) {
         tone: typeof body?.tone === "string" ? body.tone : null,
         includeBroll: body?.includeBroll === true,
         templateId,
+        // One item per child, so a split child is always a Short when vertical-only.
+        itemCount: 1,
         pacing: sanitisePacing(body?.pacing),
         voices: sanitiseVoices(body?.voices),
         createdBy: admin.email,
@@ -230,6 +232,9 @@ export async function POST(req: Request) {
     // are clamped rather than rejected, since the generator falls back to per-content-type
     // defaults for anything absent.
     templateId,
+    // Vertical-only is only a Short when it covers few items — ten reading passages in a vertical
+    // frame is a long video, and calling it a Short generated it with beat splits and word captions.
+    itemCount: snapshot.items.length,
     pacing: sanitisePacing(body?.pacing),
     voices: sanitiseVoices(body?.voices),
     createdBy: admin.email,

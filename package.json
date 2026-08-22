@@ -52,7 +52,9 @@
     "typecheck:scripts": "tsc -p tsconfig.scripts.json",
     "content:backfill-examples": "tsx scripts/backfill-examples.ts",
     "video:fix-shorts": "tsx scripts/fix-shorts-projects.ts",
-    "video:queue-status": "tsx scripts/video-queue-status.ts"
+    "video:queue-status": "tsx scripts/video-queue-status.ts",
+    "content:generate-reading": "tsx scripts/generate-reading-dialogue.ts --kind=reading",
+    "content:generate-dialogue": "tsx scripts/generate-reading-dialogue.ts --kind=conversation"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1000.0",

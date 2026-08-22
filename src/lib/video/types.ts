@@ -42,8 +42,27 @@ export const DEFAULT_STYLE_PRESET: VideoStylePreset = "lesson";
  * beat split reads as chopped up. Mixed formats therefore stay on lesson pacing; render a
  * separate vertical-only project when you want the Short.
  */
-export function stylePresetForFormats(formats: readonly string[]): VideoStylePreset {
-  return formats.length === 1 && formats[0] === "vertical" ? "shorts" : "lesson";
+/**
+ * The most items a vertical video can cover and still be a Short.
+ *
+ * A SHORT IS A LENGTH, NOT AN ASPECT RATIO. Deciding on format alone produced a 7.4-minute video
+ * labelled as a Short — "N5 reading", vertical-only with ten passages — which then generated under
+ * Shorts pacing, word captions and beat splitting, none of which suit a ten-item reading video.
+ *
+ * Five, because the five-word Shorts template lands at ~70 seconds and is the longest thing that
+ * still reads as a Short. Six of anything is past a minute for every content type.
+ */
+export const MAX_SHORTS_ITEMS = 5;
+
+/**
+ * `itemCount` omitted keeps the original format-only rule, which is what every caller that has no
+ * resolved scope yet must fall back on — the wizard asks this before it knows the item count.
+ */
+export function stylePresetForFormats(formats: readonly string[], itemCount?: number): VideoStylePreset {
+  const verticalOnly = formats.length === 1 && formats[0] === "vertical";
+  if (!verticalOnly) return "lesson";
+  if (itemCount !== undefined && itemCount > MAX_SHORTS_ITEMS) return "lesson";
+  return "shorts";
 }
 
 export const VIDEO_FORMATS: VideoFormat[] = ["vertical", "landscape", "square", "embed"];
@@ -751,7 +770,16 @@ export type ScopeKind =
   | "content_item"
   /** A theme like "birds in Japanese" — no curriculum node, no single content_type. Resolves
    * through `postIds`, which the topic builder fills in after you confirm the item list. */
-  | "topic";
+  | "topic"
+  /**
+   * One kana row (the a-line, the ka-line) or a whole syllabary.
+   *
+   * Its own scope kind because the `kana` table has NO `post_id` and every other scope resolves
+   * through posts — so kana was completely unreachable despite all 92 characters having stroke
+   * data and `kana_grid` being a finished component. Creating 92 posts to route around that would
+   * have added 92 thin pages, which is the pattern that hurt the reading section.
+   */
+  | "kana_set";
 
 export interface ScopeRef {
   levelId?: string;
@@ -766,6 +794,10 @@ export interface ScopeRef {
   postIds?: string[];
   /** `topic` scope only: the free text the video is about, used for the title and the prompt. */
   topic?: string;
+  /** `kana_set` scope only. */
+  kanaType?: "hiragana" | "katakana";
+  /** A single row like "a" or "ka". Omitted covers the whole syllabary. */
+  kanaRow?: string;
 }
 
 /** Normalised, presentation-ready content handed to the storyboard generator. Built by

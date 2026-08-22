@@ -129,8 +129,10 @@ export interface CreateProjectInput {
   voices?: VoiceConfig | null;
   /** Shared by the siblings of one video_per_item split. NULL for a standalone project. */
   batchId?: string | null;
-  /** Omitted, it is derived from `formats` by `stylePresetForFormats`. */
+  /** Omitted, it is derived from `formats` AND `itemCount` by `stylePresetForFormats`. */
   stylePreset?: VideoStylePreset;
+  /** How many content items this project covers. Vertical-only is only a Short if this is small. */
+  itemCount?: number;
   templateId?: string | null;
   /** Inherited when a project is derived from another — a Short keeps its parent's look. */
   captions?: Partial<CaptionSettings> | null;
@@ -170,7 +172,7 @@ export async function createProject(input: CreateProjectInput): Promise<VideoPro
       input.createdBy,
       // $18. Derived from the formats rather than asked for: a vertical-only project is a Short,
       // and making that an extra checkbox means one forgotten toggle produces a slow Reel.
-      input.stylePreset ?? stylePresetForFormats(input.formats),
+      input.stylePreset ?? stylePresetForFormats(input.formats, input.itemCount),
       input.templateId ?? null,
     ]
   )) as Record<string, unknown>[];

@@ -46,7 +46,9 @@ export async function POST(req: Request) {
     // item" and "31s each" for a vertical-only project that will actually generate 9s beats, so
     // the panel's headline number, its per-item warning and its cost were all for a video that was
     // never going to be built.
-    const stylePreset = stylePresetForFormats(formats);
+    // The count matters as much as the format: ten reading passages in a vertical frame is a long
+    // video, not a Short, and pricing it as one is how a 7.4-minute "Short" got made.
+    const stylePreset = stylePresetForFormats(formats, snapshot.items.length);
     const pacing = resolvePacing((body?.pacing as Partial<PacingConfig> | undefined) ?? null, kind, stylePreset);
 
     const videos = plannedVideoCount(snapshot, grouping);

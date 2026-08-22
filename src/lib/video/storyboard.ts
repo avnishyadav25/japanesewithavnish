@@ -1314,6 +1314,77 @@ function listeningSkeleton(snapshot: ContentSnapshot, config: GenerateStoryboard
   return withIntroOutro(scenes, blanks, snapshot, config, snapshot.title);
 }
 
+/**
+ * Kana: the row on screen, then each character written stroke by stroke.
+ *
+ * `kana_grid` and the stroke animation both existed and neither had ever been generated, because
+ * the `kana` table has no `post_id` and every scope resolved through posts. This is the first
+ * skeleton that never touches one.
+ *
+ * A grid card to see the row as a set, then one stroke card per character — the same shape the
+ * kanji skeleton uses, because it is the same task: watch it drawn, then say it.
+ */
+function kanaSkeleton(snapshot: ContentSnapshot, config: GenerateStoryboardConfig): Skeleton {
+  const lang = config.narrationLang;
+  const pacing = config.pacing;
+  const scenes: Scene[] = [];
+  const blanks: BlankSlot[] = [];
+
+  snapshot.items.forEach((item, i) => {
+    const base = `sc-kn${i + 1}`;
+    const chars = (item.data.characters as { character: string; romaji: string; strokeCount?: number; strokePaths: string[] }[]) ?? [];
+    if (chars.length === 0) return;
+    const kanaType = str(item.data.kanaType) ?? "hiragana";
+
+    const gridId = `${base}-lead`;
+    scenes.push({
+      id: `${base}-grid`,
+      sceneType: "kana_grid",
+      durationMode: "auto",
+      durationSeconds: Math.max(6, pacing.secondsPerItem * 0.5),
+      transitionIn: { kind: "fade", durationSeconds: 0.4 },
+      narration: [blankSegment(gridId, lang, pacing)],
+      visual: {
+        sceneType: "kana_grid",
+        kind: kanaType === "katakana" ? "katakana" : "hiragana",
+        rowLabel: str(item.data.rowLabel),
+        characters: chars.map((c) => ({ character: c.character, romaji: c.romaji, strokePaths: c.strokePaths })),
+      },
+    });
+    blanks.push({
+      id: gridId,
+      hint: `Introduce the ${item.title}: ${chars.map((c) => `${c.character} (${c.romaji})`).join(", ")}. Say what the row is and that each character will be written out. Do NOT pronounce the Japanese — a native voice does.`,
+      maxWords: 30,
+    });
+
+    chars.forEach((c, ci) => {
+      const cBase = `${base}-c${ci + 1}`;
+      scenes.push({
+        id: cBase,
+        sceneType: "kanji_stroke",
+        durationMode: "auto",
+        durationSeconds: Math.max(4, pacing.secondsPerItem * 0.3),
+        transitionIn: { kind: "wipe", durationSeconds: 0.25 },
+        // The character spoken, then the shadowing pause: kana is pure sound-to-shape, so hearing
+        // and repeating it IS the lesson.
+        narration: [jaSegment(`${cBase}-ja`, c.character, c.romaji, pacing, 0.3, true)],
+        visual: {
+          sceneType: "kanji_stroke",
+          character: c.character,
+          meaning: c.romaji,
+          onyomi: [],
+          kunyomi: [],
+          strokeCount: c.strokeCount,
+          strokePaths: c.strokePaths,
+          exampleWords: [],
+        },
+      });
+    });
+  });
+
+  return withIntroOutro(scenes, blanks, snapshot, config, snapshot.title);
+}
+
 export function buildSkeleton(snapshot: ContentSnapshot, config: GenerateStoryboardConfig): Skeleton {
   const kind = snapshot.items[0]?.kind;
   if (kind === "vocabulary") return vocabularySkeleton(snapshot, config);
@@ -1324,6 +1395,7 @@ export function buildSkeleton(snapshot: ContentSnapshot, config: GenerateStorybo
   // so a reading video never showed its passage and a listening video never played anything.
   if (kind === "reading") return readingSkeleton(snapshot, config);
   if (kind === "listening") return listeningSkeleton(snapshot, config);
+  if (kind === "kana") return kanaSkeleton(snapshot, config);
   return genericSkeleton(snapshot, config);
 }
 

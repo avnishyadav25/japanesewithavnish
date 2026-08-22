@@ -689,12 +689,12 @@ export function NewVideoWizard({ themes, bgmTracks, levels, lessons, initial }: 
                   and silently get either a fast Reel or a calm lesson with nothing saying which. */}
               <div
                 className={`mt-3 rounded-lg border p-3 text-xs leading-relaxed ${
-                  stylePresetForFormats(formats) === "shorts"
+                  stylePresetForFormats(formats, limit) === "shorts"
                     ? "border-sakura/40 bg-sakura/5 text-charcoal"
                     : "border-stone-200 bg-stone-50 text-charcoal/80"
                 }`}
               >
-                {stylePresetForFormats(formats) === "shorts" ? (
+                {stylePresetForFormats(formats, limit) === "shorts" ? (
                   <>
                     <strong>Shorts pacing.</strong> Each item is split into 2–3 short beats, the camera
                     keeps moving, captions highlight each word as it is spoken, and the hook is spoken
@@ -703,8 +703,19 @@ export function NewVideoWizard({ themes, bgmTracks, levels, lessons, initial }: 
                 ) : (
                   <>
                     <strong>Lesson pacing.</strong> One card per item, held for as long as the narration
-                    takes. <em>Vertical on its own</em> switches to Shorts pacing — adding any other
-                    format keeps lesson pacing, so a YouTube cut is never chopped into beats.
+                    takes.{" "}
+                    {formats.length === 1 && formats[0] === "vertical" ? (
+                      <>
+                        Vertical on its own would be a Short, but {limit} items is too many —{" "}
+                        <em>a Short is a length, not a shape</em>. Five or fewer switches it.
+                      </>
+                    ) : (
+                      <>
+                        <em>Vertical on its own, with five items or fewer</em>, switches to Shorts pacing —
+                        adding any other format keeps lesson pacing, so a YouTube cut is never chopped
+                        into beats.
+                      </>
+                    )}
                   </>
                 )}
               </div>

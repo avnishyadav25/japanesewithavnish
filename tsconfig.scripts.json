@@ -29,6 +29,7 @@
     "scripts/video-script-worker.ts",
     "scripts/fix-shorts-projects.ts",
     "scripts/video-queue-status.ts",
+    "scripts/generate-reading-dialogue.ts",
     "scripts/lib/chromaMatte.ts",
     "src/**/*.ts"
   ],
