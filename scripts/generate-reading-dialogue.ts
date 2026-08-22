@@ -206,15 +206,30 @@ async function generateDialogue(dryRun: boolean, level: string | null, count: nu
   console.log(`${levels.length} level(s) x ${count} conversations${dryRun ? " — DRY RUN" : ""}\n`);
   let written = 0, rejected = 0, failed = 0, cost = 0;
 
+  // RESUMABLE. The first run lost 12 conversations to truncated JSON and 3 to the validity check,
+  // and re-running blind would have produced duplicates of the 85 that worked rather than filling
+  // the 15 gaps. Situations already covered at a level are skipped, so a re-run is a top-up.
+  const existing = (await sql.query(
+    `SELECT (jlpt_level)[1] AS lvl, meta->>'situation' AS situation
+     FROM posts WHERE content_type = 'conversation' AND meta ? 'situation'`
+  )) as { lvl: string; situation: string }[];
+  const covered = new Set(existing.map((r) => `${r.lvl}::${r.situation}`));
+
   for (const lvl of levels) {
     for (let i = 0; i < count; i += 1) {
       const situation = SITUATIONS[i % SITUATIONS.length];
+      if (covered.has(`${lvl}::${situation}`)) continue;
       const label = `  ${lvl}  ${String(i + 1).padStart(2)}/${count}  ${situation.slice(0, 40).padEnd(42)}`;
       try {
         const result = await callDeepSeekJson({
           systemPrompt: DIALOGUE_SYSTEM,
           userMessage: `Write a conversation of 6 to 10 turns.\nJLPT level: ${lvl}\nSituation: ${situation}`,
-          maxTokens: 1600,
+          /**
+           * Scaled by level, because the first run failed 12 of 100 on TRUNCATED JSON — almost all
+           * at N1, where ten turns of longer sentences plus romaji and translation simply did not
+           * fit 1600 tokens. The model was not wrong; the budget was.
+           */
+          maxTokens: lvl === "N1" || lvl === "N2" ? 3000 : 2200,
           temperature: 0.8,
           timeoutMs: 60_000,
         });
@@ -259,6 +274,71 @@ async function generateDialogue(dryRun: boolean, level: string | null, count: nu
   if (written > 0) console.log("Published and flagged needs_human_review.");
 }
 
+/**
+ * Listening clips for posts that have none.
+ *
+ * Surfaced by the coverage report rather than by anything failing: 7 of 16 listening posts have an
+ * empty `meta.examples`, so a listening video for them plays nothing. Same shape as the reading
+ * fix — the structured field the video reads is what is missing.
+ */
+async function generateListening(dryRun: boolean) {
+  const rows = (await sql`
+    SELECT id, title, (jlpt_level)[1] AS lvl, meta->>'lesson_title' AS lesson_title, summary
+    FROM posts
+    WHERE status = 'published' AND content_type = 'listening'
+      AND jsonb_array_length(COALESCE(meta->'examples','[]'::jsonb)) = 0
+    ORDER BY title
+  `) as { id: string; title: string; lvl: string | null; lesson_title: string | null; summary: string | null }[];
+
+  console.log(`${rows.length} listening post(s) with no clips${dryRun ? " — DRY RUN" : ""}\n`);
+  let written = 0, rejected = 0, failed = 0, cost = 0;
+
+  for (let i = 0; i < rows.length; i += 1) {
+    const post = rows[i];
+    const lvl = post.lvl ?? "N5";
+    const label = `${String(i + 1).padStart(3)}/${rows.length}  ${lvl}  ${post.title.slice(0, 42).padEnd(44)}`;
+    try {
+      const result = await callDeepSeekJson({
+        systemPrompt: READING_SYSTEM.replace("reading passages", "listening practice sentences").replace(
+          "- Write a SINGLE coherent passage, not disconnected example sentences. It should read as one small story or description.",
+          "- Write SEPARATE sentences, each a self-contained thing a learner could hear and understand on its own."
+        ),
+        userMessage: `Write 6 listening practice sentences.\nJLPT level: ${lvl}\nTopic: ${post.lesson_title || post.title}`,
+        maxTokens: 1400,
+        temperature: 0.7,
+        timeoutMs: 60_000,
+      });
+      cost += result.estimatedCostUsd;
+      const parsed = parseJsonResponse<{ sentences?: unknown }>(result.text);
+      if (!validPassage(parsed?.sentences, 6)) {
+        console.log(`${label} rejected`);
+        rejected += 1;
+        continue;
+      }
+      // Stored in the `examples` shape the resolver reads for listening, not the `sentences` shape
+      // reading uses — the two content types read different keys and mixing them would store data
+      // that looks right and resolves to nothing.
+      const examples = parsed.sentences.map((x) => ({ ja: x.japanese, romaji: x.romaji, en: x.translation }));
+      if (dryRun) {
+        console.log(`${label} ${examples.length} clips — ${examples[0].ja}`);
+        continue;
+      }
+      await sql.query(
+        `UPDATE posts SET meta = COALESCE(meta,'{}'::jsonb) || jsonb_build_object('examples', $2::jsonb),
+                          review_state = 'needs_human_review', updated_at = NOW()
+         WHERE id = $1::uuid`,
+        [post.id, JSON.stringify(examples)]
+      );
+      console.log(`${label} ${examples.length} clips written`);
+      written += 1;
+    } catch (err) {
+      console.log(`${label} FAILED — ${(err as Error).message.slice(0, 60)}`);
+      failed += 1;
+    }
+  }
+  console.log(`\n${written} written, ${rejected} rejected, ${failed} failed. DeepSeek cost $${cost.toFixed(4)}`);
+}
+
 async function main() {
   const kind = process.argv.find((a) => a.startsWith("--kind="))?.slice(7);
   const dryRun = process.argv.includes("--dry-run");
@@ -272,10 +352,12 @@ async function main() {
   }
   if (kind === "reading") {
     await generateReading(dryRun, dryRun ? 2 : limitArg ? Number(limitArg) : null, level);
+  } else if (kind === "listening") {
+    await generateListening(dryRun);
   } else if (kind === "conversation") {
     await generateDialogue(dryRun, level, dryRun ? 2 : countArg ? Number(countArg) : 20);
   } else {
-    console.error("Pass --kind=reading or --kind=conversation");
+    console.error("Pass --kind=reading, --kind=listening or --kind=conversation");
     process.exit(1);
   }
 }
