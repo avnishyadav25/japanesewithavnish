@@ -219,6 +219,12 @@ async function queryPosts(params: {
   jlptLevel?: string;
   tags?: string[];
   limit?: number;
+  /**
+   * How many items to skip. This is what lets a level be split into parts — without it, "part 2 of
+   * 31" resolves to exactly the same 25 words as part 1, and thirty-one identical videos get made
+   * before anyone notices they are identical.
+   */
+  offset?: number;
   postIds?: string[];
 }): Promise<PostRow[]> {
   if (!sql) return [];
@@ -253,6 +259,12 @@ async function queryPosts(params: {
   if (params.limit && params.limit > 0) {
     values.push(params.limit);
     limitClause = `LIMIT $${values.length}`;
+  }
+  // OFFSET only means something under a stable ORDER BY, which the query below has: sort_order then
+  // created_at. Without a deterministic order two parts could overlap and a third cover nothing.
+  if (params.offset && params.offset > 0) {
+    values.push(params.offset);
+    limitClause += ` OFFSET $${values.length}`;
   }
 
   return (await sql.query(
@@ -609,6 +621,7 @@ export async function resolveScope(scopeKind: ScopeKind, ref: ScopeRef): Promise
       jlptLevel: ref.jlptLevel,
       tags: ref.tags,
       limit: ref.limit ?? 10,
+      offset: ref.offset,
       postIds: ref.postIds,
     });
     items = await toContentItems(rows, contentType, false);

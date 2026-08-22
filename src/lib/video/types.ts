@@ -791,6 +791,8 @@ export interface ScopeRef {
   jlptLevel?: string;
   tags?: string[];
   limit?: number;
+  /** `content_batch` only: how many items to skip, so a level can be split into numbered parts. */
+  offset?: number;
   postIds?: string[];
   /** `topic` scope only: the free text the video is about, used for the title and the prompt. */
   topic?: string;
