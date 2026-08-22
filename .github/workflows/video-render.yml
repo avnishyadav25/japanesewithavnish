@@ -23,16 +23,26 @@ on:
   schedule:
     - cron: "*/15 * * * *"
 
-# Never run two workers from this repo at once. The queue claim is safe under concurrency, but
-# serialising keeps Actions-minute usage predictable and avoids two runners both paying to
-# bundle Remotion.
-concurrency:
-  group: video-render
-  cancel-in-progress: false
+# PARALLEL, deliberately. This used to serialise every run behind one concurrency group.
+#
+# The claim was never the reason: claimNextJob uses FOR UPDATE SKIP LOCKED, so two runners
+# physically cannot take the same job — the serialisation was about predictable Actions minutes,
+# and minutes are free on a public repo. At 2.5x realtime and one runner, the ~461-video backlog
+# is about 141 hours; four runners make it a day.
+#
+# What each runner still pays: one Remotion bundle. That is the real cost of parallelism here, and
+# it is bounded per run rather than per job, which is why max_jobs matters more than runner count.
 
 jobs:
   render:
     runs-on: ubuntu-latest
+    strategy:
+      # Four workers draining the same queue. `fail-fast: false` matters: one runner hitting a bad
+      # storyboard must not cancel the other three mid-render, which would leave their jobs claimed
+      # and waiting on the five-minute stale-heartbeat sweep.
+      fail-fast: false
+      matrix:
+        worker: [1, 2, 3, 4]
     # Generous, because a long-form 1080p render legitimately takes tens of minutes. The worker
     # heartbeats throughout; if the runner is killed anyway, the job is reclaimed after five
     # quiet minutes rather than being lost.
@@ -108,7 +118,7 @@ jobs:
 
       - name: Drain the render queue
         if: steps.queue.outputs.jobs != '0'
-        run: npm run video:worker -- --once --max-jobs=${{ github.event.inputs.max_jobs || 2 }} --runner=github-actions
+        run: npm run video:worker -- --once --max-jobs=${{ github.event.inputs.max_jobs || 2 }} --runner=github-actions-${{ matrix.worker }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminCard } from "@/components/admin/AdminCard";
+import { contentCoverage } from "@/lib/video/coverage";
 import { AdminTable } from "@/components/admin/AdminTable";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { MaybeSocialIcon } from "@/components/icons/SocialIcons";
@@ -25,6 +26,9 @@ export const dynamic = "force-dynamic";
  * because a month of work gets scheduled off them.
  */
 export default async function ContentPlanPage() {
+  // What is actually video-ready, which is a different number from "published" and the one that
+  // matters. Every content defect this project hit was invisible until somebody ran a query.
+  const coverage = await contentCoverage();
   const [matrix, unposted, pipeline, cadence, themes] = await Promise.all([
     getVideoCoverageMatrix(),
     getUnpostedRenders(20),
@@ -48,6 +52,50 @@ export default async function ContentPlanPage() {
         ]}
         actions={[{ label: "New video", href: "/admin/video/new" }]}
       />
+
+      {/* -------- Coverage -------- */}
+      <AdminCard className="mb-8">
+        <h2 className="font-heading text-lg font-bold text-charcoal mb-1">What is ready to film</h2>
+        <p className="text-sm text-secondary mb-4">
+          <strong>Published</strong> is how many pages exist. <strong>Ready</strong> is how many a video
+          can actually use — a published reading post with no passage makes no video. Everything this
+          section shows was previously invisible until someone wrote a query.
+        </p>
+        {coverage.empty.length > 0 && (
+          <p className="text-sm text-primary mb-3">
+            No usable content at all for: {coverage.empty.join(", ")}.
+          </p>
+        )}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs uppercase tracking-wide text-secondary border-b border-[var(--divider)]">
+                <th className="py-2 pr-3">Type</th>
+                <th className="py-2 pr-3">Level</th>
+                <th className="py-2 pr-3 text-right">Published</th>
+                <th className="py-2 pr-3 text-right">Ready</th>
+                <th className="py-2">Blocker</th>
+              </tr>
+            </thead>
+            <tbody>
+              {coverage.rows.map((r) => {
+                const short = r.ready < r.published;
+                return (
+                  <tr key={`${r.contentType}-${r.level}`} className="border-b border-[var(--divider)] last:border-0">
+                    <td className="py-1.5 pr-3 text-charcoal">{r.contentType}</td>
+                    <td className="py-1.5 pr-3 text-secondary">{r.level}</td>
+                    <td className="py-1.5 pr-3 text-right tabular-nums text-secondary">{r.published}</td>
+                    <td className={`py-1.5 pr-3 text-right tabular-nums ${short ? "text-primary font-semibold" : "text-charcoal"}`}>
+                      {r.ready}
+                    </td>
+                    <td className="py-1.5 text-xs text-primary">{r.blocker ?? ""}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </AdminCard>
 
       {/* -------- Pipeline -------- */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">

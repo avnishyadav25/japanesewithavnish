@@ -17,11 +17,12 @@
  * the admin <Player> and the headless render all load the same file.
  */
 import React from "react";
-import { Img, staticFile, useCurrentFrame } from "remotion";
+import { Img, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import type { BrandingSettings, ResolvedTimeline, Scene } from "@/lib/video/types";
 import { fitTitleBar, logoAsset } from "@/lib/video/branding";
-import { mascotForScene } from "@/lib/video/mascots";
+import { mascotForBeat } from "@/lib/video/mascots";
 import { CornerMascot } from "../scenes/MascotScenes";
+import { segmentOffsets } from "@/lib/video/timeline";
 import { useLayout } from "../LayoutContext";
 import { fontStackSans } from "../theme";
 
@@ -50,6 +51,7 @@ export const BrandOverlay: React.FC<{
 }> = ({ branding, showHashtag, showTitleBar, title, scenes, timeline }) => {
   const { theme, scale } = useLayout();
   const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
 
   // The overlay sits outside the per-scene <Sequence>s, so it has to work out which scene is on
   // screen itself. Read from the same resolved spans the sequences use rather than recomputing —
@@ -62,7 +64,22 @@ export const BrandOverlay: React.FC<{
 
   // Cast by subject, so the owl always teaches grammar and the fox always does vocabulary.
   // Rendered here rather than inside each scene component: a new scene type gets one for free.
-  const cornerMascot = branding.mascots && currentScene ? mascotForScene(currentScene.sceneType) : null;
+  /**
+   * The corner teacher, and WHICH POSE it holds right now.
+   *
+   * It used to be one frozen image for the whole scene, which is what made it read as a sticker
+   * rather than a character. It now steps through a pose sequence as the narration moves from
+   * sentence to sentence — explaining, pointing at the thing, encouraging — using the beat index
+   * the overlay already computes for the camera.
+   *
+   * `mascotForBeat` filters through isGenerated() and falls back to the single cast pose, so this
+   * changes nothing until the teaching art is promoted.
+   */
+  const beatIndex = currentScene
+    ? Math.max(0, segmentOffsets(currentScene).filter((o) => sceneStartFrame + o * fps <= frame).length - 1)
+    : 0;
+  const cornerMascot =
+    branding.mascots && currentScene ? mascotForBeat(currentScene.sceneType, beatIndex) : null;
   const asset = logoAsset(branding);
   const logoSize = scale.pad * 1.6;
 

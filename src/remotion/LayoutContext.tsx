@@ -7,7 +7,7 @@
  */
 import React, { createContext, useContext, useMemo } from "react";
 import type { VideoStylePreset, VideoThemeTokens } from "@/lib/video/types";
-import { motionFor, type MotionPreset } from "@/lib/video/motion";
+import { motionFor, type MotionPreset, type MotionProfile } from "@/lib/video/motion";
 import { DEFAULT_THEME, LAYOUT_SCALES, type LayoutScale, type SceneLayout } from "./theme";
 
 interface LayoutContextValue {
@@ -28,12 +28,13 @@ const LayoutContext = createContext<LayoutContextValue>({
 export const LayoutProvider: React.FC<{
   layout: SceneLayout;
   theme: VideoThemeTokens;
-  stylePreset?: VideoStylePreset | null;
+  /** A motion profile name, or a style preset — the original pair share names. */
+  motionProfile?: MotionProfile | VideoStylePreset | null;
   children: React.ReactNode;
-}> = ({ layout, theme, stylePreset, children }) => {
+}> = ({ layout, theme, motionProfile, children }) => {
   const value = useMemo(
-    () => ({ layout, scale: LAYOUT_SCALES[layout], theme, motion: motionFor(stylePreset) }),
-    [layout, theme, stylePreset]
+    () => ({ layout, scale: LAYOUT_SCALES[layout], theme, motion: motionFor(motionProfile) }),
+    [layout, theme, motionProfile]
   );
   return <LayoutContext.Provider value={value}>{children}</LayoutContext.Provider>;
 };

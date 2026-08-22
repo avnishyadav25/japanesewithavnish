@@ -43,7 +43,8 @@ async function main() {
     "../src/lib/video/projects"
   );
   const { resolveScope } = await import("../src/lib/video/scopeResolver");
-  const { resolvePacing } = await import("../src/lib/video/pacing");
+  const { levelPacing, resolvePacing } = await import("../src/lib/video/pacing");
+  const { templateById } = await import("../src/lib/video/templates");
   const { generateStoryboard, outroSiteUrl } = await import("../src/lib/video/storyboard");
   const { recordGenerationRun } = await import("../src/lib/video/audit");
   // Dynamic, like every other import in this file — the module graph is loaded after dotenv so
@@ -108,13 +109,27 @@ async function main() {
 
         const pacing = resolvePacing(project.pacing, snapshot.items[0]?.kind, stylePreset);
 
+        // Level shifts pacing on top of whatever the project set. It changed nothing at all before
+
+        // this — an N1 video was an N5 video with harder words in it.
+
+        // The template the project was created from. Its pacing overrides sit ON TOP of the resolved
+        // defaults and UNDER the level adjustment, so a drill stays a drill at every level while the
+        // level still shifts it. Without reading it here a regenerate would silently drop the recall
+        // round and revert to generic pacing.
+        const template = templateById(project.templateId);
+        const templated = template ? { ...pacing, ...template.pacing } : pacing;
+        const levelledPacing = levelPacing(templated, snapshot.jlptLevel);
+
         // No batch cap: that limit belongs to the request path, not here.
         const generated = await generateStoryboard(snapshot, {
           projectId: id,
           narrationLang: lang as never,
           themeKey: project.themeKey,
-          pacing,
+          pacing: levelledPacing,
           stylePreset,
+          recall: template?.recall,
+          motionProfile: template?.motionProfile,
           decorAssets,
           voices: project.voices,
           tone: project.tone,
@@ -164,7 +179,7 @@ async function main() {
           userMessage: generated.request.userMessage,
           rawResponse: generated.rawResponse,
           slots: generated.request.slots,
-          pacing,
+          pacing: levelledPacing,
           estimatedSeconds: generated.request.estimatedSeconds,
           promptTokens: generated.usage.promptTokens,
           completionTokens: generated.usage.completionTokens,

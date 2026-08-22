@@ -59,7 +59,17 @@ export interface MotionPreset {
  * any drift in these numbers is a bug, not a taste decision. `cameraPush: 0` keeps lesson scenes
  * as still as they have always been.
  */
-export const MOTION_PRESETS: Record<VideoStylePreset, MotionPreset> = {
+/**
+ * Named motion profiles, decoupled from the style preset.
+ *
+ * They used to be the same thing — one profile per preset — which made "give long-form some motion"
+ * an all-or-nothing change to every lesson ever rendered. A profile is now selected per project
+ * (via its template), so `lesson` keeps returning an identity camera for everything already made
+ * and a new format can opt into `teaching` without restyling the back catalogue.
+ */
+export type MotionProfile = "lesson" | "teaching" | "shorts";
+
+export const MOTION_PRESETS: Record<MotionProfile, MotionPreset> = {
   lesson: {
     enter: { damping: 200, mass: 0.6 },
     enterDistance: 28,
@@ -70,6 +80,28 @@ export const MOTION_PRESETS: Record<VideoStylePreset, MotionPreset> = {
     cameraPunch: 0,
     transition: { kind: "fade", durationSeconds: 0.3 },
   },
+  /**
+   * Long-form that moves without fidgeting.
+   *
+   * Half the Shorts camera and a slower stagger. The measurement that motivated it: a 16-second
+   * teaching scene completes every entrance by frame 40 and then holds a still image for nearly
+   * fifteen seconds. The fix for that is not Shorts pacing — a lesson frame carries a word, a
+   * reading, a meaning and an example, and punching it every beat competes with reading them.
+   *
+   * A fade rather than a slide between scenes, because a lesson cut is a change of subject, not a
+   * beat drop.
+   */
+  teaching: {
+    enter: { damping: 26, mass: 0.6, stiffness: 150 },
+    enterDistance: 32,
+    hero: { damping: 13, mass: 0.5, stiffness: 150 },
+    heroFrom: 0.74,
+    staggerScale: 0.8,
+    cameraPush: 0.022,
+    cameraPunch: 0.008,
+    transition: { kind: "fade", durationSeconds: 0.35 },
+  },
+
   shorts: {
     // damping 18 against stiffness 190 settles in ~0.35s with a slight overshoot: the value
     // arrives, tips fractionally past, and comes back. That overshoot is most of what separates
@@ -87,8 +119,13 @@ export const MOTION_PRESETS: Record<VideoStylePreset, MotionPreset> = {
   },
 };
 
-export function motionFor(preset: VideoStylePreset | undefined | null): MotionPreset {
-  return MOTION_PRESETS[preset ?? "lesson"] ?? MOTION_PRESETS.lesson;
+/**
+ * Accepts a profile name OR a style preset, since the two share names for the original pair. A
+ * storyboard written before profiles existed carries only its preset, and resolves exactly as it
+ * always did.
+ */
+export function motionFor(profile: MotionProfile | VideoStylePreset | undefined | null): MotionPreset {
+  return MOTION_PRESETS[(profile as MotionProfile) ?? "lesson"] ?? MOTION_PRESETS.lesson;
 }
 
 /**

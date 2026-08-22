@@ -219,6 +219,12 @@ async function queryPosts(params: {
   jlptLevel?: string;
   tags?: string[];
   limit?: number;
+  /**
+   * How many items to skip. This is what lets a level be split into parts — without it, "part 2 of
+   * 31" resolves to exactly the same 25 words as part 1, and thirty-one identical videos get made
+   * before anyone notices they are identical.
+   */
+  offset?: number;
   postIds?: string[];
 }): Promise<PostRow[]> {
   if (!sql) return [];
@@ -254,6 +260,12 @@ async function queryPosts(params: {
     values.push(params.limit);
     limitClause = `LIMIT $${values.length}`;
   }
+  // OFFSET only means something under a stable ORDER BY, which the query below has: sort_order then
+  // created_at. Without a deterministic order two parts could overlap and a third cover nothing.
+  if (params.offset && params.offset > 0) {
+    values.push(params.offset);
+    limitClause += ` OFFSET $${values.length}`;
+  }
 
   return (await sql.query(
     `SELECT p.id, p.slug, p.title, p.summary, (p.jlpt_level)[1] AS jlpt_level, p.content_type, p.meta,
@@ -270,8 +282,15 @@ async function queryPosts(params: {
 async function resolveLessonItems(lessonIds: string[]): Promise<ContentItem[]> {
   if (!sql || lessonIds.length === 0) return [];
   const lessons = (await sql.query(
+    // IDs, not just titles. A finished video has to be attachable to the lesson AND to the module
+    // and submodule above it, and only the titles used to survive this query — so nothing
+    // downstream could name the tier it belonged to. `curriculum_lessons` carries only
+    // `submodule_id`, so the ids for the tiers above exist nowhere else without this join chain.
     `SELECT l.id, l.code, l.title, l.slug, l.goal, l.introduction, l.summary, l.content_type,
-            l.estimated_minutes, sm.title AS submodule_title, m.title AS module_title, lv.code AS level_code
+            l.estimated_minutes,
+            sm.id AS submodule_id, sm.title AS submodule_title,
+            m.id AS module_id, m.title AS module_title,
+            lv.id AS level_id, lv.code AS level_code
      FROM curriculum_lessons l
      JOIN curriculum_submodules sm ON sm.id = l.submodule_id
      JOIN curriculum_modules m ON m.id = sm.module_id
@@ -332,8 +351,11 @@ async function resolveLessonItems(lessonIds: string[]): Promise<ContentItem[]> {
         introduction: lesson.introduction,
         contentType: lesson.content_type,
         estimatedMinutes: lesson.estimated_minutes,
+        moduleId: lesson.module_id,
         moduleTitle: lesson.module_title,
+        submoduleId: lesson.submodule_id,
         submoduleTitle: lesson.submodule_title,
+        levelId: lesson.level_id,
         objectives: objectives.map((o) => o.objective_text),
       },
       examples: [],
@@ -463,6 +485,10 @@ async function scopeTitle(scopeKind: ScopeKind, ref: ScopeRef): Promise<string> 
     // decorated with a level prefix.
     return ref.topic?.trim() || "Untitled topic";
   }
+  if (scopeKind === "kana_set") {
+    const name = ref.kanaType === "katakana" ? "Katakana" : "Hiragana";
+    return ref.kanaRow ? `${name} ${ref.kanaRow}-line` : name;
+  }
   if (scopeKind === "content_batch") {
     const level = ref.jlptLevel ? `${ref.jlptLevel} ` : "";
     return `${level}${ref.contentType ?? "content"}`.trim();
@@ -512,6 +538,63 @@ async function resolveTopicItems(postIds: string[]): Promise<ContentItem[]> {
  * resolves to nothing, so the admin gets "no published vocabulary matched those filters"
  * instead of a silently empty video.
  */
+/**
+ * Kana, straight off the `kana` table.
+ *
+ * The only resolver that touches no post row. `kana` has no `post_id` — it is a fixed set of 92
+ * characters, not a library of articles — so every other scope path, all of which join through
+ * posts, could never reach it. That is why all 92 characters have stroke data and no kana video
+ * has ever been possible.
+ *
+ * One ContentItem per ROW (the a-line, the ka-line), because that is the unit a learner practises
+ * and the unit `kana_grid` draws. A whole syllabary in one item would be a 46-cell grid nobody can
+ * read at video size.
+ */
+async function resolveKanaItems(ref: ScopeRef): Promise<ContentItem[]> {
+  const type = ref.kanaType ?? "hiragana";
+  const rows = (await sql!.query(
+    `SELECT character, romaji, row_label, stroke_count, stroke_data, sort_order
+     FROM kana
+     WHERE type = $1 ${ref.kanaRow ? "AND row_label = $2" : ""}
+     ORDER BY sort_order`,
+    ref.kanaRow ? [type, ref.kanaRow] : [type]
+  )) as Record<string, unknown>[];
+
+  const byRow = new Map<string, Record<string, unknown>[]>();
+  for (const row of rows) {
+    const key = String(row.row_label ?? "misc");
+    byRow.set(key, [...(byRow.get(key) ?? []), row]);
+  }
+
+  return Array.from(byRow).map(([rowLabel, chars]) => ({
+    kind: "kana" as const,
+    title: `${type === "hiragana" ? "Hiragana" : "Katakana"} ${rowLabel}-line`,
+    summary: chars.map((c) => `${c.character} (${c.romaji})`).join(" "),
+    // No JLPT level: kana sits below N5 and claiming a level would put it in the wrong batches.
+    jlptLevel: undefined,
+    url: `/learn/${type}`,
+    data: {
+      kanaType: type,
+      rowLabel,
+      characters: chars.map((c) => ({
+        character: String(c.character),
+        romaji: String(c.romaji),
+        strokeCount: typeof c.stroke_count === "number" ? c.stroke_count : undefined,
+        strokePaths: strokePathsOf(c.stroke_data),
+      })),
+    },
+    examples: [],
+    blocks: [],
+  }));
+}
+
+/** Stroke data is stored either as a bare array of paths or as `{ paths: [...] }`. */
+function strokePathsOf(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw.filter((x): x is string => typeof x === "string");
+  const paths = (raw as { paths?: unknown } | null)?.paths;
+  return Array.isArray(paths) ? paths.filter((x): x is string => typeof x === "string") : [];
+}
+
 export async function resolveScope(scopeKind: ScopeKind, ref: ScopeRef): Promise<ContentSnapshot> {
   if (!sql) throw new Error("Database unavailable");
 
@@ -538,12 +621,15 @@ export async function resolveScope(scopeKind: ScopeKind, ref: ScopeRef): Promise
       jlptLevel: ref.jlptLevel,
       tags: ref.tags,
       limit: ref.limit ?? 10,
+      offset: ref.offset,
       postIds: ref.postIds,
     });
     items = await toContentItems(rows, contentType, false);
   } else if (scopeKind === "topic") {
     if (!ref.postIds?.length) throw new Error("topic scope requires at least one selected item");
     items = await resolveTopicItems(ref.postIds);
+  } else if (scopeKind === "kana_set") {
+    items = await resolveKanaItems(ref);
   } else {
     items = await resolveLessonItems(await lessonIdsUnder(scopeKind, ref));
   }
@@ -554,6 +640,8 @@ export async function resolveScope(scopeKind: ScopeKind, ref: ScopeRef): Promise
         ? `No published ${ref.contentType ?? "content"} matched those filters.`
         : scopeKind === "topic"
           ? "None of the selected items are published any more."
+          : scopeKind === "kana_set"
+            ? `No ${ref.kanaType ?? "hiragana"} rows matched.`
           : "That scope contains no published content yet."
     );
   }

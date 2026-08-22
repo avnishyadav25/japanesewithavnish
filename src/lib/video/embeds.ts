@@ -68,6 +68,39 @@ export async function getVideosForLesson(lessonId: string): Promise<EmbeddedVide
   return rows.map(toEmbedded);
 }
 
+/**
+ * Videos attached anywhere at or above a lesson — the lesson itself, its submodule, its module.
+ *
+ * A module-scope video covers many lessons, so it is attached once to the module rather than
+ * copied onto each of them. Without this walk it would be attached correctly and shown nowhere,
+ * which is the state `getVideosForLesson` was already in: written, correct, and never called.
+ *
+ * Ordered nearest-first, so a video made for this exact lesson appears above one that covers the
+ * whole module.
+ */
+export async function getVideosForLessonTree(lessonId: string): Promise<EmbeddedVideo[]> {
+  if (!sql) return [];
+  const rows = (await sql.query(
+    `${SELECT}
+       AND (
+         l.lesson_id = $1::uuid
+         OR l.submodule_id = (SELECT submodule_id FROM curriculum_lessons WHERE id = $1::uuid)
+         OR l.module_id = (
+           SELECT sm.module_id FROM curriculum_lessons cl
+           JOIN curriculum_submodules sm ON sm.id = cl.submodule_id
+           WHERE cl.id = $1::uuid
+         )
+       )
+     ORDER BY
+       CASE WHEN l.lesson_id IS NOT NULL THEN 0
+            WHEN l.submodule_id IS NOT NULL THEN 1
+            ELSE 2 END,
+       l.sort_order, r.created_at DESC`,
+    [lessonId]
+  )) as Record<string, unknown>[];
+  return rows.map(toEmbedded);
+}
+
 /** ISO 8601 duration, which is what schema.org VideoObject requires — "PT1M32S", not "92". */
 export function toIso8601Duration(seconds: number): string {
   const total = Math.max(0, Math.round(seconds));

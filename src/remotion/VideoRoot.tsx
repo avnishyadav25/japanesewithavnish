@@ -84,13 +84,16 @@ export const VideoRoot: React.FC<VideoRootProps> = ({
   // Absent means `lesson` — every storyboard written before the preset existed was rendered that
   // way, so defaulting anywhere else would retroactively restyle the back catalogue.
   const stylePreset = storyboard.stylePreset ?? "lesson";
-  const motion = motionFor(stylePreset);
+  // The document's own profile when it has one, otherwise the preset's — which is what every
+  // storyboard written before profiles existed resolves to, unchanged.
+  const motionProfile = storyboard.motionProfile ?? stylePreset;
+  const motion = motionFor(motionProfile);
   // Project override wins over the storyboard's frozen copy; resolveCaptions fills the fields
   // storyboards written before caption styling existed do not carry.
   const captions = resolveCaptions({ ...storyboard.captions, ...(captionSettings ?? {}) });
 
   return (
-    <LayoutProvider layout={layout} theme={theme} stylePreset={stylePreset}>
+    <LayoutProvider layout={layout} theme={theme} motionProfile={motionProfile}>
       <AbsoluteFill style={{ background: theme.bg }}>
         {storyboard.scenes.map((scene, i) => {
           const span = timeline.sceneFrameSpans[i];

@@ -4,6 +4,34 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LEARN_CONTENT_TYPES } from "@/lib/learn-filters";
 import { FORMAT_SPECS, NARRATION_LANG_LABELS, NARRATION_LANGS, VIDEO_FORMATS, stylePresetForFormats } from "@/lib/video/types";
+import { VIDEO_TEMPLATES } from "@/lib/video/templates";
+
+/**
+ * The templates, plus an explicit "Custom" so choosing nothing is a choice rather than an oversight.
+ * Typed loosely on purpose — Custom has no style preset or pacing, and modelling that as a partial
+ * template would put an unusable entry into VIDEO_TEMPLATES itself.
+ */
+const TEMPLATE_CHOICES: {
+  id: string;
+  label: string;
+  description: string;
+  itemsPerVideo: number;
+  stylePreset?: "lesson" | "shorts";
+}[] = [
+  {
+    id: "",
+    label: "Custom — set everything by hand",
+    description: "No template. The length and pacing are whatever you choose below.",
+    itemsPerVideo: 0,
+  },
+  ...Object.values(VIDEO_TEMPLATES).map((t) => ({
+    id: t.id,
+    label: t.label,
+    description: t.description,
+    itemsPerVideo: t.itemsPerVideo,
+    stylePreset: t.stylePreset,
+  })),
+];
 import type { NarrationLang, PacingConfig, ScopeKind, ScopeRef, VideoFormat, VoiceConfig } from "@/lib/video/types";
 import { formatDuration } from "@/lib/video/pacing";
 import { VOICE_CATALOGUE } from "@/lib/video/voices";
@@ -109,6 +137,7 @@ export function NewVideoWizard({ themes, bgmTracks, levels, lessons, initial }: 
   const [topicNotice, setTopicNotice] = useState<string | null>(null);
 
   // --- step 2: output ---
+  const [templateId, setTemplateId] = useState<string>("");
   const [grouping, setGrouping] = useState<"single_video" | "video_per_item">("single_video");
   const [formats, setFormats] = useState<VideoFormat[]>(["vertical"]);
   const [narrationLangs, setNarrationLangs] = useState<NarrationLang[]>(["en"]);
@@ -258,7 +287,7 @@ export function NewVideoWizard({ themes, bgmTracks, levels, lessons, initial }: 
       const res = await fetch("/api/admin/video/scope/preview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scopeKind, scopeRef, grouping, formats, narrationLangs, pacing, voices }),
+        body: JSON.stringify({ scopeKind, scopeRef, grouping, formats, narrationLangs, pacing, voices, templateId: templateId || undefined }),
       });
       const data = await readJson(res);
       if (!res.ok) throw new Error(data.error || "Could not resolve that scope");
@@ -351,6 +380,7 @@ export function NewVideoWizard({ themes, bgmTracks, levels, lessons, initial }: 
           scopeKind,
           scopeRef: scopeKind === "topic" ? { topic: topic.trim(), postIds: effectivePostIds ?? [] } : scopeRef,
           grouping,
+          templateId: templateId || undefined,
           formats,
           narrationLangs,
           themeKey,
@@ -605,6 +635,43 @@ export function NewVideoWizard({ themes, bgmTracks, levels, lessons, initial }: 
               )}
             </div>
 
+            {/* Templates make a format repeatable: how many items, how it is paced, whether it ends
+                with a recall round. Picking one sets the rest of this step, so a series is the same
+                shape every time rather than whatever the sliders happened to be on. */}
+            <div>
+              <span className={label}>Format</span>
+              <div className="space-y-2 mb-4">
+                {TEMPLATE_CHOICES.map((t) => (
+                  <label
+                    key={t.id || "custom"}
+                    className={`flex items-start gap-2 text-sm rounded-card border p-2.5 cursor-pointer transition ${
+                      templateId === t.id ? "border-primary bg-red-light" : "border-[var(--divider)] hover:border-primary/40"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="template"
+                      className="mt-1"
+                      checked={templateId === t.id}
+                      onChange={() => {
+                        setTemplateId(t.id);
+                        if (t.id && t.stylePreset) {
+                          // A template owns the shape of its format, so choosing one sets the
+                          // fields it defines rather than leaving them to disagree with it.
+                          setFormats(t.stylePreset === "shorts" ? ["vertical"] : ["landscape"]);
+                          setLimit(t.itemsPerVideo);
+                        }
+                      }}
+                    />
+                    <span>
+                      <span className="text-charcoal font-medium">{t.label}</span>
+                      <span className="block text-xs text-secondary">{t.description}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
             <div>
               <span className={label}>Formats</span>
               <div className="space-y-2">
@@ -622,12 +689,12 @@ export function NewVideoWizard({ themes, bgmTracks, levels, lessons, initial }: 
                   and silently get either a fast Reel or a calm lesson with nothing saying which. */}
               <div
                 className={`mt-3 rounded-lg border p-3 text-xs leading-relaxed ${
-                  stylePresetForFormats(formats) === "shorts"
+                  stylePresetForFormats(formats, limit) === "shorts"
                     ? "border-sakura/40 bg-sakura/5 text-charcoal"
                     : "border-stone-200 bg-stone-50 text-charcoal/80"
                 }`}
               >
-                {stylePresetForFormats(formats) === "shorts" ? (
+                {stylePresetForFormats(formats, limit) === "shorts" ? (
                   <>
                     <strong>Shorts pacing.</strong> Each item is split into 2–3 short beats, the camera
                     keeps moving, captions highlight each word as it is spoken, and the hook is spoken
@@ -636,8 +703,19 @@ export function NewVideoWizard({ themes, bgmTracks, levels, lessons, initial }: 
                 ) : (
                   <>
                     <strong>Lesson pacing.</strong> One card per item, held for as long as the narration
-                    takes. <em>Vertical on its own</em> switches to Shorts pacing — adding any other
-                    format keeps lesson pacing, so a YouTube cut is never chopped into beats.
+                    takes.{" "}
+                    {formats.length === 1 && formats[0] === "vertical" ? (
+                      <>
+                        Vertical on its own would be a Short, but {limit} items is too many —{" "}
+                        <em>a Short is a length, not a shape</em>. Five or fewer switches it.
+                      </>
+                    ) : (
+                      <>
+                        <em>Vertical on its own, with five items or fewer</em>, switches to Shorts pacing —
+                        adding any other format keeps lesson pacing, so a YouTube cut is never chopped
+                        into beats.
+                      </>
+                    )}
                   </>
                 )}
               </div>

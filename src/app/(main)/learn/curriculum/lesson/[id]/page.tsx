@@ -5,6 +5,9 @@ import { getSession } from "@/lib/auth/session";
 import { LessonCompleteButton } from "./LessonCompleteButton";
 import { LearnMarkdown } from "@/components/learn/LearnMarkdown";
 import { InteractivePracticePanel } from "@/components/learn/practices/InteractivePracticePanel";
+import { ContentVideoSection } from "@/components/learn/ContentVideo";
+import { canonicalUrl } from "@/lib/seo";
+import { getVideosForLessonTree } from "@/lib/video/embeds";
 import { canAccessLesson } from "@/lib/auth/access";
 import { Countdown } from "@/components/learn/Countdown";
 import { getResolvedLessonBlocks } from "@/lib/curriculum/getLessonBlocks";
@@ -301,8 +304,17 @@ export default async function LearnCurriculumLessonPage({ params }: { params: Pr
         ? Array.from(new Set(writingKatakanaChars))
         : [];
 
+  // Videos attached to this lesson, its submodule or its module. `getVideosForLesson` has existed
+  // since video publishing was built and had ZERO callers — the lesson page had no video slot at
+  // all, so a correctly attached video rendered nowhere.
+  const lessonVideos = await getVideosForLessonTree(row.id);
+  // Canonical, not the request path: VideoObject schema needs an absolute URL, and the [id] route
+  // accepts a uuid or a slug so the request path is not stable.
+  const lessonPageUrl = canonicalUrl(`/learn/curriculum/lesson/${row.slug || row.id}`);
+
   const tocLinks = [
     { href: "#intro", label: "Introduction" },
+    ...(lessonVideos.length > 0 ? [{ href: "#video", label: "Watch" }] : []),
     { href: "#lesson", label: "Lesson Content" },
     ...(exercises.length > 0 ? [{ href: "#exercises", label: "Exercises" }] : []),
     ...(examples.length > 0 ? [{ href: "#examples", label: "Examples" }] : []),
@@ -380,6 +392,17 @@ export default async function LearnCurriculumLessonPage({ params }: { params: Pr
           
           {/* Left Column: Lesson markdown body + exercises + practices */}
           <div className="lg:col-span-8 space-y-8 min-w-0">
+            {lessonVideos.length > 0 && (
+              /* Above the written lesson: a student who would rather watch should not have to
+                 scroll past the whole thing to discover there is a video. */
+              <section id="video" className="scroll-mt-6">
+                <h2 className="font-heading text-lg font-semibold text-charcoal mb-3">
+                  {lessonVideos.length === 1 ? "Watch this lesson" : "Videos for this lesson"}
+                </h2>
+                <ContentVideoSection videos={lessonVideos} pageUrl={lessonPageUrl} />
+              </section>
+            )}
+
             <section id="lesson" className="scroll-mt-6">
               <h2 className="font-heading text-lg font-semibold text-charcoal mb-3">Lesson Content</h2>
               {lessonBlocks.length > 0 ? (

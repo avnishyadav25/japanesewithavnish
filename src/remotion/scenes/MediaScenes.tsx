@@ -277,12 +277,49 @@ export const ListeningPromptScene: React.FC<{ visual: ListeningPromptVisual }> =
   );
 };
 
+/**
+ * The frame the answer appears on.
+ *
+ * Exported and pure so it can be ASSERTED. `thinkingSeconds` was declared on QuizQuestionVisual
+ * from the start and never read — the reveal came from scene length alone, so setting the field did
+ * nothing. A recall round is precisely an instruction to wait a given number of seconds, so a test
+ * has to be able to prove the number moves the reveal. Buried inside the component body it could
+ * only be checked by rendering and looking.
+ *
+ * Measured from when the question is legible, not from frame 0: the question and options stagger in
+ * over ~0.6s, and starting the clock earlier gives less thinking time than promised.
+ *
+ * Clamped by the scene's length, so asking for four seconds inside a three-second scene still
+ * leaves time to read the answer instead of never revealing it.
+ */
+export function quizRevealFrame(thinkingSeconds: number | undefined, durationInFrames: number, fps: number): number {
+  const legible = Math.round(fps * 0.6);
+  const minAnswer = Math.round(fps * 1.4);
+  const asked = legible + Math.round((thinkingSeconds ?? 2) * fps);
+  return Math.max(legible, Math.min(asked, durationInFrames - minAnswer));
+}
+
 export const QuizQuestionScene: React.FC<{ visual: QuizQuestionVisual }> = ({ visual }) => {
   const { theme, scale } = useLayout();
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
-  // Reveal in the last third, always leaving at least a second to read the answer.
-  const revealFrame = Math.max(Math.round(fps * 1.5), durationInFrames - Math.round(fps * 2.2));
+  /**
+   * When the answer appears.
+   *
+   * `thinkingSeconds` was declared on QuizQuestionVisual from the start and NEVER READ — the reveal
+   * was derived purely from scene length, so setting the field did nothing and a "give them two
+   * seconds to answer" instruction was silently ignored. A recall round is exactly that instruction,
+   * so the field has to mean something.
+   *
+   * It is measured from the moment the question is legible rather than from frame 0: the question
+   * and its options stagger in over the first ~0.6s, and starting the clock before the viewer can
+   * read the question gives them less thinking time than the number promises.
+   *
+   * Still clamped by the scene's own length. A caller asking for four seconds of thinking inside a
+   * three-second scene gets a reveal that at least leaves time to read the answer, rather than one
+   * that never fires.
+   */
+  const revealFrame = quizRevealFrame(visual.thinkingSeconds, durationInFrames, fps);
   const revealed = frame >= revealFrame;
   const countdown = Math.max(0, Math.ceil((revealFrame - frame) / fps));
 

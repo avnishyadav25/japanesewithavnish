@@ -2,12 +2,16 @@ import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth/admin";
 import { sql } from "@/lib/db";
 import { logEvent } from "@/lib/video/projects";
+import { curriculumTargets, validateLinks, type LinkTarget } from "@/lib/video/curriculumLinks";
 
 interface SnapshotItem {
   postId?: string;
   slug?: string;
   title?: string;
   kind?: string;
+  /** Where the curriculum ids live. This type omitted `data` entirely, which is why a lesson-scope
+   *  video could never be attached to its lesson: the id was in the snapshot and unreadable. */
+  data?: Record<string, unknown>;
 }
 
 interface RenderRow {
@@ -16,7 +20,7 @@ interface RenderRow {
   approval_status: string;
   is_current: boolean;
   doc: { scenes?: { sourceRef?: { kind: string; id: string } }[] };
-  content_snapshot: { items?: SnapshotItem[] } | null;
+  content_snapshot: { items?: SnapshotItem[]; jlptLevel?: string } | null;
 }
 
 async function loadRender(id: string): Promise<RenderRow | null> {
@@ -37,27 +41,60 @@ async function loadRender(id: string): Promise<RenderRow | null> {
  * item whose scenes carry no ref. Chrome scenes (intro, outro, mascot) have no postId and drop out
  * naturally.
  */
-function targetsOf(render: RenderRow): { postId: string; title: string; slug?: string; kind?: string }[] {
-  const items = render.content_snapshot?.items ?? [];
-  const seen = new Set<string>();
-  const targets: { postId: string; title: string; slug?: string; kind?: string }[] = [];
-
-  for (const item of items) {
-    if (!item.postId || seen.has(item.postId)) continue;
-    seen.add(item.postId);
-    targets.push({ postId: item.postId, title: item.title ?? item.slug ?? item.postId, slug: item.slug, kind: item.kind });
-  }
+function targetsOf(render: RenderRow): LinkTarget[] {
+  const targets = curriculumTargets(render.content_snapshot);
+  if (targets.length > 0) return targets;
 
   // Fall back to scene provenance for storyboards written before content_snapshot was populated.
-  if (targets.length === 0) {
-    for (const scene of render.doc?.scenes ?? []) {
-      const ref = scene.sourceRef;
-      if (ref?.kind !== "post" || seen.has(ref.id)) continue;
-      seen.add(ref.id);
-      targets.push({ postId: ref.id, title: ref.id });
-    }
+  const seen = new Set<string>();
+  const fallback: LinkTarget[] = [];
+  for (const scene of render.doc?.scenes ?? []) {
+    const ref = scene.sourceRef;
+    if (ref?.kind !== "post" || seen.has(ref.id)) continue;
+    seen.add(ref.id);
+    fallback.push({ kind: "post", id: ref.id, title: ref.id });
   }
-  return targets;
+  return fallback;
+}
+
+/**
+ * The JLPT level of every curriculum target, for the mismatch check.
+ *
+ * One query per tier rather than per target: a module-scope video can nominate dozens of lessons,
+ * and this runs on the click that publishes.
+ */
+async function levelsForTargets(targets: LinkTarget[]): Promise<Map<string, string | null>> {
+  const out = new Map<string, string | null>();
+  const ids = (kind: LinkTarget["kind"]) => targets.filter((t) => t.kind === kind).map((t) => t.id);
+
+  const lessons = ids("lesson");
+  if (lessons.length > 0) {
+    const rows = (await sql!.query(
+      `SELECT l.id, lv.code FROM curriculum_lessons l
+       JOIN curriculum_submodules sm ON sm.id = l.submodule_id
+       JOIN curriculum_modules m ON m.id = sm.module_id
+       JOIN curriculum_levels lv ON lv.id = m.level_id
+       WHERE l.id = ANY($1::uuid[])`, [lessons])) as { id: string; code: string | null }[];
+    for (const r of rows) out.set(`lesson:${r.id}`, r.code);
+  }
+  const submodules = ids("submodule");
+  if (submodules.length > 0) {
+    const rows = (await sql!.query(
+      `SELECT sm.id, lv.code FROM curriculum_submodules sm
+       JOIN curriculum_modules m ON m.id = sm.module_id
+       JOIN curriculum_levels lv ON lv.id = m.level_id
+       WHERE sm.id = ANY($1::uuid[])`, [submodules])) as { id: string; code: string | null }[];
+    for (const r of rows) out.set(`submodule:${r.id}`, r.code);
+  }
+  const modules = ids("module");
+  if (modules.length > 0) {
+    const rows = (await sql!.query(
+      `SELECT m.id, lv.code FROM curriculum_modules m
+       JOIN curriculum_levels lv ON lv.id = m.level_id
+       WHERE m.id = ANY($1::uuid[])`, [modules])) as { id: string; code: string | null }[];
+    for (const r of rows) out.set(`module:${r.id}`, r.code);
+  }
+  return out;
 }
 
 /**
@@ -78,11 +115,23 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (!render) return NextResponse.json({ error: "Render not found" }, { status: 404 });
 
   const targets = targetsOf(render);
+  // Every tier, not just posts. Filtering to post_id here is what made a lesson link invisible to
+  // the picker even once one existed.
   const linkedRows = (await sql`
-    SELECT post_id FROM video_content_links WHERE render_id = ${id}::uuid AND post_id IS NOT NULL
-  `) as { post_id: string }[];
+    SELECT post_id, lesson_id, module_id, submodule_id FROM video_content_links
+    WHERE render_id = ${id}::uuid
+  `) as { post_id: string | null; lesson_id: string | null; module_id: string | null; submodule_id: string | null }[];
 
-  return NextResponse.json({ targets, linked: linkedRows.map((r) => r.post_id) });
+  const linked = linkedRows.flatMap((r) =>
+    [
+      r.post_id && `post:${r.post_id}`,
+      r.lesson_id && `lesson:${r.lesson_id}`,
+      r.module_id && `module:${r.module_id}`,
+      r.submodule_id && `submodule:${r.submodule_id}`,
+    ].filter((x): x is string => Boolean(x))
+  );
+
+  return NextResponse.json({ targets, linked });
 }
 
 /**
@@ -105,8 +154,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   if (action === "unlink") {
     // A specific page when given one, otherwise every page — the card offers both.
-    if (typeof body?.postId === "string") {
-      await sql`DELETE FROM video_content_links WHERE render_id = ${id}::uuid AND post_id = ${body.postId}::uuid`;
+    // `kind:id`, matching the link shape. postId is still accepted for the older call shape.
+    const one = typeof body?.target === "string" ? body.target : typeof body?.postId === "string" ? `post:${body.postId}` : null;
+    if (one) {
+      const [kind, tid] = one.split(":");
+      const col = (
+        { post: "post_id", lesson: "lesson_id", module: "module_id", submodule: "submodule_id" } as Record<string, string | undefined>
+      )[kind];
+      if (!col) return NextResponse.json({ error: `Unknown target kind "${kind}".` }, { status: 400 });
+      await sql.query(`DELETE FROM video_content_links WHERE render_id = $1::uuid AND ${col} = $2::uuid`, [id, tid]);
     } else {
       await sql`DELETE FROM video_content_links WHERE render_id = ${id}::uuid`;
     }
@@ -125,54 +181,96 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "This render has been superseded by a newer one." }, { status: 409 });
   }
 
-  const lessonId: string | null = typeof body?.lessonId === "string" ? body.lessonId : null;
+  /**
+   * Targets as `kind:id` strings, so one list covers posts and all three curriculum tiers.
+   * `postIds` and `lessonId` are still accepted for anything still sending the old shape.
+   */
+  let chosen: LinkTarget[] = [];
+  const all = targetsOf(render);
+  const byKey = new Map(all.map((t) => [`${t.kind}:${t.id}`, t]));
 
-  let postIds: string[] = [];
-  if (Array.isArray(body?.postIds)) postIds = body.postIds.filter((p: unknown): p is string => typeof p === "string");
-  else if (typeof body?.postId === "string") postIds = [body.postId];
+  if (Array.isArray(body?.targets)) {
+    for (const key of body.targets as unknown[]) {
+      if (typeof key !== "string") continue;
+      const found = byKey.get(key);
+      if (found) chosen.push(found);
+      else {
+        const [kind, tid] = key.split(":");
+        if (["post", "lesson", "module", "submodule"].includes(kind) && tid) {
+          chosen.push({ kind: kind as LinkTarget["kind"], id: tid, title: tid });
+        }
+      }
+    }
+  }
+  if (Array.isArray(body?.postIds)) {
+    for (const p of body.postIds) if (typeof p === "string") chosen.push({ kind: "post", id: p, title: p });
+  } else if (typeof body?.postId === "string") {
+    chosen.push({ kind: "post", id: body.postId, title: body.postId });
+  }
+  if (typeof body?.lessonId === "string") chosen.push({ kind: "lesson", id: body.lessonId, title: body.lessonId });
 
-  if (postIds.length === 0 && !lessonId) {
-    const targets = targetsOf(render);
-    if (targets.length === 1) {
-      postIds = [targets[0].postId];
+  if (chosen.length === 0) {
+    if (all.length === 1) {
+      chosen = [all[0]];
     } else {
-      // The candidate list travels with the error so the card can render a picker straight from
-      // the failed response, instead of the admin being told to supply an id by hand.
       return NextResponse.json(
         {
           error:
-            targets.length === 0
-              ? "This video is not tied to a content page. Pass a postId or lessonId."
-              : `This video covers ${targets.length} pages — choose which to publish it on.`,
-          targets,
+            all.length === 0
+              ? "This video is not tied to any content page or lesson."
+              : `This video covers ${all.length} places — choose where to publish it.`,
+          targets: all,
         },
         { status: 400 }
       );
     }
   }
 
+  /**
+   * The relationship check the roadmap asks for, run BEFORE anything is written.
+   *
+   * `?force=true` exists because a legitimate exception will eventually turn up — a revision video
+   * deliberately placed a level down, say — and a check with no override is a check people route
+   * around. Overriding is recorded in the event payload.
+   */
+  const levelByTarget = await levelsForTargets(chosen);
+  const issues = validateLinks({
+    videoLevel: render.content_snapshot?.jlptLevel ?? null,
+    targets: chosen,
+    levelByTarget,
+  });
+  if (issues.length > 0 && body?.force !== true) {
+    return NextResponse.json(
+      {
+        error: issues[0].reason,
+        issues,
+        hint: "Publish anyway by sending force: true if this placement is deliberate.",
+      },
+      { status: 409 }
+    );
+  }
+
   const placement = typeof body?.placement === "string" ? body.placement : "inline";
   const sortOrder = typeof body?.sortOrder === "number" ? body.sortOrder : 0;
 
-  // ON CONFLICT against the partial unique indexes added in migration 147. Before those, clicking
-  // Publish twice embedded the same video on the same page twice, and nothing ever cleaned it up.
+  // One INSERT shape per tier, each against its own partial unique index (migrations 147 and 154).
+  // Before those, clicking Publish twice embedded the same video on the same page twice.
+  const COLUMN: Record<LinkTarget["kind"], string> = {
+    post: "post_id",
+    lesson: "lesson_id",
+    module: "module_id",
+    submodule: "submodule_id",
+  };
   let linked = 0;
-  if (lessonId) {
-    const rows = (await sql`
-      INSERT INTO video_content_links (render_id, lesson_id, placement, sort_order, is_published)
-      VALUES (${id}::uuid, ${lessonId}::uuid, ${placement}, ${sortOrder}, true)
-      ON CONFLICT (render_id, lesson_id) WHERE lesson_id IS NOT NULL DO NOTHING
-      RETURNING id
-    `) as { id: string }[];
-    linked += rows.length;
-  }
-  for (const postId of postIds) {
-    const rows = (await sql`
-      INSERT INTO video_content_links (render_id, post_id, placement, sort_order, is_published)
-      VALUES (${id}::uuid, ${postId}::uuid, ${placement}, ${sortOrder}, true)
-      ON CONFLICT (render_id, post_id) WHERE post_id IS NOT NULL DO NOTHING
-      RETURNING id
-    `) as { id: string }[];
+  for (const target of chosen) {
+    const col = COLUMN[target.kind];
+    const rows = (await sql.query(
+      `INSERT INTO video_content_links (render_id, ${col}, placement, sort_order, is_published)
+       VALUES ($1::uuid, $2::uuid, $3, $4, true)
+       ON CONFLICT (render_id, ${col}) WHERE ${col} IS NOT NULL DO NOTHING
+       RETURNING id`,
+      [id, target.id, placement, sortOrder]
+    )) as { id: string }[];
     linked += rows.length;
   }
 
@@ -181,16 +279,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     renderId: id,
     actor: admin.email,
     eventType: "render_linked",
-    payload: { postIds, lessonId, linked },
+    payload: { targets: chosen.map((t) => `${t.kind}:${t.id}`), linked, forced: body?.force === true && issues.length > 0 },
   });
 
-  const requested = postIds.length + (lessonId ? 1 : 0);
+  const requested = chosen.length;
   const already = requested - linked;
   return NextResponse.json({
     ok: true,
     linked,
-    postIds,
-    lessonId,
+    targets: chosen.map((t) => `${t.kind}:${t.id}`),
     message:
       linked === 0
         ? "Already published to the site."

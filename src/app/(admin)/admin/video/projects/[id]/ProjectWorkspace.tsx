@@ -41,12 +41,30 @@ interface Props {
 const ACTIVE_JOB_STATUSES = new Set(["queued", "claimed", "running"]);
 
 /** One content page a render can be embedded on, as returned by GET .../renders/[id]/link. */
+/**
+ * A place a video can be published. Keyed on `kind:id` rather than a bare postId, because a
+ * curriculum video belongs on its lesson, module or submodule — and this type being post-only was
+ * half of why a lesson-scope video could only ever be attached to the word pages it mentioned.
+ */
 interface LinkTarget {
-  postId: string;
+  kind: "post" | "lesson" | "module" | "submodule";
+  id: string;
   title: string;
   slug?: string;
-  kind?: string;
+  contentKind?: string;
+  context?: string;
 }
+
+function targetKey(t: LinkTarget): string {
+  return `${t.kind}:${t.id}`;
+}
+
+const TARGET_LABEL: Record<LinkTarget["kind"], string> = {
+  lesson: "Lesson",
+  module: "Module",
+  submodule: "Submodule",
+  post: "Page",
+};
 
 export function ProjectWorkspace({
   project,
@@ -355,7 +373,7 @@ export function ProjectWorkspace({
         // A multi-page video comes back 400 carrying its candidate list. Opening the picker is
         // the useful response to that, not printing "This video covers 10 pages" and stopping.
         if (Array.isArray(data.targets) && data.targets.length > 0) {
-          setLinkPicker({ renderId, targets: data.targets, chosen: data.targets.map((t: LinkTarget) => t.postId) });
+          setLinkPicker({ renderId, targets: data.targets, chosen: data.targets.map(targetKey) });
           return;
         }
         throw new Error(data.error || "Request failed");
@@ -481,7 +499,10 @@ export function ProjectWorkspace({
       }
       // Pages it is already on start ticked, so the dialog shows current state rather than
       // implying nothing is published.
-      const preselected = linked.length > 0 ? linked : targets.map((t) => t.postId);
+      // Curriculum tiers are pre-ticked over the individual word pages: a lesson video belongs on
+      // the lesson, and ticking twenty word pages by default is how it ends up everywhere.
+      const curriculum = targets.filter((t) => t.kind !== "post").map(targetKey);
+      const preselected = linked.length > 0 ? linked : curriculum.length > 0 ? curriculum : targets.map(targetKey);
       setLinkPicker({ renderId, targets, chosen: preselected });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load the pages for this video");
@@ -1160,7 +1181,7 @@ export function ProjectWorkspace({
                 type="button"
                 className="text-primary hover:underline"
                 onClick={() =>
-                  setLinkPicker((p) => (p ? { ...p, chosen: p.targets.map((t) => t.postId) } : p))
+                  setLinkPicker((p) => (p ? { ...p, chosen: p.targets.map(targetKey) } : p))
                 }
               >
                 Select all
@@ -1176,9 +1197,10 @@ export function ProjectWorkspace({
 
             <div className="max-h-72 overflow-y-auto border border-[var(--divider)] rounded-card divide-y divide-[var(--divider)] mb-4">
               {linkPicker.targets.map((t) => {
-                const on = linkPicker.chosen.includes(t.postId);
+                const key = targetKey(t);
+                const on = linkPicker.chosen.includes(key);
                 return (
-                  <label key={t.postId} className="flex items-center gap-3 px-3 py-2 text-sm cursor-pointer">
+                  <label key={key} className="flex items-center gap-3 px-3 py-2 text-sm cursor-pointer">
                     <input
                       type="checkbox"
                       checked={on}
@@ -1187,14 +1209,24 @@ export function ProjectWorkspace({
                           p
                             ? {
                                 ...p,
-                                chosen: on ? p.chosen.filter((x) => x !== t.postId) : [...p.chosen, t.postId],
+                                chosen: on ? p.chosen.filter((x) => x !== key) : [...p.chosen, key],
                               }
                             : p
                         )
                       }
                     />
-                    <span className="text-charcoal flex-1 truncate">{t.title}</span>
-                    {t.slug && t.kind && (
+                    <span
+                      className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded-full shrink-0 ${
+                        t.kind === "post" ? "bg-stone-100 text-secondary" : "bg-red-light text-primary font-semibold"
+                      }`}
+                    >
+                      {TARGET_LABEL[t.kind]}
+                    </span>
+                    <span className="text-charcoal flex-1 truncate">
+                      {t.title}
+                      {t.context ? <span className="text-secondary text-xs"> · {t.context}</span> : null}
+                    </span>
+                    {t.slug && t.contentKind && (
                       <a
                         href={`/learn/${t.kind}/${t.slug}`}
                         target="_blank"
@@ -1214,7 +1246,7 @@ export function ProjectWorkspace({
               <button
                 type="button"
                 disabled={linkPicker.chosen.length === 0 || busy !== null}
-                onClick={() => renderAction(linkPicker.renderId, "link", { postIds: linkPicker.chosen })}
+                onClick={() => renderAction(linkPicker.renderId, "link", { targets: linkPicker.chosen })}
                 className="btn-primary text-sm disabled:opacity-50"
               >
                 Publish to {linkPicker.chosen.length} page{linkPicker.chosen.length === 1 ? "" : "s"}

@@ -72,6 +72,24 @@ const CAST: { character: MascotCharacter; pose: MascotPose }[] = [
   { character: "crane", pose: "bow" },
   { character: "rabbit", pose: "read" },
   { character: "rabbit", pose: "wave" },
+
+  // --- the teaching set (roadmap 6.3) --------------------------------------------------------
+  // Only the three subject teachers, not all eight characters. MASCOT_BY_SCENE_TYPE already casts
+  // by subject — owl explains grammar, tanuki does handwriting, fox introduces vocabulary — and
+  // giving the whole cast six new poses each would be 48 images to generate and review for
+  // characters that appear in one scene type apiece.
+  { character: "fox", pose: "explain" },
+  { character: "fox", pose: "pointLeft" },
+  { character: "fox", pose: "encourage" },
+  { character: "fox", pose: "surprise" },
+  { character: "owl", pose: "explain" },
+  { character: "owl", pose: "pointLeft" },
+  { character: "owl", pose: "correct" },
+  { character: "owl", pose: "encourage" },
+  { character: "tanuki", pose: "explain" },
+  { character: "tanuki", pose: "pointDown" },
+  { character: "tanuki", pose: "encourage" },
+  { character: "tanuki", pose: "surprise" },
 ];
 
 /**
@@ -159,14 +177,30 @@ async function main() {
   }
   const onlyArg = args.find((a) => a.startsWith("--only"))?.split("=")[1] ?? args[args.indexOf("--only") + 1];
 
+  /**
+   * `--only` accepts a COMMA-SEPARATED list, in either `character:pose` or the `character-pose`
+   * slug form the files are named with.
+   *
+   * It used to accept exactly one `character:pose` and — worse — SILENTLY IGNORE anything without
+   * a colon. Passing `--only=fox-explain,fox-pointLeft` therefore regenerated the entire cast of
+   * 28: twenty-eight image-model calls and a full re-matte, for a request that named two. An
+   * unrecognised filter now fails loudly, because the cost of guessing wrong here is measured in
+   * minutes and money.
+   */
   let cast = CAST;
-  if (onlyArg && onlyArg.includes(":")) {
-    const [c, p] = onlyArg.split(":");
-    cast = CAST.filter((x) => x.character === c && x.pose === p);
-    if (cast.length === 0) {
+  if (onlyArg) {
+    const wanted = onlyArg.split(",").map((x) => x.trim()).filter(Boolean);
+    cast = CAST.filter((x) =>
+      wanted.some((w) => w === `${x.character}:${x.pose}` || w === slug(x.character, x.pose))
+    );
+    const unmatched = wanted.filter(
+      (w) => !CAST.some((x) => w === `${x.character}:${x.pose}` || w === slug(x.character, x.pose))
+    );
+    if (unmatched.length > 0 || cast.length === 0) {
       console.error(
-        `No cast entry "${onlyArg}". Characters: ${Object.keys(MASCOT_CHARACTERS).join(", ")}. ` +
-          `Poses: ${Object.keys(MASCOT_POSES).join(", ")}.`
+        `No cast entry for: ${unmatched.join(", ") || onlyArg}\n` +
+          `Use character:pose or the slug form, comma-separated. Known slugs:\n  ` +
+          CAST.map((x) => slug(x.character, x.pose)).join(", ")
       );
       process.exit(1);
     }
