@@ -3,6 +3,7 @@ import { getAdminSession } from "@/lib/auth/admin";
 import { sql } from "@/lib/db";
 import { resolveScope } from "@/lib/video/scopeResolver";
 import { MAX_SPLIT_ITEMS, childTitle, splitSnapshot } from "@/lib/video/splitScope";
+import { templateById } from "@/lib/video/templates";
 import { randomUUID } from "crypto";
 import { createProject, listProjects, logEvent } from "@/lib/video/projects";
 import { isKnownVoice } from "@/lib/video/voices";
@@ -93,6 +94,10 @@ export async function POST(req: Request) {
   // alongside would silently drop all of them back to lesson pacing, so the flag overrides rather
   // than merges with whatever formats were posted.
   const bulkShorts = body?.bulkShorts === true;
+
+  // The format template, validated against the registry rather than trusted: an unknown id stored
+  // here would be read back by generation, resolve to null, and silently produce generic pacing.
+  const templateId = typeof body?.templateId === "string" && templateById(body.templateId) ? body.templateId : null;
   const formats = (Array.isArray(body?.formats) ? body.formats : ["vertical"]).filter((f: string) =>
     VIDEO_FORMATS.includes(f as VideoFormat)
   ) as VideoFormat[];
@@ -169,6 +174,7 @@ export async function POST(req: Request) {
         targetDurationSeconds: typeof body?.targetDurationSeconds === "number" ? body.targetDurationSeconds : null,
         tone: typeof body?.tone === "string" ? body.tone : null,
         includeBroll: body?.includeBroll === true,
+        templateId,
         pacing: sanitisePacing(body?.pacing),
         voices: sanitiseVoices(body?.voices),
         createdBy: admin.email,
@@ -223,6 +229,7 @@ export async function POST(req: Request) {
     // secondsPerItem would produce a word budget the model cannot work to. Out-of-range values
     // are clamped rather than rejected, since the generator falls back to per-content-type
     // defaults for anything absent.
+    templateId,
     pacing: sanitisePacing(body?.pacing),
     voices: sanitiseVoices(body?.voices),
     createdBy: admin.email,

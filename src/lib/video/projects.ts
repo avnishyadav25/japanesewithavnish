@@ -96,6 +96,7 @@ function toProjectRow(row: Record<string, unknown>): VideoProjectRow {
     // Rows written before the column existed read NULL, which resolves to `lesson` — exactly how
     // they were generated and rendered.
     stylePreset: ((row.style_preset as string | null) ?? "lesson") as VideoStylePreset,
+    templateId: (row.template_id as string | null) ?? null,
     captions: (row.captions as Partial<CaptionSettings> | null) ?? null,
     branding: (row.branding as Partial<BrandingSettings> | null) ?? null,
     status: row.status as ProjectStatus,
@@ -109,7 +110,7 @@ function toProjectRow(row: Record<string, unknown>): VideoProjectRow {
 
 const PROJECT_COLUMNS = `id, title, scope_kind, scope_ref, grouping, theme_key, bgm_track_id,
   narration_langs, formats, target_duration_seconds, tone, include_broll, pacing, voices,
-  captions, branding, batch_id, style_preset,
+  captions, branding, batch_id, style_preset, template_id,
   status, current_storyboard_id, error_message, created_by, created_at::text, updated_at::text`;
 
 export interface CreateProjectInput {
@@ -130,6 +131,7 @@ export interface CreateProjectInput {
   batchId?: string | null;
   /** Omitted, it is derived from `formats` by `stylePresetForFormats`. */
   stylePreset?: VideoStylePreset;
+  templateId?: string | null;
   /** Inherited when a project is derived from another — a Short keeps its parent's look. */
   captions?: Partial<CaptionSettings> | null;
   branding?: Partial<BrandingSettings> | null;
@@ -144,9 +146,9 @@ export async function createProject(input: CreateProjectInput): Promise<VideoPro
     `INSERT INTO video_projects
        (title, scope_kind, scope_ref, grouping, theme_key, bgm_track_id, narration_langs, formats,
         target_duration_seconds, tone, include_broll, pacing, voices, batch_id, captions, branding,
-        created_by, style_preset)
+        created_by, style_preset, template_id)
      VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7::text[], $8::text[], $9, $10, $11, $12::jsonb, $13::jsonb,
-             $14::uuid, $15::jsonb, $16::jsonb, $17, $18)
+             $14::uuid, $15::jsonb, $16::jsonb, $17, $18, $19)
      RETURNING ${PROJECT_COLUMNS}`,
     [
       input.title,
@@ -169,6 +171,7 @@ export async function createProject(input: CreateProjectInput): Promise<VideoPro
       // $18. Derived from the formats rather than asked for: a vertical-only project is a Short,
       // and making that an extra checkbox means one forgotten toggle produces a slow Reel.
       input.stylePreset ?? stylePresetForFormats(input.formats),
+      input.templateId ?? null,
     ]
   )) as Record<string, unknown>[];
   return toProjectRow(rows[0]);

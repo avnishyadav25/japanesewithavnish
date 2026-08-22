@@ -837,6 +837,8 @@ export interface VideoProjectRow {
   batchId: string | null;
   /** Which pacing and motion rules this project generates and renders under. */
   stylePreset: VideoStylePreset;
+  /** The format template it was created from, so a regenerate reproduces the same format. */
+  templateId: string | null;
   /** Caption style. Read at render time, so changing it is a re-cut rather than a regenerate. */
   captions: Partial<CaptionSettings> | null;
   /** Per-project brand overrides. NULL = DEFAULT_BRANDING. */

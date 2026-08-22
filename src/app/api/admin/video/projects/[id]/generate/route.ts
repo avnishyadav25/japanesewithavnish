@@ -12,6 +12,7 @@ import {
 } from "@/lib/video/storyboard";
 import { beatGridForTrack } from "@/lib/video/bgmCatalogue";
 import { listDecorAssets } from "@/lib/video/decor";
+import { templateById } from "@/lib/video/templates";
 import { levelPacing, resolvePacing } from "@/lib/video/pacing";
 import { recordGenerationRun, snapshotStoryboardState } from "@/lib/video/audit";
 import { triggerWorkflow } from "@/lib/video/dispatch";
@@ -93,7 +94,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     // this — an N1 video was an N5 video with harder words in it.
 
-    const levelledPacing = levelPacing(pacing, snapshot.jlptLevel);
+    // The template the project was created from. Its pacing overrides sit ON TOP of the resolved
+    // defaults and UNDER the level adjustment, so a drill stays a drill at every level while the
+    // level still shifts it. Without reading it here a regenerate would silently drop the recall
+    // round and revert to generic pacing.
+    const template = templateById(project.templateId);
+    const templated = template ? { ...pacing, ...template.pacing } : pacing;
+    const levelledPacing = levelPacing(templated, snapshot.jlptLevel);
     // Cost the request before committing to it. buildGenerationRequest is the same builder
     // generateStoryboard uses, so this counts the batches that would actually run — and it makes
     // no network call, so refusing here is free.
@@ -103,6 +110,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       themeKey: project.themeKey,
       pacing: levelledPacing,
       stylePreset,
+      recall: template?.recall,
+      motionProfile: template?.motionProfile,
       decorAssets,
       voices: project.voices,
       tone: toneOverride ?? project.tone,
@@ -185,6 +194,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         // it was priced as a Short. Nine projects, every version. stylePreset is now required on
         // the config, so omitting it here is a build failure rather than a silently wrong video.
         stylePreset,
+        recall: template?.recall,
+        motionProfile: template?.motionProfile,
         decorAssets,
         voices: project.voices,
         tone: toneOverride ?? project.tone,

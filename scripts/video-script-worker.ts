@@ -44,6 +44,7 @@ async function main() {
   );
   const { resolveScope } = await import("../src/lib/video/scopeResolver");
   const { levelPacing, resolvePacing } = await import("../src/lib/video/pacing");
+  const { templateById } = await import("../src/lib/video/templates");
   const { generateStoryboard, outroSiteUrl } = await import("../src/lib/video/storyboard");
   const { recordGenerationRun } = await import("../src/lib/video/audit");
   // Dynamic, like every other import in this file — the module graph is loaded after dotenv so
@@ -112,7 +113,13 @@ async function main() {
 
         // this — an N1 video was an N5 video with harder words in it.
 
-        const levelledPacing = levelPacing(pacing, snapshot.jlptLevel);
+        // The template the project was created from. Its pacing overrides sit ON TOP of the resolved
+        // defaults and UNDER the level adjustment, so a drill stays a drill at every level while the
+        // level still shifts it. Without reading it here a regenerate would silently drop the recall
+        // round and revert to generic pacing.
+        const template = templateById(project.templateId);
+        const templated = template ? { ...pacing, ...template.pacing } : pacing;
+        const levelledPacing = levelPacing(templated, snapshot.jlptLevel);
 
         // No batch cap: that limit belongs to the request path, not here.
         const generated = await generateStoryboard(snapshot, {
@@ -121,6 +128,8 @@ async function main() {
           themeKey: project.themeKey,
           pacing: levelledPacing,
           stylePreset,
+          recall: template?.recall,
+          motionProfile: template?.motionProfile,
           decorAssets,
           voices: project.voices,
           tone: project.tone,
